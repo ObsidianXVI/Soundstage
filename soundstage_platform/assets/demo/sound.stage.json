@@ -1,0 +1,2178 @@
+{
+  "id": "demo-sound",
+  "breakpoints": [
+    {
+      "id": "desktop",
+      "name": "Desktop",
+      "minWidth": 768.0,
+      "designSize": {
+        "width": 1440.0,
+        "height": 900.0
+      }
+    },
+    {
+      "id": "mobile",
+      "name": "Mobile",
+      "minWidth": 0.0,
+      "designSize": {
+        "width": 390.0,
+        "height": 844.0
+      }
+    }
+  ],
+  "baseBreakpointId": "desktop",
+  "schemaVersion": 1,
+  "meta": {
+    "title": "Lights Go Low",
+    "slug": "sound-demo",
+    "author": "Soundstage",
+    "description": "Fonts, audio, lyrics and animated text (T0.7).",
+    "coverAssetId": "cover",
+    "language": "en"
+  },
+  "tokens": {
+    "collections": [],
+    "textStyles": {},
+    "paintStyles": {},
+    "effectStyles": {}
+  },
+  "defaultTextStyle": {
+    "fontFamilyId": "serif",
+    "fontWeight": 400,
+    "italic": false,
+    "fontVariations": {},
+    "fontSize": 16.0,
+    "lineHeight": {
+      "type": "auto"
+    },
+    "letterSpacing": {
+      "value": 0.0,
+      "type": "percent"
+    },
+    "paragraphSpacing": 0.0,
+    "paragraphIndent": 0.0,
+    "textCase": "none",
+    "decoration": {
+      "kind": "none",
+      "style": "solid",
+      "skipInk": true
+    },
+    "fills": [
+      {
+        "id": "text",
+        "color": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "visible": true,
+        "opacity": 1.0,
+        "blendMode": "normal",
+        "type": "solid"
+      }
+    ],
+    "openType": {},
+    "baselineShift": "none",
+    "listStyle": "none"
+  },
+  "assets": {
+    "font-fraunces": {
+      "id": "font-fraunces",
+      "kind": "font",
+      "uri": "asset://assets/demo/fonts/Fraunces-Variable.ttf",
+      "name": "Fraunces (OFL)",
+      "mime": "",
+      "byteSize": 0,
+      "variants": [],
+      "alt": "",
+      "credit": ""
+    },
+    "font-grotesk": {
+      "id": "font-grotesk",
+      "kind": "font",
+      "uri": "asset://assets/demo/fonts/SpaceGrotesk-Variable.ttf",
+      "name": "Space Grotesk (OFL)",
+      "mime": "",
+      "byteSize": 0,
+      "variants": [],
+      "alt": "",
+      "credit": ""
+    },
+    "clip": {
+      "id": "clip",
+      "kind": "audio",
+      "uri": "asset://assets/demo/audio/lights_go_low.wav",
+      "name": "Lights Go Low (CC0)",
+      "mime": "audio/wav",
+      "byteSize": 0,
+      "duration": 16.0,
+      "variants": [],
+      "alt": "",
+      "credit": ""
+    },
+    "cover": {
+      "id": "cover",
+      "kind": "image",
+      "uri": "asset://assets/demo/images/hero_dusk.png",
+      "name": "Dusk",
+      "mime": "",
+      "byteSize": 0,
+      "variants": [],
+      "alt": "",
+      "credit": ""
+    }
+  },
+  "fonts": {
+    "serif": {
+      "id": "serif",
+      "name": "Fraunces",
+      "faces": [
+        {
+          "assetId": "font-fraunces",
+          "weight": 400,
+          "italic": false,
+          "variable": true,
+          "axes": [
+            {
+              "tag": "opsz",
+              "min": 9.0,
+              "max": 144.0,
+              "default": 9.0
+            },
+            {
+              "tag": "wght",
+              "min": 100.0,
+              "max": 900.0,
+              "default": 900.0
+            },
+            {
+              "tag": "SOFT",
+              "min": 0.0,
+              "max": 100.0,
+              "default": 0.0
+            },
+            {
+              "tag": "WONK",
+              "min": 0.0,
+              "max": 1.0,
+              "default": 1.0
+            }
+          ]
+        }
+      ],
+      "fallback": "serif"
+    },
+    "sans": {
+      "id": "sans",
+      "name": "Space Grotesk",
+      "faces": [
+        {
+          "assetId": "font-grotesk",
+          "weight": 400,
+          "italic": false,
+          "variable": true,
+          "axes": [
+            {
+              "tag": "wght",
+              "min": 300.0,
+              "max": 700.0,
+              "default": 300.0
+            }
+          ]
+        }
+      ],
+      "fallback": "sans"
+    }
+  },
+  "components": {},
+  "variantSets": {},
+  "scenes": [
+    {
+      "id": "title",
+      "root": {
+        "common": {
+          "id": "title-root",
+          "name": "Stage",
+          "visible": true,
+          "locked": false,
+          "opacity": 1.0,
+          "x": 0.0,
+          "y": 0.0,
+          "width": 1440.0,
+          "height": 900.0,
+          "rotation": 0.0,
+          "flipX": false,
+          "flipY": false,
+          "motion": {
+            "translateX": 0.0,
+            "translateY": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "rotate": 0.0,
+            "skewX": 0.0,
+            "skewY": 0.0,
+            "originX": 0.5,
+            "originY": 0.5
+          },
+          "layoutChild": {
+            "positioning": "auto",
+            "horizontalSizing": "fixed",
+            "verticalSizing": "fixed",
+            "constraints": {
+              "horizontal": "left",
+              "vertical": "top"
+            },
+            "grid": {
+              "columnSpan": 1,
+              "rowSpan": 1,
+              "alignX": "start",
+              "alignY": "start"
+            }
+          },
+          "mask": "none",
+          "breakpointOverrides": {
+            "mobile": {
+              "width": {
+                "value": 390.0,
+                "type": "number"
+              },
+              "height": {
+                "value": 844.0,
+                "type": "number"
+              }
+            }
+          },
+          "bindings": {},
+          "componentBindings": {},
+          "interactions": []
+        },
+        "appearance": {
+          "fills": [
+            {
+              "id": "bg",
+              "color": {
+                "r": 0.0784313725490196,
+                "g": 0.06666666666666667,
+                "b": 0.10980392156862745,
+                "a": 1.0
+              },
+              "visible": true,
+              "opacity": 1.0,
+              "blendMode": "normal",
+              "type": "solid"
+            }
+          ],
+          "strokes": {
+            "paints": [],
+            "weight": {
+              "weight": 1.0,
+              "type": "uniform"
+            },
+            "align": "inside",
+            "cap": "none",
+            "join": "miter",
+            "miterLimit": 4.0,
+            "dash": []
+          },
+          "effects": [],
+          "cornerRadius": {
+            "radius": 0.0,
+            "type": "uniform"
+          },
+          "cornerSmoothing": 0.0
+        },
+        "children": [
+          {
+            "common": {
+              "id": "title-heading",
+              "name": "title-heading",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 120.0,
+              "y": 170.0,
+              "width": 1200.0,
+              "height": 0.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 16.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 150.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 358.0,
+                    "type": "number"
+                  },
+                  "style.fontSize": {
+                    "value": 58.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": []
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "Lights Go Low",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "serif",
+              "fontWeight": 300,
+              "fontSize": 132.0,
+              "lineHeight": {
+                "value": 100.0,
+                "type": "percent"
+              },
+              "letterSpacing": {
+                "value": -2.0,
+                "type": "percent"
+              },
+              "fills": [
+                {
+                  "id": "ink",
+                  "color": {
+                    "r": 0.9686274509803922,
+                    "g": 0.9450980392156862,
+                    "b": 0.9098039215686274,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ]
+            },
+            "autoResize": "height",
+            "truncation": "none",
+            "alignHorizontal": "center",
+            "alignVertical": "top",
+            "leadingTrim": "none",
+            "type": "text"
+          },
+          {
+            "common": {
+              "id": "title-weight",
+              "name": "title-weight",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 320.0,
+              "y": 360.0,
+              "width": 800.0,
+              "height": 0.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 16.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 290.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 358.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 60.0,
+                    "type": "number"
+                  },
+                  "style.fontSize": {
+                    "value": 30.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": []
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "variable weight",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "serif",
+              "fontWeight": 200,
+              "fontSize": 56.0,
+              "lineHeight": {
+                "value": 115.0,
+                "type": "percent"
+              },
+              "letterSpacing": {
+                "value": 0.0,
+                "type": "percent"
+              },
+              "fills": [
+                {
+                  "id": "ink",
+                  "color": {
+                    "r": 0.9490196078431372,
+                    "g": 0.7215686274509804,
+                    "b": 0.5019607843137255,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ]
+            },
+            "autoResize": "height",
+            "truncation": "none",
+            "alignHorizontal": "center",
+            "alignVertical": "top",
+            "leadingTrim": "none",
+            "type": "text"
+          },
+          {
+            "common": {
+              "id": "title-reveal",
+              "name": "reveal",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 270.0,
+              "y": 520.0,
+              "width": 900.0,
+              "height": 260.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 16.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 400.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 358.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 380.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "fills": [],
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": [],
+              "cornerRadius": {
+                "radius": 0.0,
+                "type": "uniform"
+              },
+              "cornerSmoothing": 0.0
+            },
+            "children": [
+              {
+                "common": {
+                  "id": "title-reveal-text",
+                  "name": "title-reveal-text",
+                  "visible": true,
+                  "locked": false,
+                  "opacity": 1.0,
+                  "x": 0.0,
+                  "y": 0.0,
+                  "width": 900.0,
+                  "height": 0.0,
+                  "rotation": 0.0,
+                  "flipX": false,
+                  "flipY": false,
+                  "motion": {
+                    "translateX": 0.0,
+                    "translateY": 0.0,
+                    "scaleX": 1.0,
+                    "scaleY": 1.0,
+                    "rotate": 0.0,
+                    "skewX": 0.0,
+                    "skewY": 0.0,
+                    "originX": 0.5,
+                    "originY": 0.5
+                  },
+                  "layoutChild": {
+                    "positioning": "absolute",
+                    "horizontalSizing": "fixed",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "leftRight",
+                      "vertical": "center"
+                    },
+                    "grid": {
+                      "columnSpan": 1,
+                      "rowSpan": 1,
+                      "alignX": "start",
+                      "alignY": "start"
+                    }
+                  },
+                  "mask": "none",
+                  "breakpointOverrides": {
+                    "mobile": {
+                      "style.fontSize": {
+                        "value": 22.0,
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "bindings": {},
+                  "componentBindings": {},
+                  "interactions": []
+                },
+                "appearance": {
+                  "strokes": {
+                    "paints": [],
+                    "weight": {
+                      "weight": 1.0,
+                      "type": "uniform"
+                    },
+                    "align": "inside",
+                    "cap": "none",
+                    "join": "miter",
+                    "miterLimit": 4.0,
+                    "dash": []
+                  },
+                  "effects": []
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "A story is a sequence of scenes. Scroll, and each word arrives in its own time, fading and rising into place.",
+                        "style": {}
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 400,
+                  "fontSize": 30.0,
+                  "lineHeight": {
+                    "value": 140.0,
+                    "type": "percent"
+                  },
+                  "letterSpacing": {
+                    "value": 0.0,
+                    "type": "percent"
+                  },
+                  "fills": [
+                    {
+                      "id": "ink",
+                      "color": {
+                        "r": 0.8509803921568627,
+                        "g": 0.8235294117647058,
+                        "b": 0.7725490196078432,
+                        "a": 1.0
+                      },
+                      "visible": true,
+                      "opacity": 1.0,
+                      "blendMode": "normal",
+                      "type": "solid"
+                    }
+                  ]
+                },
+                "autoResize": "height",
+                "truncation": "none",
+                "alignHorizontal": "center",
+                "alignVertical": "top",
+                "leadingTrim": "none",
+                "type": "text"
+              }
+            ],
+            "clipContent": false,
+            "behavior": {
+              "clockId": "title-scroll",
+              "unit": "word",
+              "stagger": 0.03,
+              "range": {
+                "start": 0.05,
+                "end": 0.75
+              },
+              "type": "textReveal"
+            },
+            "modeOverrides": {},
+            "type": "frame"
+          }
+        ],
+        "clipContent": true,
+        "modeOverrides": {},
+        "type": "frame"
+      },
+      "name": "Title",
+      "kind": "pinned",
+      "scrollLength": 1.5,
+      "tracks": [
+        {
+          "id": "tr0",
+          "target": "title-heading",
+          "property": "style.fills.ink.color",
+          "clockId": "title-scroll",
+          "keyframes": [
+            {
+              "id": "tr0-k0",
+              "t": 0.0,
+              "value": {
+                "value": {
+                  "r": 0.9686274509803922,
+                  "g": 0.9450980392156862,
+                  "b": 0.9098039215686274,
+                  "a": 1.0
+                },
+                "type": "color"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            },
+            {
+              "id": "tr0-k1",
+              "t": 0.5,
+              "value": {
+                "value": {
+                  "r": 0.9490196078431372,
+                  "g": 0.7215686274509804,
+                  "b": 0.5019607843137255,
+                  "a": 1.0
+                },
+                "type": "color"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            },
+            {
+              "id": "tr0-k2",
+              "t": 1.0,
+              "value": {
+                "value": {
+                  "r": 0.9098039215686274,
+                  "g": 0.43529411764705883,
+                  "b": 0.40784313725490196,
+                  "a": 1.0
+                },
+                "type": "color"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            }
+          ]
+        },
+        {
+          "id": "tr1",
+          "target": "title-heading",
+          "property": "style.letterSpacing",
+          "clockId": "title-scroll",
+          "keyframes": [
+            {
+              "id": "tr1-k0",
+              "t": 0.0,
+              "value": {
+                "value": {
+                  "value": -2.0,
+                  "type": "percent"
+                },
+                "type": "letterSpacing"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            },
+            {
+              "id": "tr1-k1",
+              "t": 1.0,
+              "value": {
+                "value": {
+                  "value": 12.0,
+                  "type": "percent"
+                },
+                "type": "letterSpacing"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            }
+          ]
+        },
+        {
+          "id": "tr2",
+          "target": "title-weight",
+          "property": "style.fontWeight",
+          "clockId": "title-scroll",
+          "keyframes": [
+            {
+              "id": "tr2-k0",
+              "t": 0.0,
+              "value": {
+                "value": 200.0,
+                "type": "number"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            },
+            {
+              "id": "tr2-k1",
+              "t": 0.8,
+              "value": {
+                "value": 900.0,
+                "type": "number"
+              },
+              "easing": {
+                "preset": "easeInOut",
+                "type": "preset"
+              }
+            }
+          ]
+        }
+      ],
+      "clocks": [
+        {
+          "id": "title-scroll",
+          "sceneId": "title",
+          "smoothing": 0.15,
+          "type": "sceneScroll"
+        }
+      ],
+      "background": [],
+      "modeOverrides": {},
+      "transitionIn": {
+        "kind": "none",
+        "amount": 0.0
+      }
+    },
+    {
+      "id": "lyric",
+      "root": {
+        "common": {
+          "id": "lyric-root",
+          "name": "Stage",
+          "visible": true,
+          "locked": false,
+          "opacity": 1.0,
+          "x": 0.0,
+          "y": 0.0,
+          "width": 1440.0,
+          "height": 900.0,
+          "rotation": 0.0,
+          "flipX": false,
+          "flipY": false,
+          "motion": {
+            "translateX": 0.0,
+            "translateY": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "rotate": 0.0,
+            "skewX": 0.0,
+            "skewY": 0.0,
+            "originX": 0.5,
+            "originY": 0.5
+          },
+          "layoutChild": {
+            "positioning": "auto",
+            "horizontalSizing": "fixed",
+            "verticalSizing": "fixed",
+            "constraints": {
+              "horizontal": "left",
+              "vertical": "top"
+            },
+            "grid": {
+              "columnSpan": 1,
+              "rowSpan": 1,
+              "alignX": "start",
+              "alignY": "start"
+            }
+          },
+          "mask": "none",
+          "breakpointOverrides": {
+            "mobile": {
+              "width": {
+                "value": 390.0,
+                "type": "number"
+              },
+              "height": {
+                "value": 844.0,
+                "type": "number"
+              }
+            }
+          },
+          "bindings": {},
+          "componentBindings": {},
+          "interactions": []
+        },
+        "appearance": {
+          "fills": [
+            {
+              "id": "bg",
+              "color": {
+                "r": 0.050980392156862744,
+                "g": 0.043137254901960784,
+                "b": 0.0784313725490196,
+                "a": 1.0
+              },
+              "visible": true,
+              "opacity": 1.0,
+              "blendMode": "normal",
+              "type": "solid"
+            }
+          ],
+          "strokes": {
+            "paints": [],
+            "weight": {
+              "weight": 1.0,
+              "type": "uniform"
+            },
+            "align": "inside",
+            "cap": "none",
+            "join": "miter",
+            "miterLimit": 4.0,
+            "dash": []
+          },
+          "effects": [],
+          "cornerRadius": {
+            "radius": 0.0,
+            "type": "uniform"
+          },
+          "cornerSmoothing": 0.0
+        },
+        "children": [
+          {
+            "common": {
+              "id": "lyric-caption",
+              "name": "lyric-caption",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 320.0,
+              "y": 92.0,
+              "width": 800.0,
+              "height": 0.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 16.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 96.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 358.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 40.0,
+                    "type": "number"
+                  },
+                  "style.fontSize": {
+                    "value": 11.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": []
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "LIGHTS GO LOW · an original tone sketch, CC0",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "sans",
+              "fontWeight": 500,
+              "fontSize": 15.0,
+              "lineHeight": {
+                "value": 115.0,
+                "type": "percent"
+              },
+              "letterSpacing": {
+                "value": 18.0,
+                "type": "percent"
+              },
+              "fills": [
+                {
+                  "id": "ink",
+                  "color": {
+                    "r": 0.6470588235294118,
+                    "g": 0.6235294117647059,
+                    "b": 0.7098039215686275,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ]
+            },
+            "autoResize": "height",
+            "truncation": "none",
+            "alignHorizontal": "center",
+            "alignVertical": "top",
+            "leadingTrim": "none",
+            "type": "text"
+          },
+          {
+            "common": {
+              "id": "lyric-frame",
+              "name": "lyrics",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 220.0,
+              "y": 190.0,
+              "width": 1000.0,
+              "height": 460.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 12.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 180.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 366.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 440.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "fills": [],
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": [],
+              "cornerRadius": {
+                "radius": 0.0,
+                "type": "uniform"
+              },
+              "cornerSmoothing": 0.0
+            },
+            "children": [
+              {
+                "common": {
+                  "id": "lyric-template",
+                  "name": "lyric-template",
+                  "visible": true,
+                  "locked": false,
+                  "opacity": 1.0,
+                  "x": 0.0,
+                  "y": 0.0,
+                  "width": 1000.0,
+                  "height": 0.0,
+                  "rotation": 0.0,
+                  "flipX": false,
+                  "flipY": false,
+                  "motion": {
+                    "translateX": 0.0,
+                    "translateY": 0.0,
+                    "scaleX": 1.0,
+                    "scaleY": 1.0,
+                    "rotate": 0.0,
+                    "skewX": 0.0,
+                    "skewY": 0.0,
+                    "originX": 0.5,
+                    "originY": 0.5
+                  },
+                  "layoutChild": {
+                    "positioning": "absolute",
+                    "horizontalSizing": "fixed",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "leftRight",
+                      "vertical": "center"
+                    },
+                    "grid": {
+                      "columnSpan": 1,
+                      "rowSpan": 1,
+                      "alignX": "start",
+                      "alignY": "start"
+                    }
+                  },
+                  "mask": "none",
+                  "breakpointOverrides": {
+                    "mobile": {
+                      "style.fontSize": {
+                        "value": 28.0,
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "bindings": {},
+                  "componentBindings": {},
+                  "interactions": []
+                },
+                "appearance": {
+                  "strokes": {
+                    "paints": [],
+                    "weight": {
+                      "weight": 1.0,
+                      "type": "uniform"
+                    },
+                    "align": "inside",
+                    "cap": "none",
+                    "join": "miter",
+                    "miterLimit": 4.0,
+                    "dash": []
+                  },
+                  "effects": []
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Line",
+                        "style": {}
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "serif",
+                  "fontSize": 52.0,
+                  "lineHeight": {
+                    "value": 120.0,
+                    "type": "percent"
+                  },
+                  "paragraphSpacing": 18.0
+                },
+                "autoResize": "height",
+                "truncation": "none",
+                "alignHorizontal": "center",
+                "alignVertical": "top",
+                "leadingTrim": "none",
+                "type": "text"
+              }
+            ],
+            "clipContent": true,
+            "behavior": {
+              "audioTrackId": "song",
+              "activeStyle": {
+                "fontWeight": 600,
+                "fills": [
+                  {
+                    "id": "ink",
+                    "color": {
+                      "r": 1.0,
+                      "g": 0.96,
+                      "b": 0.9,
+                      "a": 1.0
+                    },
+                    "visible": true,
+                    "opacity": 1.0,
+                    "blendMode": "normal",
+                    "type": "solid"
+                  }
+                ]
+              },
+              "inactiveStyle": {
+                "fontWeight": 300,
+                "fills": [
+                  {
+                    "id": "ink",
+                    "color": {
+                      "r": 1.0,
+                      "g": 0.96,
+                      "b": 0.9,
+                      "a": 0.28
+                    },
+                    "visible": true,
+                    "opacity": 1.0,
+                    "blendMode": "normal",
+                    "type": "solid"
+                  }
+                ]
+              },
+              "scrollMode": "center",
+              "type": "lyrics"
+            },
+            "modeOverrides": {},
+            "type": "frame"
+          },
+          {
+            "common": {
+              "id": "lyric-bar-bg",
+              "name": "",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 420.0,
+              "y": 760.0,
+              "width": 600.0,
+              "height": 3.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 45.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 720.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 300.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 3.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "geometry": {
+              "type": "rectangle"
+            },
+            "appearance": {
+              "fills": [
+                {
+                  "id": "f",
+                  "color": {
+                    "r": 0.22745098039215686,
+                    "g": 0.20392156862745098,
+                    "b": 0.2823529411764706,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ],
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": [],
+              "cornerRadius": {
+                "radius": 0.0,
+                "type": "uniform"
+              },
+              "cornerSmoothing": 0.0
+            },
+            "type": "shape"
+          },
+          {
+            "common": {
+              "id": "lyric-bar",
+              "name": "",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 420.0,
+              "y": 760.0,
+              "width": 600.0,
+              "height": 3.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 0.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.0,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "absolute",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "x": {
+                    "value": 45.0,
+                    "type": "number"
+                  },
+                  "y": {
+                    "value": 720.0,
+                    "type": "number"
+                  },
+                  "width": {
+                    "value": 300.0,
+                    "type": "number"
+                  },
+                  "height": {
+                    "value": 3.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "geometry": {
+              "type": "rectangle"
+            },
+            "appearance": {
+              "fills": [
+                {
+                  "id": "f",
+                  "color": {
+                    "r": 0.9490196078431372,
+                    "g": 0.7215686274509804,
+                    "b": 0.5019607843137255,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ],
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": [],
+              "cornerRadius": {
+                "radius": 0.0,
+                "type": "uniform"
+              },
+              "cornerSmoothing": 0.0
+            },
+            "type": "shape"
+          }
+        ],
+        "clipContent": true,
+        "modeOverrides": {},
+        "type": "frame"
+      },
+      "name": "Lyric",
+      "kind": "pinned",
+      "scrollLength": 2.0,
+      "tracks": [
+        {
+          "id": "tr3",
+          "target": "lyric-bar",
+          "property": "motion.scaleX",
+          "clockId": "song-time",
+          "keyframes": [
+            {
+              "id": "tr3-k0",
+              "t": 0.0,
+              "value": {
+                "value": 0.0,
+                "type": "number"
+              },
+              "easing": {
+                "type": "linear"
+              }
+            },
+            {
+              "id": "tr3-k1",
+              "t": 16.0,
+              "value": {
+                "value": 1.0,
+                "type": "number"
+              },
+              "easing": {
+                "type": "linear"
+              }
+            }
+          ]
+        }
+      ],
+      "clocks": [
+        {
+          "id": "song-time",
+          "audioTrackId": "song",
+          "smoothing": 0.0,
+          "type": "audio"
+        }
+      ],
+      "background": [],
+      "modeOverrides": {},
+      "transitionIn": {
+        "kind": "none",
+        "amount": 0.0
+      }
+    },
+    {
+      "id": "coda",
+      "root": {
+        "common": {
+          "id": "coda-root",
+          "name": "Coda",
+          "visible": true,
+          "locked": false,
+          "opacity": 1.0,
+          "x": 0.0,
+          "y": 0.0,
+          "width": 1440.0,
+          "height": 520.0,
+          "rotation": 0.0,
+          "flipX": false,
+          "flipY": false,
+          "motion": {
+            "translateX": 0.0,
+            "translateY": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "rotate": 0.0,
+            "skewX": 0.0,
+            "skewY": 0.0,
+            "originX": 0.5,
+            "originY": 0.5
+          },
+          "layoutChild": {
+            "positioning": "auto",
+            "horizontalSizing": "fixed",
+            "verticalSizing": "fixed",
+            "constraints": {
+              "horizontal": "left",
+              "vertical": "top"
+            },
+            "grid": {
+              "columnSpan": 1,
+              "rowSpan": 1,
+              "alignX": "start",
+              "alignY": "start"
+            }
+          },
+          "mask": "none",
+          "breakpointOverrides": {
+            "mobile": {
+              "width": {
+                "value": 390.0,
+                "type": "number"
+              },
+              "height": {
+                "value": 480.0,
+                "type": "number"
+              }
+            }
+          },
+          "bindings": {},
+          "componentBindings": {},
+          "interactions": []
+        },
+        "appearance": {
+          "fills": [
+            {
+              "id": "bg",
+              "color": {
+                "r": 0.9568627450980393,
+                "g": 0.9372549019607843,
+                "b": 0.9019607843137255,
+                "a": 1.0
+              },
+              "visible": true,
+              "opacity": 1.0,
+              "blendMode": "normal",
+              "type": "solid"
+            }
+          ],
+          "strokes": {
+            "paints": [],
+            "weight": {
+              "weight": 1.0,
+              "type": "uniform"
+            },
+            "align": "inside",
+            "cap": "none",
+            "join": "miter",
+            "miterLimit": 4.0,
+            "dash": []
+          },
+          "effects": [],
+          "cornerRadius": {
+            "radius": 0.0,
+            "type": "uniform"
+          },
+          "cornerSmoothing": 0.0
+        },
+        "children": [
+          {
+            "common": {
+              "id": "coda-heading",
+              "name": "coda-heading",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1200.0,
+              "height": 0.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "style.fontSize": {
+                    "value": 36.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": []
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "Trimmed to the cap height",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "serif",
+              "fontWeight": 500,
+              "fontSize": 72.0,
+              "lineHeight": {
+                "value": 115.0,
+                "type": "percent"
+              },
+              "letterSpacing": {
+                "value": 0.0,
+                "type": "percent"
+              },
+              "fills": [
+                {
+                  "id": "ink",
+                  "color": {
+                    "r": 0.11372549019607843,
+                    "g": 0.08627450980392157,
+                    "b": 0.14901960784313725,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ]
+            },
+            "autoResize": "height",
+            "truncation": "none",
+            "alignHorizontal": "left",
+            "alignVertical": "top",
+            "leadingTrim": "capHeight",
+            "type": "text"
+          },
+          {
+            "common": {
+              "id": "coda-body",
+              "name": "coda-body",
+              "visible": true,
+              "locked": false,
+              "opacity": 1.0,
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1200.0,
+              "height": 0.0,
+              "rotation": 0.0,
+              "flipX": false,
+              "flipY": false,
+              "motion": {
+                "translateX": 0.0,
+                "translateY": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "rotate": 0.0,
+                "skewX": 0.0,
+                "skewY": 0.0,
+                "originX": 0.5,
+                "originY": 0.5
+              },
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "grid": {
+                  "columnSpan": 1,
+                  "rowSpan": 1,
+                  "alignX": "start",
+                  "alignY": "start"
+                }
+              },
+              "mask": "none",
+              "breakpointOverrides": {
+                "mobile": {
+                  "style.fontSize": {
+                    "value": 17.0,
+                    "type": "number"
+                  }
+                }
+              },
+              "bindings": {},
+              "componentBindings": {},
+              "interactions": []
+            },
+            "appearance": {
+              "strokes": {
+                "paints": [],
+                "weight": {
+                  "weight": 1.0,
+                  "type": "uniform"
+                },
+                "align": "inside",
+                "cap": "none",
+                "join": "miter",
+                "miterLimit": 4.0,
+                "dash": []
+              },
+              "effects": []
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "leadingTrim: capHeight reads the font’s OS/2 table, so the block above starts exactly at the top of its capitals and ends on its baseline, the way Figma’s vertical trim does.",
+                    "style": {}
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "sans",
+              "fontWeight": 400,
+              "fontSize": 22.0,
+              "lineHeight": {
+                "value": 150.0,
+                "type": "percent"
+              },
+              "letterSpacing": {
+                "value": 0.0,
+                "type": "percent"
+              },
+              "fills": [
+                {
+                  "id": "ink",
+                  "color": {
+                    "r": 0.2901960784313726,
+                    "g": 0.25882352941176473,
+                    "b": 0.34509803921568627,
+                    "a": 1.0
+                  },
+                  "visible": true,
+                  "opacity": 1.0,
+                  "blendMode": "normal",
+                  "type": "solid"
+                }
+              ]
+            },
+            "autoResize": "height",
+            "truncation": "none",
+            "alignHorizontal": "left",
+            "alignVertical": "top",
+            "leadingTrim": "none",
+            "type": "text"
+          }
+        ],
+        "autoLayout": {
+          "direction": "vertical",
+          "wrap": false,
+          "gap": {
+            "value": 24.0,
+            "type": "fixed"
+          },
+          "counterAxisGap": {
+            "value": 0.0,
+            "type": "fixed"
+          },
+          "padding": {
+            "top": 120.0,
+            "right": 120.0,
+            "bottom": 120.0,
+            "left": 120.0
+          },
+          "primaryAlign": "start",
+          "counterAlign": "start",
+          "rowAlign": "start",
+          "strokesIncludedInLayout": false,
+          "reverseZIndex": false
+        },
+        "clipContent": false,
+        "modeOverrides": {},
+        "type": "frame"
+      },
+      "name": "Coda",
+      "kind": "flow",
+      "scrollLength": 0.0,
+      "tracks": [],
+      "clocks": [
+        {
+          "id": "coda-scroll",
+          "sceneId": "coda",
+          "smoothing": 0.0,
+          "type": "sceneScroll"
+        }
+      ],
+      "background": [],
+      "modeOverrides": {},
+      "transitionIn": {
+        "kind": "none",
+        "amount": 0.0
+      }
+    }
+  ],
+  "audioTracks": [
+    {
+      "id": "song",
+      "assetId": "clip",
+      "scope": {
+        "sceneId": "lyric",
+        "type": "scene"
+      },
+      "autoplay": true,
+      "loop": true,
+      "volume": 0.8,
+      "fadeIn": 0.6,
+      "fadeOut": 0.8,
+      "lyrics": {
+        "lines": [
+          {
+            "start": 1.0,
+            "text": "Lights go low across the stage",
+            "words": [
+              {
+                "start": 1.0,
+                "text": "Lights",
+                "end": 1.5
+              },
+              {
+                "start": 1.5,
+                "text": "go",
+                "end": 1.75
+              },
+              {
+                "start": 1.75,
+                "text": "low",
+                "end": 2.25
+              },
+              {
+                "start": 2.25,
+                "text": "a",
+                "end": 2.5
+              },
+              {
+                "start": 2.5,
+                "text": "cross",
+                "end": 3.0
+              },
+              {
+                "start": 3.0,
+                "text": "the",
+                "end": 3.25
+              },
+              {
+                "start": 3.25,
+                "text": "stage",
+                "end": 4.0
+              }
+            ]
+          },
+          {
+            "start": 4.0,
+            "text": "every word becomes a sound",
+            "words": [
+              {
+                "start": 4.0,
+                "text": "ev",
+                "end": 4.25
+              },
+              {
+                "start": 4.25,
+                "text": "ery",
+                "end": 4.5
+              },
+              {
+                "start": 4.5,
+                "text": "word",
+                "end": 5.0
+              },
+              {
+                "start": 5.0,
+                "text": "be",
+                "end": 5.25
+              },
+              {
+                "start": 5.25,
+                "text": "comes",
+                "end": 5.75
+              },
+              {
+                "start": 5.75,
+                "text": "a",
+                "end": 6.0
+              },
+              {
+                "start": 6.0,
+                "text": "sound",
+                "end": 7.0
+              }
+            ]
+          },
+          {
+            "start": 7.0,
+            "text": "scroll the night and turn the page",
+            "words": [
+              {
+                "start": 7.0,
+                "text": "scroll",
+                "end": 7.5
+              },
+              {
+                "start": 7.5,
+                "text": "the",
+                "end": 7.75
+              },
+              {
+                "start": 7.75,
+                "text": "night",
+                "end": 8.25
+              },
+              {
+                "start": 8.25,
+                "text": "and",
+                "end": 8.5
+              },
+              {
+                "start": 8.5,
+                "text": "turn",
+                "end": 9.0
+              },
+              {
+                "start": 9.0,
+                "text": "the",
+                "end": 9.25
+              },
+              {
+                "start": 9.25,
+                "text": "page",
+                "end": 10.0
+              }
+            ]
+          },
+          {
+            "start": 10.0,
+            "text": "till the story comes around",
+            "end": 13.5,
+            "words": [
+              {
+                "start": 10.0,
+                "text": "till",
+                "end": 10.5
+              },
+              {
+                "start": 10.5,
+                "text": "the",
+                "end": 10.75
+              },
+              {
+                "start": 10.75,
+                "text": "sto",
+                "end": 11.0
+              },
+              {
+                "start": 11.0,
+                "text": "ry",
+                "end": 11.25
+              },
+              {
+                "start": 11.25,
+                "text": "comes",
+                "end": 11.75
+              },
+              {
+                "start": 11.75,
+                "text": "a",
+                "end": 12.0
+              },
+              {
+                "start": 12.0,
+                "text": "round",
+                "end": 13.0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

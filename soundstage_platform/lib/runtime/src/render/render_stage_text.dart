@@ -111,7 +111,9 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
   void unbindTrack(Object handle) {
     if (handle is! TextStyleChannel || !_animation.remove(handle)) return;
     _animDirty = true;
-    applyInvalidation(StageInvalidation.layout);
+    // Unbinding while detaching (the node leaves the tree) invalidates
+    // nothing: the node lays out again when it re-attaches.
+    if (!_detaching) applyInvalidation(StageInvalidation.layout);
   }
 
   // ---- Fonts (T0.7) -------------------------------------------------------------
@@ -140,11 +142,18 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
     _listenFonts();
   }
 
+  bool _detaching = false;
+
   @override
   void detach() {
     _listening?.removeListener(_fontLoaded);
     _listening = null;
-    super.detach();
+    _detaching = true;
+    try {
+      super.detach();
+    } finally {
+      _detaching = false;
+    }
   }
 
   // ---- TextReveal (T0.7) --------------------------------------------------------
@@ -157,7 +166,7 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
   set reveal(StageTextRevealPaint? value) {
     if (identical(value, _reveal)) return;
     _reveal = value;
-    markNeedsPaint();
+    if (!_detaching) markNeedsPaint();
   }
 
   /// The number of reveal units of the laid-out text for [unit].
