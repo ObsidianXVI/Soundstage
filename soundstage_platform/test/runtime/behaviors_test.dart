@@ -273,6 +273,50 @@ void main() {
       }
     });
 
+    test('lerpLyricStyle interpolates weight, size, spacing and colour', () {
+      const a = ir.TextStyle(
+        fontWeight: 300,
+        fontSize: 20,
+        letterSpacing: ir.LetterSpacing.px(0),
+        fills: [ir.Paint.solid(id: 'i', color: ir.StageColor.black)],
+      );
+      const b = ir.TextStyle(
+        fontWeight: 700,
+        fontSize: 30,
+        letterSpacing: ir.LetterSpacing.px(2),
+        fills: [ir.Paint.solid(id: 'i', color: ir.StageColor.white)],
+      );
+      expect(lerpLyricStyle(a, b, 0).fontWeight, 300);
+      expect(lerpLyricStyle(a, b, 1).fontWeight, 700);
+      final m = lerpLyricStyle(a, b, 0.5);
+      expect(m.fontWeight, 500);
+      expect(m.fontSize, 25);
+      expect(letterSpacingPx(m.letterSpacing, m.fontSize), closeTo(1, 1e-9));
+      final fill = m.fills.single as ir.SolidPaint;
+      expect(fill.color.r, inInclusiveRange(0.3, 0.7));
+    });
+
+    testWidgets('a line in transition paints once, in the mixed style', (
+      tester,
+    ) async {
+      final d = doc(ir.LyricsScrollMode.center);
+      // 3.125 s: line 0 is fading out and line 1 fading in (mix 0.5 each).
+      await _pump(tester, d, {'__lyrics/lyrics': 3 + kLyricsFade / 2});
+      final box = stageBox(tester, 'template') as RenderStageLyrics;
+      // Three lines, plus the clipped sung overlay of the word-timed line 0.
+      expect(box, paintsExactlyCountTimes(#drawParagraph, 4));
+      // Steady state paints the same number: no second rendering anywhere.
+      await _pump(tester, d, {'__lyrics/lyrics': 4});
+      expect(box, paintsExactlyCountTimes(#drawParagraph, 3));
+    });
+
+    testWidgets('the viewport edges fade through a dstIn mask', (tester) async {
+      final d = doc(ir.LyricsScrollMode.center);
+      await _pump(tester, d, {'__lyrics/lyrics': 4});
+      final box = stageBox(tester, 'template') as RenderStageLyrics;
+      expect(box, paintsExactlyCountTimes(#drawRect, 1));
+    });
+
     testWidgets('paints at its laid-out width after a dry layout elsewhere', (
       tester,
     ) async {

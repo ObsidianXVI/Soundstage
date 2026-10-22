@@ -16,6 +16,10 @@ const double kLyricsFade = 0.25;
 /// How long the line stack takes to scroll to a new line (easeInOutCubic).
 const double kLyricsScroll = 0.6;
 
+/// The fraction of the frame's height over which each faded edge goes from
+/// transparent to opaque.
+const double kLyricsEdgeFade = 0.2;
+
 /// The cross-fade (0 inactive … 1 active) of a line that is active from
 /// [start] to [end] at audio time [t]: it fades in over [kLyricsFade] from
 /// its start and out over [kLyricsFade] from its end.
@@ -26,6 +30,28 @@ double lyricLineMix(double t, double start, double end) {
       ? 1.0
       : 1 - math.min(1.0, math.max(0.0, (t - end) / kLyricsFade));
   return math.min(fadeIn, fadeOut);
+}
+
+/// [inactive] → [active] at [t] (0–1): weight, size, letter spacing and
+/// fills interpolate; every other field follows the nearer end. Variable
+/// axes (`wght`, `opsz`) are then derived per frame from the interpolated
+/// weight and size by `stageTextStyle`.
+ir.TextStyle lerpLyricStyle(ir.TextStyle a, ir.TextStyle b, double t) {
+  final near = t < 0.5 ? a : b;
+  final size = ir.lerpDouble(a.fontSize, b.fontSize, t);
+  final spacing = ir.lerpDouble(
+    letterSpacingPx(a.letterSpacing, a.fontSize),
+    letterSpacingPx(b.letterSpacing, b.fontSize),
+    t,
+  );
+  return near.copyWith(
+    fontWeight: ir
+        .lerpDouble(a.fontWeight.toDouble(), b.fontWeight.toDouble(), t)
+        .round(),
+    fontSize: size,
+    letterSpacing: ir.LetterSpacing.px(spacing),
+    fills: ir.lerpPaints(a.fills, b.fills, t) ?? near.fills,
+  );
 }
 
 double _easeInOutCubic(double t) =>
@@ -46,6 +72,10 @@ double lyricsScrollOffset(ir.LyricsDoc doc, List<double> targets, double t) {
 class _Line {
   _Line(this.source, this.inactive, this.active, this.unsung, this.words);
 
+  /// The reused painters of a line in transition (interpolated style).
+  TextPainter? mid;
+  TextPainter? midUnsung;
+
   final ir.LyricLine source;
   final TextPainter inactive;
   final TextPainter active;
@@ -64,6 +94,8 @@ class _Line {
     inactive.dispose();
     active.dispose();
     unsung?.dispose();
+    mid?.dispose();
+    midUnsung?.dispose();
   }
 }
 
@@ -73,8 +105,19 @@ class _Line {
 /// width and position).
 ///
 /// - **Styles.** Each line has an inactive (template ⊕ `inactiveStyle`)
-///   and an active (template ⊕ `activeStyle`) rendering, cross-faded over
-///   [kLyricsFade] as the line starts and ends ([lyricLineMix]).
+///   and an active (template ⊕ `activeStyle`) style. A line in transition
+///   (over [kLyricsFade] as it starts and ends, [lyricLineMix]) is drawn
+///   **once** in the style interpolated between the two (weight through
+///   the variable axis, size, letter spacing, colour), so two renderings
+///   never overlap and nothing ghosts. Only lines with `0 < mix < 1` (at
+///   most two, only during the transition) re-lay-out each frame, into
+///   one reused painter; every other line paints its cached painter.
+///   The slot of a line is as tall as the taller of its two end styles,
+///   so a transition never moves another line.
+/// - **Edges.** The stack fades out towards the frame's top and bottom
+///   edges ([kLyricsEdgeFade]) with an alpha mask (`saveLayer` + a
+///   gradient in `dstIn`) instead of a hard clip; in `top` scroll mode
+///   only the bottom edge fades.
 /// - **Layout** never changes with time: each line's slot is as tall as
 ///   its taller rendering, with the template's paragraph spacing between
 ///   lines. The stack hugs its height; the frame should clip it.
@@ -131,6 +174,8 @@ class RenderStageLyrics extends RenderStageBox {
 
   List<_Line>? _lines;
   double _laidOutWidth = -1;
+  ir.TextStyle _inactiveStyle = const ir.TextStyle();
+  ir.TextStyle _activeStyle = const ir.TextStyle();
 
   void _reset() {
     for (final l in _lines ?? const <_Line>[]) {
@@ -170,6 +215,8 @@ class RenderStageLyrics extends RenderStageBox {
     final inactive = ir.mergeTextStyle(template, _behavior.inactiveStyle);
     final active = ir.mergeTextStyle(template, _behavior.activeStyle);
     final unsung = active.copyWith(fills: inactive.fills);
+    _inactiveStyle = inactive;
+    _activeStyle = active;
     final align = _align;
     TextPainter painter(String text, ir.TextStyle s) => TextPainter(
       text: TextSpan(
@@ -350,6 +397,9 @@ class RenderStageLyrics extends RenderStageBox {
     final frameH = p is RenderBox && p.hasSize ? p.size.height : size.height;
     final t = _time;
     final o = paintOpacity;
+    final width = size.width;
+    final fade = _edgeFade(offset, frameH);
+    if (fade != null) canvas.saveLayer(fade.rect, Paint());
     for (var i = 0; i < lines.length; i++) {
       final l = lines[i];
       final y = l.top - scroll;
@@ -359,21 +409,155 @@ class RenderStageLyrics extends RenderStageBox {
       final at = offset + Offset(0, y);
       if (mix <= 0) {
         _paintPainter(canvas, l.inactive, at, l.height, o);
-      } else if (mix >= 1 && o >= 1) {
-        _paintActive(canvas, l, at, t, end);
+      } else if (mix >= 1) {
+        if (o >= 1) {
+          _paintLine(canvas, l, at, t, end, l.active, l.unsung, cache: true);
+        } else {
+          _layer(
+            canvas,
+            at,
+            l,
+            o,
+            () => _paintLine(
+              canvas,
+              l,
+              at,
+              t,
+              end,
+              l.active,
+              l.unsung,
+              cache: true,
+            ),
+          );
+        }
       } else {
-        _layer(canvas, at, l, o * (1 - mix), () {
-          l.inactive.paint(canvas, at + Offset(0, _dy(l, l.inactive)));
-        });
-        _layer(
-          canvas,
-          at,
-          l,
-          o * mix,
-          () => _paintActive(canvas, l, at, t, end),
-        );
+        final (mid, midUnsung) = _midPainters(l, mix, width);
+        if (o >= 1) {
+          _paintLine(canvas, l, at, t, end, mid, midUnsung, cache: false);
+        } else {
+          _layer(
+            canvas,
+            at,
+            l,
+            o,
+            () =>
+                _paintLine(canvas, l, at, t, end, mid, midUnsung, cache: false),
+          );
+        }
       }
     }
+    if (fade != null) {
+      canvas
+        ..drawRect(
+          fade.rect,
+          Paint()
+            ..blendMode = BlendMode.dstIn
+            ..shader = fade.shader,
+        )
+        ..restore();
+    }
+  }
+
+  /// The mask for the viewport edges, and whether to open its layer: the
+  /// frame's own rect in this box's coordinates.
+  ({Rect rect, ui.Shader shader})? _edgeFade(Offset offset, double frameH) {
+    final pd = parentData;
+    final dy = pd is BoxParentData ? pd.offset.dy : 0.0;
+    final rect = Rect.fromLTWH(offset.dx, offset.dy - dy, size.width, frameH);
+    final f = kLyricsEdgeFade.clamp(0.0, 0.5);
+    final top = _behavior.scrollMode != ir.LyricsScrollMode.top;
+    const clear = Color(0x00000000), solid = Color(0xFF000000);
+    final shader = ui.Gradient.linear(
+      rect.topCenter,
+      rect.bottomCenter,
+      [if (top) clear, solid, solid, clear],
+      [if (top) 0.0, if (top) f else 0.0, 1 - f, 1.0],
+    );
+    return (rect: rect, shader: shader);
+  }
+
+  /// The line's painters in the style [mix] of the way from inactive to
+  /// active, laid out at [width] (reused; relayout per call).
+  (TextPainter, TextPainter?) _midPainters(_Line l, double mix, double width) {
+    final fonts = environment.fonts;
+    final style = lerpLyricStyle(_inactiveStyle, _activeStyle, mix);
+    TextPainter fill(TextPainter? p, ir.TextStyle s) {
+      p ??= TextPainter(
+        textAlign: _align,
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.noScaling,
+      );
+      p
+        ..text = TextSpan(
+          text: applyTextCase(l.source.text, s.textCase),
+          style: stageTextStyle(s, fonts),
+        )
+        ..layout(minWidth: width, maxWidth: width);
+      return p;
+    }
+
+    final mid = l.mid = fill(l.mid, style);
+    final hasWords = l.source.words.isNotEmpty;
+    final unsung = hasWords
+        ? (l.midUnsung = fill(
+            l.midUnsung,
+            style.copyWith(fills: _inactiveStyle.fills),
+          ))
+        : null;
+    return (mid, unsung);
+  }
+
+  /// Paints one line: [active] alone, or on word-timed lines the [unsung]
+  /// layout with the sung words of [active] clipped over it.
+  void _paintLine(
+    Canvas canvas,
+    _Line l,
+    Offset at,
+    double t,
+    double end,
+    TextPainter active,
+    TextPainter? unsung, {
+    required bool cache,
+  }) {
+    final pos = at + Offset(0, _dy(l, active));
+    if (unsung == null || l.source.words.isEmpty) {
+      active.paint(canvas, pos);
+      return;
+    }
+    unsung.paint(canvas, pos);
+    List<List<Rect>> compute() => [
+      for (final r in l.words)
+        r.isCollapsed
+            ? const <Rect>[]
+            : [
+                for (final b in active.getBoxesForSelection(
+                  TextSelection(baseOffset: r.start, extentOffset: r.end),
+                  boxHeightStyle: ui.BoxHeightStyle.max,
+                ))
+                  b.toRect(),
+              ],
+    ];
+    final boxes = cache ? (l.wordBoxes ??= compute()) : compute();
+    final sung = Path();
+    var any = false;
+    for (var w = 0; w < l.source.words.length && w < boxes.length; w++) {
+      final p = ir.lyricWordProgress(l.source, w, t, end);
+      if (p <= 0) break;
+      for (final r in boxes[w]) {
+        final right = p >= 1 ? r.right : r.left + r.width * p;
+        // Extend left so a word's sweep joins the previous word.
+        sung.addRect(
+          Rect.fromLTRB(r.left - 1, r.top, right, r.bottom).shift(pos),
+        );
+        any = true;
+      }
+    }
+    if (!any) return;
+    canvas
+      ..save()
+      ..clipPath(sung);
+    active.paint(canvas, pos);
+    canvas.restore();
   }
 
   double _dy(_Line l, TextPainter p) => (l.height - p.height) / 2;
@@ -412,49 +596,6 @@ class RenderStageLyrics extends RenderStageBox {
       Paint()..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0)),
     );
     paint();
-    canvas.restore();
-  }
-
-  void _paintActive(Canvas canvas, _Line l, Offset at, double t, double end) {
-    final active = l.active;
-    final pos = at + Offset(0, _dy(l, active));
-    final unsung = l.unsung;
-    if (unsung == null || l.source.words.isEmpty) {
-      active.paint(canvas, pos);
-      return;
-    }
-    unsung.paint(canvas, pos);
-    final boxes = l.wordBoxes ??= [
-      for (final r in l.words)
-        r.isCollapsed
-            ? const <Rect>[]
-            : [
-                for (final b in active.getBoxesForSelection(
-                  TextSelection(baseOffset: r.start, extentOffset: r.end),
-                  boxHeightStyle: ui.BoxHeightStyle.max,
-                ))
-                  b.toRect(),
-              ],
-    ];
-    final sung = Path();
-    var any = false;
-    for (var w = 0; w < l.source.words.length && w < boxes.length; w++) {
-      final p = ir.lyricWordProgress(l.source, w, t, end);
-      if (p <= 0) break;
-      for (final r in boxes[w]) {
-        final right = p >= 1 ? r.right : r.left + r.width * p;
-        // Extend left so a word's sweep joins the previous word.
-        sung.addRect(
-          Rect.fromLTRB(r.left - 1, r.top, right, r.bottom).shift(pos),
-        );
-        any = true;
-      }
-    }
-    if (!any) return;
-    canvas
-      ..save()
-      ..clipPath(sung);
-    active.paint(canvas, pos);
     canvas.restore();
   }
 }

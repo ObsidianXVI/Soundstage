@@ -460,3 +460,45 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     mixed bench (frames and shapes together) measures 0 in some runs and up to about 2.4 boxed
     doubles per frame in others; each kind alone is 0. AOT and the web compile doubles unboxed
     through these calls.
+
+**T0.8 polish and the wheel experiment**
+
+47. **Lyric style interpolation.** A lyric line in transition (`0 < mix < 1`, over `kLyricsFade`)
+    is painted once, in `lerpLyricStyle(inactive, active, mix)`: weight (so the variable `wght`
+    axis, via `stageTextStyle`), size, letter spacing (as px) and fills interpolate; every other
+    field follows the nearer end. No two renderings overlap, so nothing ghosts. Only lines in
+    transition (at most two) relayout, each frame, into one reused painter; word-timed lines
+    paint an interpolated "unsung" layout under the clipped sung words. Slots stay as tall as the
+    taller end style, so a transition never moves another line. On a non-variable family the face
+    snaps at the weight midpoint.
+48. **Lyric edge fade.** The stack is painted into a `saveLayer` the size of the frame, then a
+    vertical gradient is drawn over it with `BlendMode.dstIn` (`kLyricsEdgeFade` = 20% of the
+    frame height per edge; `top` scroll mode fades the bottom edge only). One extra layer per
+    lyrics frame while visible.
+49. **Gate cover crop.** `gateCoverPlacement` draws the cover so its focal point (the moon) lands
+    in the upper `kGateFocalArea` (42%) of the viewport, centred on narrow screens, zooming up to
+    1.6x when the plain crop cannot move it; the title block is bottom-aligned below it and
+    drops the description on short viewports. `StageEnterGate.buildChildOnEnter` mounts the player
+    when the gate starts fading, so entry animations (a timeline on scene enter) play in view.
+50. **Mouse-wheel smoothing (opt-in, `StagePlayer.wheelSmoothing`).** `StageScrollController`
+    creates `StageScrollPosition`, which overrides `ScrollPosition.pointerScroll(delta)`: the
+    hook `Scrollable` calls (after registering the `PointerScrollEvent` with
+    `GestureBinding.pointerSignalResolver` and flipping axes for modifier keys). Keyboard
+    (`ScrollAction` → `animateTo`), touch drags, scrollbar drags and `jumpTo` never reach it, and
+    any of them cancels a smoothed scroll (`beginActivity`). A *notch* moves a target offset
+    (accumulating, clamped to the extent) and the position follows it with `StageSmoother`
+    (critically damped, `smoothing` 0.06 s: 9% of a notch left after 120 ms, 2% after ~180 ms,
+    exact integration, frame-rate independent) through `forcePixels`, with the same scroll
+    notifications as a native wheel scroll. **Telling a wheel from a trackpad** (`WheelClassifier`):
+    Flutter web turns every DOM `wheel` event into a `PointerScrollEvent` with `kind: mouse` and
+    CSS-pixel `scrollDelta`, with no `deltaMode`, `wheelDelta` or device flag, so only delta and
+    timing remain. Precise: `|delta| < 40`; non-integer delta; within 150 ms of a precise event
+    (a flick's big first delta, then its dense momentum); in a dense stream (< 20 ms apart)
+    unless the size repeats the previous notch. Otherwise a notch. **Failure modes:** a hard
+    trackpad flick's first event (integer, >= 40, after a pause) is taken as a notch and eased for
+    ~150 ms; mice with acceleration curves or small per-notch deltas (some Mac mice, Logitech
+    "smooth scrolling" and "SmartShift" free-spin) look like a trackpad and stay native; a
+    free-spinning wheel with varying deltas turns native after its first notches; Linux/Firefox
+    notches of 53/48 px pass the threshold, 3-line notches of 40 px on some setups sit on it.
+    Pinned scenes already smooth through their clocks, so a smoothed notch adds its ~120 ms on
+    top of the clock's. The demos turn it on, `?wheel=native` turns it off.

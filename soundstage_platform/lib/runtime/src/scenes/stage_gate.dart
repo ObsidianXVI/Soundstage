@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
@@ -9,6 +10,40 @@ import '../media/audio.dart';
 import '../render/stage_environment.dart';
 import '../render/text/text_style_mapping.dart';
 import 'stage_player.dart';
+
+/// Where the gate puts its cover image: the rectangle the [image] is drawn
+/// into over [viewport], and where its [focal] point (a fraction of the
+/// image) lands.
+typedef GateCoverPlacement = ({Rect dest, Offset focalAt});
+
+/// The fraction of the viewport's height, from the top, reserved for the
+/// cover's focal subject (the moon): the text block lives below it.
+const double kGateFocalArea = 0.42;
+
+/// Draws [image] to cover [viewport] with its [focal] point (the moon) in
+/// the upper focal area, centred horizontally on narrow viewports and a
+/// little right of centre on wide ones. The image is zoomed (up to 1.6×
+/// the plain cover scale) when the plain crop has no room to move the
+/// subject up, so the subject never sits behind the text.
+GateCoverPlacement gateCoverPlacement(Size image, Size viewport, Offset focal) {
+  final cover = math.max(
+    viewport.width / image.width,
+    viewport.height / image.height,
+  );
+  final ty = viewport.height * kGateFocalArea / 2;
+  final tx = viewport.width * (viewport.width < 700 ? 0.5 : 0.6);
+  // The lowest the focal point can sit at scale s is
+  // vh - (1 - fy) * ih * s; ask for enough scale to reach ty.
+  final needed = (viewport.height - ty) / ((1 - focal.dy) * image.height);
+  final scale = math.min(math.max(cover, needed), cover * 1.6);
+  final w = image.width * scale, h = image.height * scale;
+  final ox = (tx - focal.dx * w).clamp(viewport.width - w, 0.0);
+  final oy = (ty - focal.dy * h).clamp(viewport.height - h, 0.0);
+  return (
+    dest: Rect.fromLTWH(ox, oy, w, h),
+    focalAt: Offset(ox + focal.dx * w, oy + focal.dy * h),
+  );
+}
 
 /// The default label of the enter control.
 const String kStageEnterLabel = 'Enter the stage';
@@ -34,7 +69,20 @@ class StageEnterGate extends StatefulWidget {
     this.label = kStageEnterLabel,
     this.fadeDuration = const Duration(milliseconds: 600),
     this.onEntered,
+    this.coverFocal = const Offset(0.5, 0.5),
+    this.buildChildOnEnter = false,
   });
+
+  /// Mount [child] only when the gate starts fading out, so entry
+  /// animations (a timeline that plays on scene enter) play in view rather
+  /// than behind the gate. The first scene's fonts and images are already
+  /// loaded by then.
+  final bool buildChildOnEnter;
+
+  /// The cover's subject (the moon, a face) as a fraction of the image.
+  /// The cover is cropped so it sits above the text block ([kGateFocalArea]
+  /// of the height), never behind the title.
+  final Offset coverFocal;
 
   final ir.StageDocument document;
 
@@ -141,7 +189,10 @@ class _StageEnterGateState extends State<StageEnterGate> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        widget.child,
+        if (!widget.buildChildOnEnter ||
+            _phase == _Phase.fading ||
+            _phase == _Phase.done)
+          widget.child,
         if (_phase != _Phase.done)
           AnimatedOpacity(
             opacity: _phase == _Phase.fading ? 0 : 1,
@@ -166,8 +217,9 @@ class _StageEnterGateState extends State<StageEnterGate> {
     final env = widget.environment;
     final title = doc.meta.title.isEmpty ? 'Soundstage' : doc.meta.title;
     final base = stageTextStyle(doc.defaultTextStyle, env.fonts);
-    final width = MediaQuery.maybeSizeOf(context)?.width ?? 800;
-    final titleSize = (width * 0.07).clamp(32.0, 96.0);
+    final screen = MediaQuery.maybeSizeOf(context) ?? const Size(800, 600);
+    final width = screen.width, height = screen.height;
+    final titleSize = math.min((width * 0.07).clamp(32.0, 96.0), height * 0.11);
     const ink = Color(0xFFF7F1E8);
     final loading = _phase != _Phase.waiting;
     return Semantics(
@@ -194,7 +246,11 @@ class _StageEnterGateState extends State<StageEnterGate> {
                 fit: StackFit.expand,
                 children: [
                   if (doc.meta.coverAssetId != null)
-                    _Cover(assetId: doc.meta.coverAssetId!, environment: env),
+                    _Cover(
+                      assetId: doc.meta.coverAssetId!,
+                      environment: env,
+                      focal: widget.coverFocal,
+                    ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -204,66 +260,76 @@ class _StageEnterGateState extends State<StageEnterGate> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: base.copyWith(
-                            fontSize: titleSize,
-                            height: 1.05,
-                            color: ink,
-                            letterSpacing: -0.01 * titleSize,
-                          ),
-                        ),
-                        if (doc.meta.description.isNotEmpty) ...[
-                          const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        24,
+                        0,
+                        24,
+                        math.min(48, height * 0.08),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
                           Text(
-                            doc.meta.description,
+                            title,
                             textAlign: TextAlign.center,
                             style: base.copyWith(
-                              fontSize: 17,
-                              height: 1.4,
-                              color: ink.withValues(alpha: 0.75),
+                              fontSize: titleSize,
+                              height: 1.05,
+                              color: ink,
+                              letterSpacing: -0.01 * titleSize,
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 40),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: ink.withValues(alpha: 0.8),
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28,
-                              vertical: 14,
-                            ),
-                            child: Text(
-                              loading ? 'Loading…' : widget.label,
+                          if (doc.meta.description.isNotEmpty &&
+                              height >= 520) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              doc.meta.description,
+                              textAlign: TextAlign.center,
                               style: base.copyWith(
-                                fontSize: 15,
-                                color: ink,
-                                letterSpacing: 2,
+                                fontSize: 17,
+                                height: 1.4,
+                                color: ink.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                          SizedBox(height: height >= 520 ? 40 : 20),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: ink.withValues(alpha: 0.8),
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                                vertical: 14,
+                              ),
+                              child: Text(
+                                loading ? 'Loading…' : widget.label,
+                                style: base.copyWith(
+                                  fontSize: 15,
+                                  color: ink,
+                                  letterSpacing: 2,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Sound on · Enter or tap',
-                          style: base.copyWith(
-                            fontSize: 12,
-                            color: ink.withValues(alpha: 0.55),
-                            letterSpacing: 1,
+                          const SizedBox(height: 12),
+                          Text(
+                            'Sound on · Enter or tap',
+                            style: base.copyWith(
+                              fontSize: 12,
+                              color: ink.withValues(alpha: 0.55),
+                              letterSpacing: 1,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -278,10 +344,15 @@ class _StageEnterGateState extends State<StageEnterGate> {
 
 /// The document cover, cropped to fill.
 class _Cover extends StatefulWidget {
-  const _Cover({required this.assetId, required this.environment});
+  const _Cover({
+    required this.assetId,
+    required this.environment,
+    required this.focal,
+  });
 
   final String assetId;
   final StageEnvironment environment;
+  final Offset focal;
 
   @override
   State<_Cover> createState() => _CoverState();
@@ -309,10 +380,27 @@ class _CoverState extends State<_Cover> {
   Widget build(BuildContext context) {
     final image = _image;
     if (image == null) return const SizedBox.shrink();
-    return RawImage(
-      image: image,
-      fit: BoxFit.cover,
-      opacity: const AlwaysStoppedAnimation(0.55),
+    return LayoutBuilder(
+      builder: (context, c) {
+        final p = gateCoverPlacement(
+          Size(image.width.toDouble(), image.height.toDouble()),
+          c.biggest,
+          widget.focal,
+        );
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned.fromRect(
+              rect: p.dest,
+              child: RawImage(
+                image: image,
+                fit: BoxFit.fill,
+                opacity: const AlwaysStoppedAnimation(0.55),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

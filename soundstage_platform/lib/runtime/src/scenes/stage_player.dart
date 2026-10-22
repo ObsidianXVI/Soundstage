@@ -13,6 +13,7 @@ import '../render/stage_environment.dart';
 import '../widgets/stage_node_widget.dart';
 import '../widgets/stage_scene_view.dart';
 import 'sliver_stage_scene.dart';
+import 'wheel_smoothing.dart';
 
 /// Talks to a mounted [StagePlayer]: timeline controls, clock values, and
 /// the node registry (the editor overlay's `NodeGeometryRegistry`).
@@ -76,6 +77,7 @@ class StagePlayer extends StatefulWidget {
     this.controller,
     this.lazyWindow = 1,
     this.physics,
+    this.wheelSmoothing,
   });
 
   final ir.StageDocument document;
@@ -100,6 +102,11 @@ class StagePlayer extends StatefulWidget {
   final double lazyWindow;
   final ScrollPhysics? physics;
 
+  /// Opt-in smoothing of discrete mouse-wheel notches (null = the
+  /// browser's native wheel behaviour). Trackpad, touch and keyboard
+  /// scrolling always stay native. See [StageWheelSmoothing].
+  final StageWheelSmoothing? wheelSmoothing;
+
   @override
   State<StagePlayer> createState() => _StagePlayerState();
 }
@@ -108,7 +115,9 @@ class _StagePlayerState extends State<StagePlayer>
     with TickerProviderStateMixin {
   final ir.Resolver _resolver = ir.Resolver();
   final StageNodeRegistry _registry = StageNodeRegistry();
-  final ScrollController _scroll = ScrollController();
+  late final StageScrollController _scroll = StageScrollController(
+    smoothing: widget.wheelSmoothing,
+  );
   late StageAnimator _animator;
   late StageEnvironment _env;
 
@@ -174,6 +183,7 @@ class _StagePlayerState extends State<StagePlayer>
   @override
   void didUpdateWidget(StagePlayer old) {
     super.didUpdateWidget(old);
+    _scroll.smoothing = widget.wheelSmoothing;
     final envChanged =
         !identical(old.environment, widget.environment) ||
         old.mode != widget.mode ||

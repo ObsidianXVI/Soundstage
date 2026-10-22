@@ -39,5 +39,6 @@ export 'src/render/text/text_style_mapping.dart';
 export 'src/scenes/sliver_stage_scene.dart';
 export 'src/scenes/stage_gate.dart';
 export 'src/scenes/stage_player.dart';
+export 'src/scenes/wheel_smoothing.dart';
 export 'src/widgets/stage_node_widget.dart';
 export 'src/widgets/stage_scene_view.dart';
