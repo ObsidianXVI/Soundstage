@@ -500,9 +500,9 @@ class _Validator {
           case 'assetId' || 'posterAssetId':
             _asset(value.value, pl, nodeId: nodeId);
           case 'textStyleId' ||
-                'fillStyleId' ||
-                'strokeStyleId' ||
-                'effectStyleId':
+              'fillStyleId' ||
+              'strokeStyleId' ||
+              'effectStyleId':
             _styleRefs(
               loc,
               text: last == 'textStyleId' ? value.value : null,
@@ -555,8 +555,6 @@ class _Validator {
   void _tracks(Scene s, String loc) {
     final index = <String, Node>{};
     _indexNodes(s.root, index);
-    final overlay = doc.overlay;
-    if (overlay != null) _indexNodes(overlay, index);
     final sceneClocks = {for (final c in s.clocks) c.id};
     _unique(s.tracks.map((t) => t.id), '$loc.tracks', 'track');
     for (final (i, t) in s.tracks.indexed) {
@@ -853,13 +851,13 @@ class _Validator {
         final al = '$il.actions[$ai]';
         switch (a) {
           case PlayTimelineAction(:final clockId) ||
-                PauseTimelineAction(:final clockId) ||
-                ReverseTimelineAction(:final clockId) ||
-                SeekTimelineAction(:final clockId):
+              PauseTimelineAction(:final clockId) ||
+              ReverseTimelineAction(:final clockId) ||
+              SeekTimelineAction(:final clockId):
             _clock(clockId, al);
           case PlayAudioAction(:final audioTrackId) ||
-                PauseAudioAction(:final audioTrackId) ||
-                SeekAudioAction(:final audioTrackId):
+              PauseAudioAction(:final audioTrackId) ||
+              SeekAudioAction(:final audioTrackId):
             _audio(audioTrackId, al);
           case SetVariableAction(:final variableId, :final value):
             _variable(variableId, al, nodeId: nodeId);

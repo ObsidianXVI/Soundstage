@@ -312,6 +312,63 @@ void main() {
       }
     });
 
+    forSeeds('incremental re-resolve equals a fresh resolve after edits', (
+      seed,
+    ) {
+      final r = Random(seed);
+      var doc = DocGen(seed).build();
+      final long = Resolver();
+      final ctx = ResolveContext(
+        breakpointId: doc.breakpoints[r.nextInt(doc.breakpoints.length)].id,
+      );
+      long.resolve(doc, ctx);
+      for (var step = 0; step < 6; step++) {
+        final nodes = sceneNodes(doc);
+        final target = nodes[r.nextInt(nodes.length)];
+        final edited = switch (r.nextInt(4)) {
+          0 => editNode(
+            doc,
+            target.id,
+            (n) =>
+                n.copyWith(common: n.common.copyWith(opacity: r.nextDouble())),
+          ),
+          1 => editNode(
+            doc,
+            target.id,
+            (n) =>
+                n.copyWith(common: n.common.copyWith(x: r.nextDouble() * 99)),
+          ),
+          2 => editNode(
+            doc,
+            target.id,
+            (n) => n is FrameNode
+                ? n.copyWith(
+                    modeOverrides: {'colMode': r.nextBool() ? 'dark' : 'light'},
+                  )
+                : n,
+          ),
+          _ => editNode(
+            doc,
+            target.id,
+            (n) => n is TextNode
+                ? n.copyWith(
+                    style: TextStyleOverride(fontSize: r.nextDouble() * 40 + 1),
+                  )
+                : n,
+          ),
+        };
+        doc = edited ?? doc;
+        // Occasionally change a shared input (tokens) so the memo must reset.
+        if (step == 3 && r.nextBool()) {
+          doc = doc.copyWith(
+            defaultTextStyle: doc.defaultTextStyle.copyWith(fontSize: 31),
+          );
+        }
+        final incremental = long.resolve(doc, ctx);
+        expect(incremental, Resolver().resolve(doc, ctx), reason: 'step $step');
+      }
+    });
+
     forSeeds('every resolved text span has a complete style', (seed) {
       final doc = DocGen(seed).build();
       final out = resolveDocument(doc);

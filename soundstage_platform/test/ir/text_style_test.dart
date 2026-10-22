@@ -3,7 +3,10 @@ import 'package:soundstage_platform/ir/ir.dart';
 
 const _size = StageSize(width: 1000, height: 800);
 
-StageDocument _doc(List<Node> children, {Map<String, String> modes = const {}}) {
+StageDocument _doc(
+  List<Node> children, {
+  Map<String, String> modes = const {},
+}) {
   return StageDocument(
     id: 'd',
     breakpoints: const [
@@ -82,7 +85,10 @@ void main() {
   test('no named style: document default, then node override', () {
     final r = resolveDocument(
       _doc(const [
-        TextNode(common: NodeCommon(id: 'plain'), content: spans),
+        TextNode(
+          common: NodeCommon(id: 'plain'),
+          content: spans,
+        ),
         TextNode(
           common: NodeCommon(id: 'over'),
           style: TextStyleOverride(fontSize: 12),
@@ -99,36 +105,45 @@ void main() {
     expect(over.fontWeight, 300);
   });
 
-  test('full merge order: default < named (tokens) < node < paragraph < span', () {
-    final doc = _doc(const [
-      TextNode(
-        common: NodeCommon(id: 'n'),
-        textStyleId: 'named',
-        style: TextStyleOverride(fontWeight: 600),
-        content: spans,
-      ),
-    ]);
-    final p = _find(resolveDocument(doc), 'n').paragraphs!.single;
-    final a = p.spans[0].style;
-    final b = p.spans[1].style;
-    expect(a.fontSize, 20); // token binding beats the stored 99
-    expect(a.textCase, TextCase.upper); // named replaces the default's lower
-    expect(a.fontWeight, 600); // node override beats named (500)
-    expect(p.paragraphSpacing, 4); // paragraph style beats named (1)
-    expect(a.paragraphSpacing, 4);
-    expect(b.fontWeight, 700); // span beats node
-    expect(b.paragraphSpacing, 4);
-  });
+  test(
+    'full merge order: default < named (tokens) < node < paragraph < span',
+    () {
+      final doc = _doc(const [
+        TextNode(
+          common: NodeCommon(id: 'n'),
+          textStyleId: 'named',
+          style: TextStyleOverride(fontWeight: 600),
+          content: spans,
+        ),
+      ]);
+      final p = _find(resolveDocument(doc), 'n').paragraphs!.single;
+      final a = p.spans[0].style;
+      final b = p.spans[1].style;
+      expect(a.fontSize, 20); // token binding beats the stored 99
+      expect(a.textCase, TextCase.upper); // named replaces the default's lower
+      expect(a.fontWeight, 600); // node override beats named (500)
+      expect(p.paragraphSpacing, 4); // paragraph style beats named (1)
+      expect(a.paragraphSpacing, 4);
+      expect(b.fontWeight, 700); // span beats node
+      expect(b.paragraphSpacing, 4);
+    },
+  );
 
   test('named-style token bindings resolve in the node modes', () {
-    final doc = _doc(const [
-      TextNode(
-        common: NodeCommon(id: 'n'),
-        textStyleId: 'named',
-        content: spans,
-      ),
-    ], modes: const {'col': 'dark'});
-    final s = _find(resolveDocument(doc), 'n').paragraphs!.single.spans[0].style;
+    final doc = _doc(
+      const [
+        TextNode(
+          common: NodeCommon(id: 'n'),
+          textStyleId: 'named',
+          content: spans,
+        ),
+      ],
+      modes: const {'col': 'dark'},
+    );
+    final s = _find(
+      resolveDocument(doc),
+      'n',
+    ).paragraphs!.single.spans[0].style;
     expect(s.fontSize, 30);
     expect(s.fontWeight, 500);
   });
@@ -153,12 +168,14 @@ void main() {
       content: spans,
     );
     final diags = <IrDiagnostic>[];
-    final set = applyPatch(node, {
-      'style.fontWeight': const IrValue.number(650),
-      'style.fills': const IrValue.paints([
-        Paint.solid(id: 'f', color: StageColor.black),
-      ]),
-    }, diagnostics: diags) as TextNode;
+    final set =
+        applyPatch(node, {
+              'style.fontWeight': const IrValue.number(650),
+              'style.fills': const IrValue.paints([
+                Paint.solid(id: 'f', color: StageColor.black),
+              ]),
+            }, diagnostics: diags)
+            as TextNode;
     expect(diags, isEmpty);
     expect(set.style.fontWeight, 650);
     expect(set.style.fills, isNotNull);
@@ -167,10 +184,12 @@ void main() {
       const IrValue.number(650),
     );
 
-    final cleared = applyPatch(set, {
-      'style.fontWeight': const IrValue.none(),
-      'style.fills': const IrValue.none(),
-    }, diagnostics: diags) as TextNode;
+    final cleared =
+        applyPatch(set, {
+              'style.fontWeight': const IrValue.none(),
+              'style.fills': const IrValue.none(),
+            }, diagnostics: diags)
+            as TextNode;
     expect(diags, isEmpty);
     expect(cleared.style, const TextStyleOverride());
     expect(
@@ -180,21 +199,17 @@ void main() {
 
     // Resolved: the set value wins, the cleared one inherits from named (500).
     expect(
-      _find(resolveDocument(_doc([set])), 'n')
-          .paragraphs!
-          .single
-          .spans[0]
-          .style
-          .fontWeight,
+      _find(
+        resolveDocument(_doc([set])),
+        'n',
+      ).paragraphs!.single.spans[0].style.fontWeight,
       650,
     );
     expect(
-      _find(resolveDocument(_doc([cleared])), 'n')
-          .paragraphs!
-          .single
-          .spans[0]
-          .style
-          .fontWeight,
+      _find(
+        resolveDocument(_doc([cleared])),
+        'n',
+      ).paragraphs!.single.spans[0].style.fontWeight,
       500,
     );
   });

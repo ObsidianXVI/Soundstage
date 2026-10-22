@@ -39,18 +39,89 @@ ResolvedDocument resolveDocument(
 /// Never throws on a broken document: problems become
 /// `ResolvedDocument.diagnostics`, and output is deterministic for the same
 /// inputs.
+///
+/// **Incremental resolution.** A long-lived `Resolver` remembers the previous
+/// pass. A scene-level subtree whose root node is the *same object*
+/// (`identical`) as in the previous pass, resolved under equal modes, is not
+/// resolved again: its `ResolvedNode` (and diagnostics) are reused, so
+/// unchanged subtrees keep their output identity. Edits that copy only the
+/// path from the root to the changed node (structural sharing) therefore
+/// re-resolve only that path. Memoised results are valid while the shared
+/// inputs are unchanged (the document's tokens, assets, components, variant
+/// sets, default text style, breakpoints, and the `ResolveContext`); when any
+/// of those changes the memo is dropped and the next pass is a full one.
+/// Only the previous pass is kept, so memory stays proportional to the
+/// document. Not thread-safe; use one `Resolver` per owner.
 class Resolver {
   Resolver({PropertyRegistry? registry})
     : registry = registry ?? PropertyRegistry.standard;
 
   final PropertyRegistry registry;
 
+  final _Memo _memo = _Memo();
+
   ResolvedDocument resolve(
     StageDocument doc, [
     ResolveContext context = const ResolveContext(),
   ]) {
-    final pass = _Pass(doc, context, registry);
-    return pass.run();
+    _memo.prepare(doc, context);
+    final pass = _Pass(doc, context, registry, _memo);
+    final out = pass.run();
+    _memo.commit(pass.memoNext);
+    return out;
+  }
+}
+
+/// One memoised scene-level subtree.
+class _MemoEntry {
+  const _MemoEntry(this.modes, this.result, this.diagnostics);
+
+  /// The (input) modes the subtree was resolved under.
+  final Map<String, String> modes;
+  final ResolvedNode result;
+
+  /// Diagnostics the subtree produced, replayed on reuse.
+  final List<IrDiagnostic> diagnostics;
+}
+
+typedef _MemoMap = Map<Node, List<_MemoEntry>>;
+
+/// The previous pass of a [Resolver] and the inputs it is valid for.
+class _Memo {
+  StageDocument? _doc;
+  ResolveContext? _ctx;
+  _MemoMap previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+
+  /// Drops the memo unless the shared inputs are unchanged.
+  void prepare(StageDocument doc, ResolveContext ctx) {
+    final d = _doc;
+    // freezed collection getters return fresh read-only views, so `identical`
+    // never holds for them; `==` is cheap here because freezed values
+    // short-circuit on identity and these inputs are small or unchanged.
+    final same =
+        d != null &&
+        identical(d.tokens, doc.tokens) &&
+        identical(d.defaultTextStyle, doc.defaultTextStyle) &&
+        d.baseBreakpointId == doc.baseBreakpointId &&
+        d.breakpoints == doc.breakpoints &&
+        d.assets == doc.assets &&
+        d.variantSets == doc.variantSets &&
+        d.components == doc.components &&
+        _ctx == ctx;
+    if (!same) previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+    _doc = doc;
+    _ctx = ctx;
+  }
+
+  void commit(_MemoMap next) => previous = next;
+
+  static bool sameModes(Map<String, String> a, Map<String, String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      if (b[e.key] != e.value) return false;
+    }
+    return true;
   }
 }
 
@@ -115,12 +186,17 @@ class _TokenResult {
 
 /// One resolution of one document for one context.
 class _Pass {
-  _Pass(this.doc, this.ctx, this.registry);
+  _Pass(this.doc, this.ctx, this.registry, this.memo);
 
   final StageDocument doc;
   final ResolveContext ctx;
   final PropertyRegistry registry;
   final List<IrDiagnostic> diagnostics = [];
+
+  final _Memo memo;
+
+  /// The memo this pass is building (becomes the next pass's `previous`).
+  final _MemoMap memoNext = LinkedHashMap<Node, List<_MemoEntry>>.identity();
 
   late final Breakpoint? breakpoint = _pickBreakpoint();
   late final List<Breakpoint> cascade = breakpoint == null
@@ -454,21 +530,56 @@ class _Pass {
   /// Applies [patch] to [n], reporting against [id].
   Node _patch(Node n, Patch patch, String id) {
     final local = <IrDiagnostic>[];
-    final out = applyPatch(
-      n,
-      patch,
-      diagnostics: local,
-      registry: registry,
-    );
+    final out = applyPatch(n, patch, diagnostics: local, registry: registry);
     for (final d in local) {
       diagnostics.add(d.copyWith(nodeId: id));
     }
     return out;
   }
 
-  /// Resolves one node and its subtree. [forcedId] and [placement] are set
-  /// for a component root being instantiated by [placement].
+  /// Resolves one node and its subtree, reusing the previous pass's result
+  /// for an unchanged scene-level subtree (see [Resolver]).
   ResolvedNode _resolveNode(
+    Node node,
+    _Scope scope, {
+    String? forcedId,
+    InstanceNode? placement,
+  }) {
+    // Only scene-level nodes are memoised; an instance's expansion is
+    // memoised as a whole at the instance node.
+    if (scope.instance != null || forcedId != null || placement != null) {
+      return _resolveNodeUncached(
+        node,
+        scope,
+        forcedId: forcedId,
+        placement: placement,
+      );
+    }
+    final hits = memo.previous[node];
+    if (hits != null) {
+      for (final e in hits) {
+        if (_Memo.sameModes(e.modes, scope.modes)) {
+          diagnostics.addAll(e.diagnostics);
+          (memoNext[node] ??= []).add(e);
+          return e.result;
+        }
+      }
+    }
+    final start = diagnostics.length;
+    final result = _resolveNodeUncached(node, scope);
+    (memoNext[node] ??= []).add(
+      _MemoEntry(
+        scope.modes,
+        result,
+        diagnostics.length == start
+            ? const []
+            : List.unmodifiable(diagnostics.sublist(start)),
+      ),
+    );
+    return result;
+  }
+
+  ResolvedNode _resolveNodeUncached(
     Node node,
     _Scope scope, {
     String? forcedId,

@@ -553,3 +553,37 @@ final List<Mutation> mutations = [
     ),
   ),
 ];
+
+/// [doc] with the scene-level node [id] replaced by `change(node)`, copying
+/// only the path from its scene root (every other subtree keeps identity).
+/// Null when there is no such node.
+StageDocument? editNode(
+  StageDocument doc,
+  String id,
+  Node Function(Node) change,
+) {
+  Node? edit(Node n) {
+    if (n.id == id) return change(n);
+    if (n is FrameNode) {
+      for (var i = 0; i < n.children.length; i++) {
+        final c = edit(n.children[i]);
+        if (c != null) {
+          final children = [...n.children];
+          children[i] = c;
+          return n.copyWith(children: children);
+        }
+      }
+    }
+    return null;
+  }
+
+  for (var i = 0; i < doc.scenes.length; i++) {
+    final root = edit(doc.scenes[i].root);
+    if (root != null) {
+      final scenes = [...doc.scenes];
+      scenes[i] = doc.scenes[i].copyWith(root: root as FrameNode);
+      return doc.copyWith(scenes: scenes);
+    }
+  }
+  return null;
+}
