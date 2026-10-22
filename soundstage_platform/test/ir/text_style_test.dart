@@ -43,9 +43,10 @@ StageDocument _doc(
         ),
       ],
       textStyles: {
+        'tsEmpty': TextStyleDef(name: 'Empty'),
         'named': TextStyleDef(
           name: 'Named',
-          style: TextStyle(
+          style: TextStyleOverride(
             fontSize: 99,
             fontWeight: 500,
             paragraphSpacing: 1,
@@ -120,7 +121,7 @@ void main() {
       final a = p.spans[0].style;
       final b = p.spans[1].style;
       expect(a.fontSize, 20); // token binding beats the stored 99
-      expect(a.textCase, TextCase.upper); // named replaces the default's lower
+      expect(a.textCase, TextCase.upper); // named overrides the default's lower
       expect(a.fontWeight, 600); // node override beats named (500)
       expect(p.paragraphSpacing, 4); // paragraph style beats named (1)
       expect(a.paragraphSpacing, 4);
@@ -128,6 +129,28 @@ void main() {
       expect(b.paragraphSpacing, 4);
     },
   );
+
+  test('a partial named style inherits unset fields from the default', () {
+    final doc = _doc(const [
+      TextNode(
+        common: NodeCommon(id: 'n'),
+        textStyleId: 'tsEmpty',
+        content: spans,
+      ),
+      TextNode(
+        common: NodeCommon(id: 'm'),
+        textStyleId: 'named',
+        content: spans,
+      ),
+    ]);
+    final r = resolveDocument(doc);
+    final empty = _find(r, 'n').paragraphs!.single.spans[0].style;
+    expect(empty.copyWith(paragraphSpacing: 0), doc.defaultTextStyle);
+    final named = _find(r, 'm').paragraphs!.single.spans[0].style;
+    expect(named.fontWeight, 500); // set by the style
+    expect(named.fills, doc.defaultTextStyle.fills); // inherited
+    expect(named.fontFamilyId, doc.defaultTextStyle.fontFamilyId);
+  });
 
   test('named-style token bindings resolve in the node modes', () {
     final doc = _doc(

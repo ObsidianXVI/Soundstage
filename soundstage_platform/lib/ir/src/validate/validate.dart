@@ -353,7 +353,7 @@ class _Validator {
     _aliasCycles();
     t.textStyles.forEach((id, def) {
       final loc = 'tokens.textStyles.$id';
-      _textStyle(def.style, '$loc.style');
+      _textOverride(def.style, '$loc.style');
       def.bindings.forEach((path, ref) {
         _variable(ref.variableId, '$loc.bindings.$path');
       });

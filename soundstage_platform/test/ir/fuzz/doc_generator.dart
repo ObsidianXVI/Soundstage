@@ -322,7 +322,7 @@ class DocGen {
       textStyles: {
         'tsA': TextStyleDef(
           name: 'A',
-          style: TextStyle(
+          style: TextStyleOverride(
             fontFamilyId: 'fB',
             fontSize: _num(10, 30),
             fontWeight: 500,

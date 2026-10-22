@@ -58,8 +58,9 @@ in `DECISIONS_NEEDED.md`.
   (`NodeCommon.componentBindings`) are on every node. `behavior` and `modeOverrides` are
   frame-only.
 - **Text styles are layered.** `StageDocument.defaultTextStyle` (a complete `TextStyle`) is the
-  base. A text node's `textStyleId` names a complete `TextStyleDef`, which replaces the default
-  (token bindings resolved in the node's modes). `TextNode.style` is a `TextStyleOverride` (all
+  base. A text node's `textStyleId` names a `TextStyleDef`, whose `style` is a partial
+  `TextStyleOverride` layered over the default (unset fields inherit; token bindings resolved in
+  the node's modes). `TextNode.style` is a `TextStyleOverride` (all
   fields nullable, null = inherit) layered over that; then the paragraph style
   (spacing/indent/list) and the span override. `style.*` paths read/write the override fields
   and `IrValue.none()` clears one. The resolved node's own `style` is emptied and `textStyleId`

@@ -580,7 +580,7 @@ const tokenSystem = TokenSystem(
   textStyles: {
     'tsBody': TextStyleDef(
       name: 'Body',
-      style: textStyle,
+      style: styleOverride,
       bindings: {'fontFamilyId': TokenRef(variableId: 'vFont')},
     ),
   },

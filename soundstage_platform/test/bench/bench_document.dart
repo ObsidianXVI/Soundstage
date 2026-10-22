@@ -239,12 +239,12 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
       textStyles: {
         'tsTitle': TextStyleDef(
           name: 'Title',
-          style: TextStyle(fontSize: 28, fontWeight: 600),
+          style: TextStyleOverride(fontSize: 28, fontWeight: 600),
           bindings: {'fontSize': TokenRef(variableId: 'vSize')},
         ),
         'tsBody': TextStyleDef(
           name: 'Body',
-          style: TextStyle(fontSize: 16, lineHeight: LineHeight.percent(150)),
+          style: TextStyleOverride(fontSize: 16, lineHeight: LineHeight.percent(150)),
         ),
       },
     ),

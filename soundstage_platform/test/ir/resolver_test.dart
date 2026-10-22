@@ -131,7 +131,7 @@ final tokens = TokenSystem(
   textStyles: {
     'tsBody': TextStyleDef(
       name: 'Body',
-      style: const TextStyle(fontSize: 18, fontWeight: 500),
+      style: const TextStyleOverride(fontSize: 18, fontWeight: 500),
       bindings: {'fills.text.color': ref('vBrand')},
     ),
   },

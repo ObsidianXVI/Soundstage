@@ -890,10 +890,11 @@ class _Pass {
     return s?.effects;
   }
 
-  /// The base of a text node's cascade: the named style (`textStyleId`, its
-  /// token bindings resolved in this node's [modes]) or, without one, the
-  /// document's default text style. A named style is complete, so it replaces
-  /// the default. The node's `style` override and the spans are layered on top.
+  /// The base of a text node's cascade: the document's default text style
+  /// with the named style (`textStyleId`) layered over it. A named style is
+  /// partial: unset fields inherit the default. Its token bindings are
+  /// resolved in this node's [modes]. The node's `style` override and the
+  /// spans are layered on top.
   TextStyle _namedTextStyle(TextNode n, Map<String, String> modes, String id) {
     final styleId = n.textStyleId;
     if (styleId == null) return doc.defaultTextStyle;
@@ -907,12 +908,19 @@ class _Pass {
       );
       return doc.defaultTextStyle;
     }
-    if (def.bindings.isEmpty) return def.style;
+    if (def.bindings.isEmpty) {
+      return mergeTextStyle(doc.defaultTextStyle, def.style);
+    }
     // Bound fields are written (through the registry) into a carrier that
-    // holds the style's own values as a full override.
+    // holds the style's own overrides.
+    final needsFills =
+        def.style.fills == null &&
+        def.bindings.keys.any((k) => k.startsWith('fills.'));
     Node carrier = TextNode(
       common: NodeCommon(id: id),
-      style: _fullOverride(def.style),
+      style: needsFills
+          ? def.style.copyWith(fills: doc.defaultTextStyle.fills)
+          : def.style,
     );
     def.bindings.forEach((rel, ref) {
       final value = _tokenValue(ref, modes, id, 'textStyles.$styleId.$rel');
@@ -929,7 +937,7 @@ class _Pass {
         carrier = next;
       }
     });
-    return mergeTextStyle(def.style, (carrier as TextNode).style);
+    return mergeTextStyle(doc.defaultTextStyle, (carrier as TextNode).style);
   }
 
   List<ResolvedParagraph> _paragraphs(TextNode n, TextStyle merged) => [
@@ -1022,25 +1030,6 @@ class _Pass {
     };
   }
 }
-
-/// [s] expressed as an override that sets every field.
-TextStyleOverride _fullOverride(TextStyle s) => TextStyleOverride(
-  fontFamilyId: s.fontFamilyId,
-  fontWeight: s.fontWeight,
-  italic: s.italic,
-  fontVariations: s.fontVariations,
-  fontSize: s.fontSize,
-  lineHeight: s.lineHeight,
-  letterSpacing: s.letterSpacing,
-  paragraphSpacing: s.paragraphSpacing,
-  paragraphIndent: s.paragraphIndent,
-  textCase: s.textCase,
-  decoration: s.decoration,
-  fills: s.fills,
-  openType: s.openType,
-  baselineShift: s.baselineShift,
-  listStyle: s.listStyle,
-);
 
 /// [base] with every non-null field of [o] applied. Map fields
 /// (`fontVariations`, `openType`) merge key-wise, the override winning.

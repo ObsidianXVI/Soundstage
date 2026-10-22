@@ -66,13 +66,14 @@ abstract class VariableCollection with _$VariableCollection {
       _$VariableCollectionFromJson(json);
 }
 
-/// A named text style. Its fields may be token-bound via `bindings`
+/// A named text style: a partial [TextStyleOverride] layered over the
+/// document's default text style. Its fields may be token-bound via `bindings`
 /// (`{ PropertyPath relative to the style: TokenRef }`).
 @freezed
 abstract class TextStyleDef with _$TextStyleDef {
   const factory TextStyleDef({
     required String name,
-    @Default(TextStyle()) TextStyle style,
+    @Default(TextStyleOverride()) TextStyleOverride style,
     @Default(<String, TokenRef>{}) Map<String, TokenRef> bindings,
   }) = _TextStyleDef;
 
