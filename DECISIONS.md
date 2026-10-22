@@ -112,3 +112,26 @@
 - **Spring easing fits the keyframe interval** (T0.3, accepted): the interval maps to the spring's
   settle time (envelope within 1e-3), normalised to end at exactly 1. Spring parameters shape the
   bounce, and keyframe spacing sets the duration. That's what a timeline user expects.
+
+- **A frame's size mode is per axis and lives in one place: `layoutChild.horizontalSizing` /
+  `verticalSizing` (fixed | hug | fill).** `autoLayout.primarySizing/counterSizing` are removed.
+  `hug` on a frame means "hug its auto-layout content" and is only meaningful with auto layout
+  (otherwise it is treated as fixed). (Settles T0.4-1, option C.)
+  Rationale: the direction-relative fields made a breakpoint patch that flips `direction` silently
+  swap which axis was fixed (a card row collapsed to height 0 on mobile in the T0.4 demo). Figma's
+  current model is one per-axis setting, and the inspector shows one control per axis.
+
+- **Positive rotation is clockwise on screen** for both `rotation` and `motion.rotate` (CSS/Flutter
+  convention). (T0.4-2, accepted.)
+
+- **A flow scene root's reference size is `designSize.width × the root's stored height`**; pinned
+  roots use `designSize`. (T0.4-3, accepted.)
+
+- **Counter-axis fill in a hugging frame stretches to the largest non-fill sibling** (and hugs if
+  every child fills). **With `gap: auto`, fill children are sized with a gap of 0**, and any
+  leftover space becomes the gap. The editor may disable these combinations, as Figma does.
+  (T0.4-4, accepted.)
+
+- **Schema v1 stays open until the first publish** (M4). Until then, format changes update the
+  fixtures and demos in place rather than adding migrations. AGENTS.md hard rule 3 applies from
+  the first published story.

@@ -88,7 +88,8 @@ Ensure the sub-agents are given enough context about the plans and approach to i
 1. `flutter analyze` must return zero errors and zero warnings before committing Dart code.
 2. `lib/ir/` never imports `package:flutter`. It must stay extractable into a standalone Dart package.
 3. Any change to the IR's serialised shape bumps `schemaVersion` and ships a migration, so saved
-   stories keep loading.
+   stories keep loading. Exception: until the first story is published (M4), schema v1 is still
+   open and may change in place (update fixtures and demos instead of migrating).
 4. Never use a third-party API without grounding evidence that it exists (pub.dev, package source).
 5. Never add API keys or secrets to any file. They live in `.env` and GCP Secret Manager (in prod).
 6. Generated files (`*.freezed.dart`, `*.g.dart`) and build output are git-ignored — never commit

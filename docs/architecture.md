@@ -170,8 +170,6 @@ autoLayout: {
   primaryAlign: start | center | end
   counterAlign: start | center | end | baseline   // baseline: horizontal only
   rowAlign: start | center | end                  // wrapped rows as a block
-  primarySizing: fixed | hug
-  counterSizing: fixed | hug
   strokesIncludedInLayout: bool
   reverseZIndex: bool                  // first child paints on top
 }
@@ -185,7 +183,7 @@ Algorithm (horizontal; vertical is the transpose):
    bounding box when `rotation ≠ 0`. If `strokesIncludedInLayout`, inflate by the outside portion
    of the child's strokes.
 3. Counter axis per child: `fixed`/`hug` as above; `fill` = content box height. Clamp min/max.
-4. If `primarySizing = hug`: frame width = Σ non-fill widths + gaps + padding, and `fill`
+4. If the frame's own `horizontalSizing = hug` (its `layoutChild` sizing, per axis): frame width = Σ non-fill widths + gaps + padding, and `fill`
    children behave as `hug`. Clamp the frame by its own min/max.
 5. Free space = content width − Σ non-fill − gap × (n − 1). Split free space **equally** among
    `fill` children, freezing any that hit min/max and redistributing (CSS flex freeze loop).
@@ -195,7 +193,7 @@ Algorithm (horizontal; vertical is the transpose):
    descendant in flow order, else its bottom edge.
 8. `wrap`: break into rows where the next child's width (min width for `fill`) would exceed the
    content width. Lay each row out by steps 5–7. Stack rows with `counterAxisGap` and position the
-   block by `rowAlign`. `counterSizing = hug` sums row heights.
+   block by `rowAlign`. A vertically hugging frame sums row heights.
 9. Absolute children are then placed per §4.3. Clip if `clipContent`.
 10. Paint order is child order (later on top) unless `reverseZIndex`.
 
