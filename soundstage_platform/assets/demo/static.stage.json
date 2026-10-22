@@ -1,0 +1,5072 @@
+{
+  "schemaVersion": 1,
+  "id": "demo-static",
+  "baseBreakpointId": "desktop",
+  "meta": {
+    "title": "Static demo (T0.4)",
+    "slug": "static-demo",
+    "author": "Soundstage",
+    "description": "Layout and text without motion.",
+    "language": "en"
+  },
+  "breakpoints": [
+    {
+      "id": "desktop",
+      "name": "Desktop",
+      "minWidth": 1024,
+      "designSize": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "tablet",
+      "name": "Tablet",
+      "minWidth": 600,
+      "designSize": {
+        "width": 834,
+        "height": 1112
+      }
+    },
+    {
+      "id": "mobile",
+      "name": "Mobile",
+      "minWidth": 0,
+      "designSize": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "fonts": {
+    "serif": {
+      "id": "serif",
+      "name": "Fraunces",
+      "faces": [],
+      "fallback": "serif"
+    },
+    "sans": {
+      "id": "sans",
+      "name": "Inter",
+      "faces": [],
+      "fallback": "sans"
+    }
+  },
+  "assets": {
+    "hero": {
+      "id": "hero",
+      "kind": "image",
+      "uri": "asset://assets/demo/images/hero_dusk.png",
+      "name": "Dusk over mountains",
+      "mime": "image/png",
+      "width": 1600,
+      "height": 1000,
+      "placeholder": {
+        "dominantColor": {
+          "r": 0.3686,
+          "g": 0.2275,
+          "b": 0.3333,
+          "a": 1.0
+        }
+      },
+      "alt": "Dusk over mountains",
+      "credit": "Procedural (tool/gen_demo_images.dart)"
+    },
+    "forest": {
+      "id": "forest",
+      "kind": "image",
+      "uri": "asset://assets/demo/images/card_forest.png",
+      "name": "Pine forest",
+      "mime": "image/png",
+      "width": 800,
+      "height": 500,
+      "placeholder": {
+        "dominantColor": {
+          "r": 0.4314,
+          "g": 0.6039,
+          "b": 0.4157,
+          "a": 1.0
+        }
+      },
+      "alt": "Pine forest",
+      "credit": "Procedural (tool/gen_demo_images.dart)"
+    },
+    "sea": {
+      "id": "sea",
+      "kind": "image",
+      "uri": "asset://assets/demo/images/card_sea.png",
+      "name": "Open sea",
+      "mime": "image/png",
+      "width": 800,
+      "height": 500,
+      "placeholder": {
+        "dominantColor": {
+          "r": 0.2392,
+          "g": 0.4941,
+          "b": 0.651,
+          "a": 1.0
+        }
+      },
+      "alt": "Open sea",
+      "credit": "Procedural (tool/gen_demo_images.dart)"
+    },
+    "dunes": {
+      "id": "dunes",
+      "kind": "image",
+      "uri": "asset://assets/demo/images/card_dunes.png",
+      "name": "Dunes",
+      "mime": "image/png",
+      "width": 800,
+      "height": 500,
+      "placeholder": {
+        "dominantColor": {
+          "r": 0.8863,
+          "g": 0.6039,
+          "b": 0.3569,
+          "a": 1.0
+        }
+      },
+      "alt": "Dunes",
+      "credit": "Procedural (tool/gen_demo_images.dart)"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hero",
+      "name": "Hero",
+      "kind": "pinned",
+      "scrollLength": 1,
+      "root": {
+        "type": "frame",
+        "common": {
+          "id": "hero-root",
+          "name": "Stage",
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 900
+        },
+        "appearance": {
+          "fills": [
+            {
+              "type": "image",
+              "id": "img",
+              "assetId": "hero",
+              "scaleMode": "fill",
+              "focalPoint": {
+                "x": 0.68,
+                "y": 0.42
+              }
+            }
+          ],
+          "cornerRadius": {
+            "type": "uniform",
+            "radius": 0
+          }
+        },
+        "children": [
+          {
+            "type": "frame",
+            "common": {
+              "id": "hero-scrim",
+              "name": "Scrim",
+              "x": 0,
+              "y": 450,
+              "width": 1440,
+              "height": 450,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "leftRight",
+                  "vertical": "bottom"
+                }
+              },
+              "breakpointOverrides": {
+                "tablet": {
+                  "y": {
+                    "type": "number",
+                    "value": 556
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 834
+                  },
+                  "height": {
+                    "type": "number",
+                    "value": 556
+                  }
+                },
+                "mobile": {
+                  "y": {
+                    "type": "number",
+                    "value": 422
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 390
+                  },
+                  "height": {
+                    "type": "number",
+                    "value": 422
+                  }
+                }
+              }
+            },
+            "appearance": {
+              "fills": [
+                {
+                  "type": "solid",
+                  "id": "fill",
+                  "color": {
+                    "r": 0.0,
+                    "g": 0.0,
+                    "b": 0.0,
+                    "a": 0.45
+                  }
+                }
+              ],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [],
+            "clipContent": false
+          },
+          {
+            "type": "text",
+            "common": {
+              "id": "hero-kicker",
+              "name": "Kicker",
+              "x": 120,
+              "y": 560,
+              "width": 600,
+              "height": 20,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "bottom"
+                }
+              },
+              "breakpointOverrides": {
+                "tablet": {
+                  "x": {
+                    "type": "number",
+                    "value": 48
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 784
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 700
+                  }
+                },
+                "mobile": {
+                  "x": {
+                    "type": "number",
+                    "value": 24
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 470
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 342
+                  }
+                }
+              }
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "A Soundstage demo · Chapter one"
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "sans",
+              "fontWeight": 600,
+              "italic": false,
+              "fontVariations": {},
+              "fontSize": 14,
+              "lineHeight": {
+                "type": "auto"
+              },
+              "letterSpacing": {
+                "type": "percent",
+                "value": 20
+              },
+              "paragraphSpacing": 0,
+              "paragraphIndent": 0,
+              "textCase": "upper",
+              "decoration": {
+                "kind": "none"
+              },
+              "fills": [
+                {
+                  "type": "solid",
+                  "id": "text",
+                  "color": {
+                    "r": 1.0,
+                    "g": 1.0,
+                    "b": 1.0,
+                    "a": 0.85
+                  }
+                }
+              ],
+              "openType": {},
+              "baselineShift": "none",
+              "listStyle": "none"
+            },
+            "autoResize": "height",
+            "alignHorizontal": "left"
+          },
+          {
+            "type": "text",
+            "common": {
+              "id": "hero-title",
+              "name": "Title",
+              "x": 120,
+              "y": 596,
+              "width": 1000,
+              "height": 200,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "bottom"
+                }
+              },
+              "breakpointOverrides": {
+                "tablet": {
+                  "x": {
+                    "type": "number",
+                    "value": 48
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 820
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 700
+                  },
+                  "style.fontSize": {
+                    "type": "number",
+                    "value": 64
+                  }
+                },
+                "mobile": {
+                  "x": {
+                    "type": "number",
+                    "value": 24
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 520
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 342
+                  },
+                  "style.fontSize": {
+                    "type": "number",
+                    "value": 44
+                  }
+                }
+              }
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "The light that stays after the sun"
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "serif",
+              "fontWeight": 700,
+              "italic": false,
+              "fontVariations": {},
+              "fontSize": 88,
+              "lineHeight": {
+                "type": "percent",
+                "value": 100
+              },
+              "letterSpacing": {
+                "type": "percent",
+                "value": -2
+              },
+              "paragraphSpacing": 0,
+              "paragraphIndent": 0,
+              "textCase": "none",
+              "decoration": {
+                "kind": "none"
+              },
+              "fills": [
+                {
+                  "type": "solid",
+                  "id": "text",
+                  "color": {
+                    "r": 1.0,
+                    "g": 1.0,
+                    "b": 1.0,
+                    "a": 1.0
+                  }
+                }
+              ],
+              "openType": {},
+              "baselineShift": "none",
+              "listStyle": "none"
+            },
+            "autoResize": "height",
+            "alignHorizontal": "left"
+          },
+          {
+            "type": "text",
+            "common": {
+              "id": "hero-credit",
+              "name": "Credit",
+              "x": 920,
+              "y": 860,
+              "width": 480,
+              "height": 16,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "right",
+                  "vertical": "bottom"
+                }
+              },
+              "breakpointOverrides": {
+                "tablet": {
+                  "x": {
+                    "type": "number",
+                    "value": 306
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 1072
+                  }
+                },
+                "mobile": {
+                  "x": {
+                    "type": "number",
+                    "value": 24
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 800
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 342
+                  },
+                  "height": {
+                    "type": "number",
+                    "value": 28
+                  }
+                }
+              }
+            },
+            "content": [
+              {
+                "spans": [
+                  {
+                    "text": "Illustration: procedural, tool/gen_demo_images.dart"
+                  }
+                ]
+              }
+            ],
+            "style": {
+              "fontFamilyId": "sans",
+              "fontWeight": 400,
+              "italic": false,
+              "fontVariations": {},
+              "fontSize": 12,
+              "lineHeight": {
+                "type": "auto"
+              },
+              "letterSpacing": {
+                "type": "percent",
+                "value": 0
+              },
+              "paragraphSpacing": 0,
+              "paragraphIndent": 0,
+              "textCase": "none",
+              "decoration": {
+                "kind": "none"
+              },
+              "fills": [
+                {
+                  "type": "solid",
+                  "id": "text",
+                  "color": {
+                    "r": 1.0,
+                    "g": 1.0,
+                    "b": 1.0,
+                    "a": 0.6
+                  }
+                }
+              ],
+              "openType": {},
+              "baselineShift": "none",
+              "listStyle": "none"
+            },
+            "autoResize": "height",
+            "alignHorizontal": "right"
+          }
+        ],
+        "clipContent": true
+      }
+    },
+    {
+      "id": "essay",
+      "name": "Essay",
+      "kind": "flow",
+      "root": {
+        "type": "frame",
+        "common": {
+          "id": "essay-root",
+          "name": "Stage",
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 2400,
+          "breakpointOverrides": {
+            "tablet": {
+              "autoLayout.padding": {
+                "type": "insets",
+                "value": {
+                  "top": 96,
+                  "right": 48,
+                  "bottom": 120,
+                  "left": 48
+                }
+              }
+            },
+            "mobile": {
+              "autoLayout.padding": {
+                "type": "insets",
+                "value": {
+                  "top": 64,
+                  "right": 24,
+                  "bottom": 80,
+                  "left": 24
+                }
+              },
+              "autoLayout.gap": {
+                "type": "gap",
+                "value": {
+                  "type": "fixed",
+                  "value": 48
+                }
+              }
+            }
+          }
+        },
+        "appearance": {
+          "fills": [
+            {
+              "type": "solid",
+              "id": "fill",
+              "color": {
+                "r": 0.9569,
+                "g": 0.9373,
+                "b": 0.902,
+                "a": 1.0
+              }
+            }
+          ],
+          "cornerRadius": {
+            "type": "uniform",
+            "radius": 0
+          }
+        },
+        "children": [
+          {
+            "type": "frame",
+            "common": {
+              "id": "essay-col",
+              "name": "Column",
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "maxWidth": 720
+              }
+            },
+            "appearance": {
+              "fills": [],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "essay-eyebrow",
+                  "name": "Eyebrow",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    }
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Part one — the essay"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 13,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 14
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "upper",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.7608,
+                        "g": 0.2549,
+                        "b": 0.0471,
+                        "a": 1.0
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "text",
+                "common": {
+                  "id": "essay-heading",
+                  "name": "Heading",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    }
+                  },
+                  "breakpointOverrides": {
+                    "mobile": {
+                      "style.fontSize": {
+                        "type": "number",
+                        "value": 34
+                      }
+                    }
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Layout is a sentence, not a shape"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "serif",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 48,
+                  "lineHeight": {
+                    "type": "percent",
+                    "value": 110
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": -1
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "none",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 1.0
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "text",
+                "common": {
+                  "id": "essay-body",
+                  "name": "Body",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    }
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Every scene in Soundstage is laid out by the rules a designer already knows: "
+                      },
+                      {
+                        "text": "hug, fill and fixed",
+                        "style": {
+                          "fontWeight": 700,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "text": ", minimum and maximum widths, and constraints against a reference size. "
+                      },
+                      {
+                        "text": "This span is larger, italic and blue.",
+                        "style": {
+                          "fontSize": 24,
+                          "italic": true,
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1137,
+                                "g": 0.3059,
+                                "b": 0.8471,
+                                "a": 1.0
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Paragraph spacing separates paragraphs, and the first line of this one is indented by thirty-two pixels, the way a printed book would set it. The rest of the paragraph wraps back to the margin."
+                      }
+                    ],
+                    "style": {
+                      "paragraphIndent": 32
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Hug sizes a frame to its content."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "unordered",
+                      "paragraphSpacing": 6
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Fill shares the free space equally, freezing at min and max."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "unordered",
+                      "paragraphSpacing": 6
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Fixed keeps the size you set."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "unordered"
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Measure."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "ordered",
+                      "paragraphSpacing": 6
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Distribute."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "ordered",
+                      "paragraphSpacing": 6
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "Align."
+                      }
+                    ],
+                    "style": {
+                      "listStyle": "ordered"
+                    }
+                  },
+                  {
+                    "spans": [
+                      {
+                        "text": "The rows below exercise wrapping, fill, baselines and rotation. "
+                      },
+                      {
+                        "text": "Small caps",
+                        "style": {
+                          "textCase": "smallCaps"
+                        }
+                      },
+                      {
+                        "text": " and an "
+                      },
+                      {
+                        "text": "underlined phrase",
+                        "style": {
+                          "decoration": {
+                            "kind": "underline"
+                          }
+                        }
+                      },
+                      {
+                        "text": " close the column."
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "serif",
+                  "fontWeight": 400,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 19,
+                  "lineHeight": {
+                    "type": "percent",
+                    "value": 160
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 0
+                  },
+                  "paragraphSpacing": 16,
+                  "paragraphIndent": 0,
+                  "textCase": "none",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 1.0
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 24
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          },
+          {
+            "type": "frame",
+            "common": {
+              "id": "tags-group",
+              "name": "Tags group",
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "maxWidth": 720
+              }
+            },
+            "appearance": {
+              "fills": [],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "tags-caption",
+                  "name": "Caption",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Hug-sized tags in a wrapping row"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 13,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 12
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "upper",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 0.55
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "frame",
+                "common": {
+                  "id": "tags",
+                  "name": "Tags",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "appearance": {
+                  "fills": [],
+                  "cornerRadius": {
+                    "type": "uniform",
+                    "radius": 0
+                  }
+                },
+                "children": [
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-0",
+                      "name": "Tag 0",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-0-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "auto layout"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-1",
+                      "name": "Tag 1",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-1-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "constraints"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-2",
+                      "name": "Tag 2",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-2-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "hug"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-3",
+                      "name": "Tag 3",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-3-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "fill"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-4",
+                      "name": "Tag 4",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-4-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "min / max"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-5",
+                      "name": "Tag 5",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-5-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "baseline"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-6",
+                      "name": "Tag 6",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-6-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "wrap"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-7",
+                      "name": "Tag 7",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-7-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "breakpoints"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-8",
+                      "name": "Tag 8",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-8-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "focal point"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-9",
+                      "name": "Tag 9",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-9-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "rich text"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-10",
+                      "name": "Tag 10",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-10-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "rotation"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "tag-11",
+                      "name": "Tag 11",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.1
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 999
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.7608,
+                              "g": 0.2549,
+                              "b": 0.0471,
+                              "a": 0.35
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "tag-11-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "paint-only motion"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 14,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 6,
+                        "right": 14,
+                        "bottom": 6,
+                        "left": 14
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  }
+                ],
+                "clipContent": false,
+                "autoLayout": {
+                  "direction": "horizontal",
+                  "wrap": true,
+                  "gap": {
+                    "type": "fixed",
+                    "value": 8
+                  },
+                  "counterAxisGap": {
+                    "type": "fixed",
+                    "value": 10
+                  },
+                  "padding": {
+                    "top": 0,
+                    "right": 0,
+                    "bottom": 0,
+                    "left": 0
+                  },
+                  "primaryAlign": "start",
+                  "counterAlign": "start",
+                  "rowAlign": "start",
+                  "primarySizing": "fixed",
+                  "counterSizing": "hug",
+                  "strokesIncludedInLayout": false,
+                  "reverseZIndex": false
+                }
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 16
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          },
+          {
+            "type": "frame",
+            "common": {
+              "id": "cards-group",
+              "name": "Cards group",
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "maxWidth": 1200
+              }
+            },
+            "appearance": {
+              "fills": [],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "cards-caption",
+                  "name": "Caption",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "A card row: fill children with min and max widths"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 13,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 12
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "upper",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 0.55
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "frame",
+                "common": {
+                  "id": "cards",
+                  "name": "Card row",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "hug",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 1200
+                  },
+                  "breakpointOverrides": {
+                    "tablet": {
+                      "autoLayout.gap": {
+                        "type": "gap",
+                        "value": {
+                          "type": "fixed",
+                          "value": 16
+                        }
+                      }
+                    },
+                    "mobile": {
+                      "autoLayout.direction": {
+                        "type": "enum",
+                        "value": "vertical"
+                      }
+                    }
+                  }
+                },
+                "appearance": {
+                  "fills": [],
+                  "cornerRadius": {
+                    "type": "uniform",
+                    "radius": 0
+                  }
+                },
+                "children": [
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "card-forest",
+                      "name": "Card forest",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0,
+                      "layoutChild": {
+                        "positioning": "auto",
+                        "horizontalSizing": "fill",
+                        "verticalSizing": "fixed",
+                        "constraints": {
+                          "horizontal": "left",
+                          "vertical": "top"
+                        },
+                        "minWidth": 220
+                      }
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 1.0,
+                            "g": 1.0,
+                            "b": 1.0,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 16
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.8863,
+                              "g": 0.851,
+                              "b": 0.7961,
+                              "a": 1.0
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "frame",
+                        "common": {
+                          "id": "card-forest-img",
+                          "name": "Image",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 180,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "appearance": {
+                          "fills": [
+                            {
+                              "type": "image",
+                              "id": "img",
+                              "assetId": "forest",
+                              "scaleMode": "fill",
+                              "focalPoint": {
+                                "x": 0.5,
+                                "y": 0.6
+                              }
+                            }
+                          ],
+                          "cornerRadius": {
+                            "type": "uniform",
+                            "radius": 10
+                          }
+                        },
+                        "children": [],
+                        "clipContent": false
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-forest-title",
+                          "name": "Title",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "Fill, minimum 220"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "serif",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 22,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 125
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-forest-body",
+                          "name": "Body",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "This card fills its share of the row and never shrinks below 220 pixels."
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 400,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 15,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 150
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 0.75
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": true,
+                    "autoLayout": {
+                      "direction": "vertical",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 12
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 16,
+                        "right": 16,
+                        "bottom": 16,
+                        "left": 16
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "fixed",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "card-sea",
+                      "name": "Card sea",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0,
+                      "layoutChild": {
+                        "positioning": "auto",
+                        "horizontalSizing": "fill",
+                        "verticalSizing": "fixed",
+                        "constraints": {
+                          "horizontal": "left",
+                          "vertical": "top"
+                        },
+                        "minWidth": 220,
+                        "maxWidth": 320
+                      }
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 1.0,
+                            "g": 1.0,
+                            "b": 1.0,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 16
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.8863,
+                              "g": 0.851,
+                              "b": 0.7961,
+                              "a": 1.0
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "frame",
+                        "common": {
+                          "id": "card-sea-img",
+                          "name": "Image",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 180,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "appearance": {
+                          "fills": [
+                            {
+                              "type": "image",
+                              "id": "img",
+                              "assetId": "sea",
+                              "scaleMode": "fill",
+                              "focalPoint": {
+                                "x": 0.5,
+                                "y": 0.6
+                              }
+                            }
+                          ],
+                          "cornerRadius": {
+                            "type": "uniform",
+                            "radius": 10
+                          }
+                        },
+                        "children": [],
+                        "clipContent": false
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-sea-title",
+                          "name": "Title",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "Fill, maximum 320"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "serif",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 22,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 125
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-sea-body",
+                          "name": "Body",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "This one fills too, but freezes at 320 pixels; the others take what it leaves."
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 400,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 15,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 150
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 0.75
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": true,
+                    "autoLayout": {
+                      "direction": "vertical",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 12
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 16,
+                        "right": 16,
+                        "bottom": 16,
+                        "left": 16
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "fixed",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "card-dunes",
+                      "name": "Card dunes",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0,
+                      "layoutChild": {
+                        "positioning": "auto",
+                        "horizontalSizing": "fill",
+                        "verticalSizing": "fixed",
+                        "constraints": {
+                          "horizontal": "left",
+                          "vertical": "top"
+                        },
+                        "minWidth": 220
+                      }
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 1.0,
+                            "g": 1.0,
+                            "b": 1.0,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 16
+                      },
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.8863,
+                              "g": 0.851,
+                              "b": 0.7961,
+                              "a": 1.0
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 1
+                        },
+                        "align": "inside"
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "frame",
+                        "common": {
+                          "id": "card-dunes-img",
+                          "name": "Image",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 180,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "appearance": {
+                          "fills": [
+                            {
+                              "type": "image",
+                              "id": "img",
+                              "assetId": "dunes",
+                              "scaleMode": "fill",
+                              "focalPoint": {
+                                "x": 0.5,
+                                "y": 0.6
+                              }
+                            }
+                          ],
+                          "cornerRadius": {
+                            "type": "uniform",
+                            "radius": 10
+                          }
+                        },
+                        "children": [],
+                        "clipContent": false
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-dunes-title",
+                          "name": "Title",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "Image focal point"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "serif",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 22,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 125
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "card-dunes-body",
+                          "name": "Body",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0,
+                          "layoutChild": {
+                            "positioning": "auto",
+                            "horizontalSizing": "fill",
+                            "verticalSizing": "fixed",
+                            "constraints": {
+                              "horizontal": "left",
+                              "vertical": "top"
+                            }
+                          }
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "Each image fills its frame and keeps its focal point in view as the card resizes."
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 400,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 15,
+                          "lineHeight": {
+                            "type": "percent",
+                            "value": 150
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 0.75
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "height",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": true,
+                    "autoLayout": {
+                      "direction": "vertical",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 12
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 16,
+                        "right": 16,
+                        "bottom": 16,
+                        "left": 16
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "fixed",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  }
+                ],
+                "clipContent": false,
+                "autoLayout": {
+                  "direction": "horizontal",
+                  "wrap": false,
+                  "gap": {
+                    "type": "fixed",
+                    "value": 24
+                  },
+                  "counterAxisGap": {
+                    "type": "fixed",
+                    "value": 0
+                  },
+                  "padding": {
+                    "top": 0,
+                    "right": 0,
+                    "bottom": 0,
+                    "left": 0
+                  },
+                  "primaryAlign": "start",
+                  "counterAlign": "start",
+                  "rowAlign": "start",
+                  "primarySizing": "fixed",
+                  "counterSizing": "hug",
+                  "strokesIncludedInLayout": false,
+                  "reverseZIndex": false
+                }
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 16
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          },
+          {
+            "type": "frame",
+            "common": {
+              "id": "baseline-group",
+              "name": "Baseline group",
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "maxWidth": 720
+              }
+            },
+            "appearance": {
+              "fills": [],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "baseline-caption",
+                  "name": "Caption",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Baselines across sizes and a nested frame"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 13,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 12
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "upper",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 0.55
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "frame",
+                "common": {
+                  "id": "baseline-row",
+                  "name": "Baseline row",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "appearance": {
+                  "fills": [],
+                  "cornerRadius": {
+                    "type": "uniform",
+                    "radius": 0
+                  }
+                },
+                "children": [
+                  {
+                    "type": "text",
+                    "common": {
+                      "id": "bl-big",
+                      "name": "Big",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "content": [
+                      {
+                        "spans": [
+                          {
+                            "text": "Big"
+                          }
+                        ]
+                      }
+                    ],
+                    "style": {
+                      "fontFamilyId": "serif",
+                      "fontWeight": 700,
+                      "italic": false,
+                      "fontVariations": {},
+                      "fontSize": 72,
+                      "lineHeight": {
+                        "type": "percent",
+                        "value": 100
+                      },
+                      "letterSpacing": {
+                        "type": "percent",
+                        "value": 0
+                      },
+                      "paragraphSpacing": 0,
+                      "paragraphIndent": 0,
+                      "textCase": "none",
+                      "decoration": {
+                        "kind": "none"
+                      },
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "text",
+                          "color": {
+                            "r": 0.1098,
+                            "g": 0.102,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "openType": {},
+                      "baselineShift": "none",
+                      "listStyle": "none"
+                    },
+                    "autoResize": "widthAndHeight",
+                    "alignHorizontal": "left"
+                  },
+                  {
+                    "type": "text",
+                    "common": {
+                      "id": "bl-medium",
+                      "name": "Medium",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "content": [
+                      {
+                        "spans": [
+                          {
+                            "text": "medium"
+                          }
+                        ]
+                      }
+                    ],
+                    "style": {
+                      "fontFamilyId": "serif",
+                      "fontWeight": 400,
+                      "italic": false,
+                      "fontVariations": {},
+                      "fontSize": 36,
+                      "lineHeight": {
+                        "type": "auto"
+                      },
+                      "letterSpacing": {
+                        "type": "percent",
+                        "value": 0
+                      },
+                      "paragraphSpacing": 0,
+                      "paragraphIndent": 0,
+                      "textCase": "none",
+                      "decoration": {
+                        "kind": "none"
+                      },
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "text",
+                          "color": {
+                            "r": 0.1098,
+                            "g": 0.102,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "openType": {},
+                      "baselineShift": "none",
+                      "listStyle": "none"
+                    },
+                    "autoResize": "widthAndHeight",
+                    "alignHorizontal": "left"
+                  },
+                  {
+                    "type": "text",
+                    "common": {
+                      "id": "bl-small",
+                      "name": "Small",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "content": [
+                      {
+                        "spans": [
+                          {
+                            "text": "small"
+                          }
+                        ]
+                      }
+                    ],
+                    "style": {
+                      "fontFamilyId": "sans",
+                      "fontWeight": 400,
+                      "italic": false,
+                      "fontVariations": {},
+                      "fontSize": 16,
+                      "lineHeight": {
+                        "type": "auto"
+                      },
+                      "letterSpacing": {
+                        "type": "percent",
+                        "value": 0
+                      },
+                      "paragraphSpacing": 0,
+                      "paragraphIndent": 0,
+                      "textCase": "none",
+                      "decoration": {
+                        "kind": "none"
+                      },
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "text",
+                          "color": {
+                            "r": 0.1098,
+                            "g": 0.102,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "openType": {},
+                      "baselineShift": "none",
+                      "listStyle": "none"
+                    },
+                    "autoResize": "widthAndHeight",
+                    "alignHorizontal": "left"
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "bl-nested",
+                      "name": "Nested frame",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 0.12
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 8
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "bl-nested-text",
+                          "name": "Nested text",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "nested 24"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 24,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.7608,
+                                "g": 0.2549,
+                                "b": 0.0471,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      },
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "bl-nested-note",
+                          "name": "Nested note",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "first text sets the baseline"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 400,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 11,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 0.1098,
+                                "g": 0.102,
+                                "b": 0.0902,
+                                "a": 0.6
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "vertical",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 2
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 10,
+                        "right": 12,
+                        "bottom": 10,
+                        "left": 12
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "bl-square",
+                      "name": "No text: bottom on baseline",
+                      "x": 0,
+                      "y": 0,
+                      "width": 24,
+                      "height": 24
+                    },
+                    "geometry": {
+                      "type": "rectangle"
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.1098,
+                            "g": 0.102,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "clipContent": false,
+                "autoLayout": {
+                  "direction": "horizontal",
+                  "wrap": true,
+                  "gap": {
+                    "type": "fixed",
+                    "value": 20
+                  },
+                  "counterAxisGap": {
+                    "type": "fixed",
+                    "value": 12
+                  },
+                  "padding": {
+                    "top": 0,
+                    "right": 0,
+                    "bottom": 0,
+                    "left": 0
+                  },
+                  "primaryAlign": "start",
+                  "counterAlign": "baseline",
+                  "rowAlign": "start",
+                  "primarySizing": "fixed",
+                  "counterSizing": "hug",
+                  "strokesIncludedInLayout": false,
+                  "reverseZIndex": false
+                }
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 16
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          },
+          {
+            "type": "frame",
+            "common": {
+              "id": "shapes-group",
+              "name": "Shapes group",
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fill",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "left",
+                  "vertical": "top"
+                },
+                "maxWidth": 720
+              }
+            },
+            "appearance": {
+              "fills": [],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 0
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "shapes-caption",
+                  "name": "Caption",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "Shapes, and a rotated frame in auto layout"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 700,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 13,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 12
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "upper",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 0.55
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "left"
+              },
+              {
+                "type": "frame",
+                "common": {
+                  "id": "shapes-row",
+                  "name": "Shapes and rotation",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    },
+                    "maxWidth": 720
+                  }
+                },
+                "appearance": {
+                  "fills": [],
+                  "cornerRadius": {
+                    "type": "uniform",
+                    "radius": 0
+                  }
+                },
+                "children": [
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "shape-pie",
+                      "name": "Pie",
+                      "x": 0,
+                      "y": 0,
+                      "width": 64,
+                      "height": 64
+                    },
+                    "geometry": {
+                      "type": "ellipse",
+                      "arcStart": 0,
+                      "arcEnd": 270
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.7608,
+                            "g": 0.2549,
+                            "b": 0.0471,
+                            "a": 1.0
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "frame",
+                    "common": {
+                      "id": "sticker",
+                      "name": "Sticker (rotated)",
+                      "x": 0,
+                      "y": 0,
+                      "width": 0,
+                      "height": 0,
+                      "rotation": -8
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.1098,
+                            "g": 0.102,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ],
+                      "cornerRadius": {
+                        "type": "uniform",
+                        "radius": 8
+                      }
+                    },
+                    "children": [
+                      {
+                        "type": "text",
+                        "common": {
+                          "id": "sticker-label",
+                          "name": "Label",
+                          "x": 0,
+                          "y": 0,
+                          "width": 0,
+                          "height": 0
+                        },
+                        "content": [
+                          {
+                            "spans": [
+                              {
+                                "text": "rotated −8°"
+                              }
+                            ]
+                          }
+                        ],
+                        "style": {
+                          "fontFamilyId": "sans",
+                          "fontWeight": 600,
+                          "italic": false,
+                          "fontVariations": {},
+                          "fontSize": 15,
+                          "lineHeight": {
+                            "type": "auto"
+                          },
+                          "letterSpacing": {
+                            "type": "percent",
+                            "value": 0
+                          },
+                          "paragraphSpacing": 0,
+                          "paragraphIndent": 0,
+                          "textCase": "none",
+                          "decoration": {
+                            "kind": "none"
+                          },
+                          "fills": [
+                            {
+                              "type": "solid",
+                              "id": "text",
+                              "color": {
+                                "r": 1.0,
+                                "g": 1.0,
+                                "b": 1.0,
+                                "a": 1.0
+                              }
+                            }
+                          ],
+                          "openType": {},
+                          "baselineShift": "none",
+                          "listStyle": "none"
+                        },
+                        "autoResize": "widthAndHeight",
+                        "alignHorizontal": "left"
+                      }
+                    ],
+                    "clipContent": false,
+                    "autoLayout": {
+                      "direction": "horizontal",
+                      "wrap": false,
+                      "gap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "counterAxisGap": {
+                        "type": "fixed",
+                        "value": 0
+                      },
+                      "padding": {
+                        "top": 10,
+                        "right": 16,
+                        "bottom": 10,
+                        "left": 16
+                      },
+                      "primaryAlign": "start",
+                      "counterAlign": "start",
+                      "rowAlign": "start",
+                      "primarySizing": "hug",
+                      "counterSizing": "hug",
+                      "strokesIncludedInLayout": false,
+                      "reverseZIndex": false
+                    }
+                  },
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "shape-star",
+                      "name": "Star",
+                      "x": 0,
+                      "y": 0,
+                      "width": 64,
+                      "height": 64
+                    },
+                    "geometry": {
+                      "type": "star",
+                      "pointCount": 5,
+                      "innerRatio": 0.45
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.8314,
+                            "g": 0.6275,
+                            "b": 0.0902,
+                            "a": 1.0
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "shape-hex",
+                      "name": "Hexagon",
+                      "x": 0,
+                      "y": 0,
+                      "width": 64,
+                      "height": 64
+                    },
+                    "geometry": {
+                      "type": "polygon",
+                      "pointCount": 6
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.0588,
+                            "g": 0.4627,
+                            "b": 0.4314,
+                            "a": 1.0
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "shape-ring",
+                      "name": "Ring",
+                      "x": 0,
+                      "y": 0,
+                      "width": 64,
+                      "height": 64
+                    },
+                    "geometry": {
+                      "type": "ellipse",
+                      "innerRadius": 0.6
+                    },
+                    "appearance": {
+                      "fills": [
+                        {
+                          "type": "solid",
+                          "id": "fill",
+                          "color": {
+                            "r": 0.1137,
+                            "g": 0.3059,
+                            "b": 0.8471,
+                            "a": 1.0
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "shape",
+                    "common": {
+                      "id": "shape-line",
+                      "name": "Line",
+                      "x": 0,
+                      "y": 0,
+                      "width": 80,
+                      "height": 0
+                    },
+                    "geometry": {
+                      "type": "line"
+                    },
+                    "appearance": {
+                      "fills": [],
+                      "strokes": {
+                        "paints": [
+                          {
+                            "type": "solid",
+                            "id": "stroke",
+                            "color": {
+                              "r": 0.1098,
+                              "g": 0.102,
+                              "b": 0.0902,
+                              "a": 1
+                            }
+                          }
+                        ],
+                        "weight": {
+                          "type": "uniform",
+                          "weight": 3
+                        },
+                        "align": "center"
+                      }
+                    }
+                  }
+                ],
+                "clipContent": false,
+                "autoLayout": {
+                  "direction": "horizontal",
+                  "wrap": true,
+                  "gap": {
+                    "type": "fixed",
+                    "value": 32
+                  },
+                  "counterAxisGap": {
+                    "type": "fixed",
+                    "value": 24
+                  },
+                  "padding": {
+                    "top": 0,
+                    "right": 0,
+                    "bottom": 0,
+                    "left": 0
+                  },
+                  "primaryAlign": "start",
+                  "counterAlign": "center",
+                  "rowAlign": "start",
+                  "primarySizing": "fixed",
+                  "counterSizing": "hug",
+                  "strokesIncludedInLayout": false,
+                  "reverseZIndex": false
+                }
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 16
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          }
+        ],
+        "clipContent": false,
+        "autoLayout": {
+          "direction": "vertical",
+          "wrap": false,
+          "gap": {
+            "type": "fixed",
+            "value": 72
+          },
+          "counterAxisGap": {
+            "type": "fixed",
+            "value": 0
+          },
+          "padding": {
+            "top": 120,
+            "right": 120,
+            "bottom": 140,
+            "left": 120
+          },
+          "primaryAlign": "start",
+          "counterAlign": "center",
+          "rowAlign": "start",
+          "primarySizing": "hug",
+          "counterSizing": "fixed",
+          "strokesIncludedInLayout": false,
+          "reverseZIndex": false
+        }
+      }
+    },
+    {
+      "id": "quote",
+      "name": "Quote",
+      "kind": "pinned",
+      "scrollLength": 0.5,
+      "root": {
+        "type": "frame",
+        "common": {
+          "id": "quote-root",
+          "name": "Stage",
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 900
+        },
+        "appearance": {
+          "fills": [
+            {
+              "type": "image",
+              "id": "img",
+              "assetId": "sea",
+              "scaleMode": "fill",
+              "focalPoint": {
+                "x": 0.5,
+                "y": 0.75
+              }
+            }
+          ],
+          "cornerRadius": {
+            "type": "uniform",
+            "radius": 0
+          }
+        },
+        "children": [
+          {
+            "type": "frame",
+            "common": {
+              "id": "quote-card",
+              "name": "Quote card",
+              "x": 370,
+              "y": 300,
+              "width": 700,
+              "height": 300,
+              "layoutChild": {
+                "positioning": "auto",
+                "horizontalSizing": "fixed",
+                "verticalSizing": "fixed",
+                "constraints": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                }
+              },
+              "breakpointOverrides": {
+                "tablet": {
+                  "x": {
+                    "type": "number",
+                    "value": 117
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 406
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 600
+                  }
+                },
+                "mobile": {
+                  "x": {
+                    "type": "number",
+                    "value": 24
+                  },
+                  "y": {
+                    "type": "number",
+                    "value": 272
+                  },
+                  "width": {
+                    "type": "number",
+                    "value": 342
+                  },
+                  "autoLayout.padding": {
+                    "type": "insets",
+                    "value": {
+                      "top": 28,
+                      "right": 24,
+                      "bottom": 28,
+                      "left": 24
+                    }
+                  }
+                }
+              }
+            },
+            "appearance": {
+              "fills": [
+                {
+                  "type": "solid",
+                  "id": "fill",
+                  "color": {
+                    "r": 1.0,
+                    "g": 1.0,
+                    "b": 1.0,
+                    "a": 0.9
+                  }
+                }
+              ],
+              "cornerRadius": {
+                "type": "uniform",
+                "radius": 20
+              }
+            },
+            "children": [
+              {
+                "type": "text",
+                "common": {
+                  "id": "quote-text",
+                  "name": "Quote",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    }
+                  },
+                  "breakpointOverrides": {
+                    "mobile": {
+                      "style.fontSize": {
+                        "type": "number",
+                        "value": 22
+                      }
+                    }
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "“A story is a sequence of rooms you walk through, not a page you read.”"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "serif",
+                  "fontWeight": 500,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 30,
+                  "lineHeight": {
+                    "type": "percent",
+                    "value": 135
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 0
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "none",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 1.0
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "center"
+              },
+              {
+                "type": "text",
+                "common": {
+                  "id": "quote-by",
+                  "name": "Attribution",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 0,
+                  "layoutChild": {
+                    "positioning": "auto",
+                    "horizontalSizing": "fill",
+                    "verticalSizing": "fixed",
+                    "constraints": {
+                      "horizontal": "left",
+                      "vertical": "top"
+                    }
+                  }
+                },
+                "content": [
+                  {
+                    "spans": [
+                      {
+                        "text": "— the Soundstage brief"
+                      }
+                    ]
+                  }
+                ],
+                "style": {
+                  "fontFamilyId": "sans",
+                  "fontWeight": 600,
+                  "italic": false,
+                  "fontVariations": {},
+                  "fontSize": 14,
+                  "lineHeight": {
+                    "type": "auto"
+                  },
+                  "letterSpacing": {
+                    "type": "percent",
+                    "value": 0
+                  },
+                  "paragraphSpacing": 0,
+                  "paragraphIndent": 0,
+                  "textCase": "none",
+                  "decoration": {
+                    "kind": "none"
+                  },
+                  "fills": [
+                    {
+                      "type": "solid",
+                      "id": "text",
+                      "color": {
+                        "r": 0.1098,
+                        "g": 0.102,
+                        "b": 0.0902,
+                        "a": 0.6
+                      }
+                    }
+                  ],
+                  "openType": {},
+                  "baselineShift": "none",
+                  "listStyle": "none"
+                },
+                "autoResize": "height",
+                "alignHorizontal": "center"
+              }
+            ],
+            "clipContent": false,
+            "autoLayout": {
+              "direction": "vertical",
+              "wrap": false,
+              "gap": {
+                "type": "fixed",
+                "value": 16
+              },
+              "counterAxisGap": {
+                "type": "fixed",
+                "value": 0
+              },
+              "padding": {
+                "top": 40,
+                "right": 40,
+                "bottom": 40,
+                "left": 40
+              },
+              "primaryAlign": "start",
+              "counterAlign": "start",
+              "rowAlign": "start",
+              "primarySizing": "hug",
+              "counterSizing": "fixed",
+              "strokesIncludedInLayout": false,
+              "reverseZIndex": false
+            }
+          }
+        ],
+        "clipContent": true
+      }
+    }
+  ]
+}
