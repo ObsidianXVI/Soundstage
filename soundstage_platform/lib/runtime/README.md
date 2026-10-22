@@ -152,9 +152,12 @@ text drop shadows (one to three `saveLayer`s each).
 **Animator** (`animator/stage_animator.dart`):
 - Groups tracks by clock and binds each target once, when its render object attaches to the
   `StageNodeRegistry`.
-- `opacity` and `motion.*` tracks write `RenderStageBox` typed slots (`setAnimatedSlot`): paint only,
-  allocation-free. Every other property goes through the box's `nodeAnimator`, which re-renders the
-  node from its resolved base through the registry, invalidating paint or layout by what changed.
+- `opacity` and `motion.*` tracks write `RenderStageBox` typed slots (`setAnimatedSlot`),
+  allocation-free. On a repaint boundary this only updates its composited layers (note 32).
+- Other tracks are offered to the box when it is a typed track host (below): frames and shapes
+  take typed paint overrides, text takes style channels. Everything else goes through the box's
+  `nodeAnimator`, which re-renders the node from its resolved base through the registry,
+  invalidating paint or layout by what changed (note 43).
 - One `Ticker`, running only while a timeline or audio clock is active or a smoothed clock hasn't
   settled.
 - Edit mode freezes clocks at `clockOverrides`, makes pointer and behaviour clocks inert, and never
@@ -163,8 +166,14 @@ text drop shadows (one to three `saveLayer`s each).
 **Typed track hosts** (T0.7, `animator/text_style_tracks.dart`): a render object implementing
 `StageTypedTrackHost` is offered every non-slot track when it binds (`bindTrack` → handle,
 `trackChanged`, `unbindTrack`). `RenderStageText` takes `style.*` and
-`content.<p>.spans.<s>.style.*` tracks as `TextStyleChannel`s (note 34). Those tracks never go
-through the node animator.
+`content.<p>.spans.<s>.style.*` tracks as `TextStyleChannel`s (note 34). `RenderStageFrame` and
+`RenderStageShape` (T0.6b) take the numeric and colour appearance tracks as typed paint overrides
+(`StageAppearanceOverrides` in `paint/appearance_overrides.dart`, note 43): each channel holds one
+track's value in a `Float64List`, written in place on `trackChanged`, and the paint seam
+(`StageAppearancePainter`, `paintStageAppearance`, the outline and stroke outsets) reads it at paint
+time. Both kinds of host share this one binding protocol; they differ only in what a channel
+writes (span styles re-merged before text layout vs paint values read at paint). Tracks a host
+declines (null handle) go through the node animator.
 
 **Behaviour drivers** (T0.7, `animator/behavior_drivers.dart`): `TextRevealDriver` and
 `LyricsDriver` follow a clock like tracks and bind to render objects through the registry. Lyrics
@@ -179,7 +188,11 @@ it. `StageEnterGate(document:, environment:, audio:, child:)` wraps the player.
 - `setAnimatedSlot(slot, value)` / `animatedSlot(slot)`, with `RenderStageBox.slotForPath`.
 - `effectiveOpacity`, and `paintTransform` reads the slots.
 - `baseNode` (resolved) vs `node` (rendered), `nodeAnimator`, `refreshAnimatedNode()`.
-- Debug counters: `debugLayoutCount` / `debugPaintCount`.
+- Typed paint overrides: `appearanceOverrides`, `addAppearanceOverride` /
+  `removeAppearanceOverride` / `clearAppearanceOverrides`, `appearanceOverrideChanged`.
+- `inBlendGroup` (note 44) and `updateCompositedLayer` (note 32).
+- Debug counters: `debugLayoutCount` / `debugPaintCount` (static) and `debugNodePaintCount` (per
+  node: how often it recorded its content).
 
 ## Behaviour notes
 
@@ -296,9 +309,9 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     Non-box spread scales about the centre. Text shadows have no spread; text has no inner
     shadow or background blur.
 24. **Blend and opacity.** Each paint's blend mode applies to its own draw (blends with the
-    stack below, inside the node). Node blend modes isolate the node in a `saveLayer`;
-    descendants that make their own compositing layers (repaint boundaries, blurs) paint
-    outside that group, so a blended group avoids them. Masks and video appearance are M3.
+    stack below, inside the node). Node blend modes isolate the node in a `saveLayer`, and
+    descendants never make compositing layers inside it (note 44). Masks and video appearance
+    are M3.
 
 **Motion (T0.6)** (DN = question for DECISIONS_NEEDED)
 
@@ -317,20 +330,26 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     - It returns to 0 outside the frame or when the pointer leaves the player.
     - Scrolling under a still pointer doesn't update it.
 28. **Which tracks are allocation-free (DN).** (Text style tracks: see note 34.)
-    - Every numeric and colour evaluator is allocation-free, and so is the push of `opacity` and
-      `motion.*`.
-    - Any other property (e.g. `fills.<id>.color`, `effects.<id>.radius`, `width`) re-renders the node
-      through the registry: one node copy per changed node per frame. That is because the paint
-      pipeline (T0.5) consumes IR paints and effects. Typed paint overrides need a hook in
-      `StageAppearancePainter`.
+    - Every numeric and colour evaluator, the push of `opacity` and `motion.*`, and (T0.6b) the
+      push of typed paint overrides on frames and shapes (note 43) are allocation-free. Painting
+      still allocates (`Paint`s, shaders, and a copy of each overridden paint or effect), but only
+      for nodes whose paint changed.
+    - Layout-class properties (`width`, `height`, `autoLayout.*`, …) and everything without a typed
+      path still re-render the node through the registry: one node copy per changed node per frame.
+    - Measuring this in the VM's JIT: see note 46.
 29. **Text style tracks.** Superseded by note 34 (T0.7): they render.
 30. **Cross-scene scroll clocks.** A `sceneScroll` clock whose `sceneId` is a different scene applies
     on the next tick (one frame later), because a sliver may only mutate its own subtree during
     layout.
 31. **Lazy flow extents.** A flow scene that has never been built reports its root's stored height.
     Once laid out, it keeps its measured height while unbuilt.
-32. **Composited updates.** Motion and opacity changes repaint the node's own repaint boundary (re-record
-    its picture). Using `updateCompositedLayer` to change only the layer is a possible follow-up.
+32. **Composited updates (T0.6b).** A repaint boundary's own layer is a `TransformLayer` holding its
+    paint transform (identity without one), with an `OpacityLayer` child holding its opacity, kept
+    even when opaque or transparent. `opacity` and `motion.*` changes call
+    `markNeedsCompositedLayerUpdate`, and `updateCompositedLayer` updates both layers: no picture is
+    re-recorded (`composited_updates_test.dart` scrolls a pinned scene and counts zero paints). A
+    boundary therefore never folds its opacity into its paint colours, and records its content even
+    at opacity 0.
 33. Vertical, top-to-bottom scrolling only.
 
 **Fonts, audio and text behaviours (T0.7)** (DN = question for DECISIONS_NEEDED)
@@ -404,3 +423,40 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     its baseline (first non-empty span of the first visible paragraph), and the last line below
     its baseline. Without OS/2 v2+ (or a document font) there is no trim and a font diagnostic.
 
+**Runtime hardening (T0.6b)** (DN = question for DECISIONS_NEEDED)
+
+43. **Typed vs registry paths.** On frames and shapes (and video, which renders as a shape):
+    - **Typed paint overrides:** `fills.<id>.color|opacity`, `fills.<id>.stops.<i>.color|position`,
+      the same under `strokes.paints.<id>`, `strokes.weight` and `strokes.weight.<side>`,
+      `effects.<id>.color|offset|blur|spread|radius`, `cornerRadius`, `cornerRadius.<corner>` and
+      `cornerSmoothing`, when every keyframe has the property's type (`CompiledTrack.isTyped`).
+    - **Slots:** `opacity`, `motion.*`.
+    - **Registry (fallback):** everything else, including discrete properties (`visible`,
+      `blendMode`, `kind`), gradient handles, image properties, whole paints/effects/stacks, layout
+      properties and malformed tracks.
+    - Typed overrides apply after the registry's, in track order, and address paints and effects by
+      id (unique ids assumed, as the spec requires). A missing id or a field the paint kind lacks
+      is ignored, like the registry. A stroke weight change relayouts only when the parent's auto
+      layout has `strokesIncludedInLayout`. Equivalence with the registry and `evaluateTrack` is
+      tested per path and composed (`paint_overrides_test.dart`).
+    - Structural decisions depend on which overrides exist, not their values, so animating never
+      changes compositing: a paint with an animated opacity counts as a painted part, a blur with
+      an animated radius keeps its layer at radius 0, and drop shadows always knock out under a
+      fill with overrides.
+44. **Blend groups.** A node inside an ancestor that isolates a group (a non-normal blend mode, or a
+    `normal` frame with a blending child) is never a repaint boundary or compositing layer
+    (`inBlendGroup`), and neither is a node that blends itself. Its opacity and layer blur become
+    canvas `saveLayer`s and its animated values repaint with the group. Decided at attach, when a
+    node's blend changes (its subtree and its parent are updated), and when a frame adopts or drops
+    a blending child. Exceptions (DN): a background blur still needs its layers, and text layer
+    blur (`text_paint.dart`) still uses an `ImageFilterLayer`; both escape the group.
+45. **Boundaries start at attach.** A node is not a repaint boundary until its first attach has
+    decided `inBlendGroup`, because the framework assumes a node that was a boundary when
+    constructed already has a layer.
+46. **Allocation measurement (DN).** `animator_alloc_bench.dart` counts VM allocations. In the JIT,
+    a `double` that crosses a call the JIT did not inline is boxed, so the result depends on
+    inlining: hot double helpers carry `@pragma('vm:prefer-inline')`, slot values pass as a
+    `Float64List` index, and the sRGB encode is local. Evaluators and slot pushes measure 0. The
+    mixed bench (frames and shapes together) measures 0 in some runs and up to about 2.4 boxed
+    doubles per frame in others; each kind alone is 0. AOT and the web compile doubles unboxed
+    through these calls.
