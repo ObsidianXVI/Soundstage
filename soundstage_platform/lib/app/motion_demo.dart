@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
+import 'sound_demo.dart' show demoWheelSmoothing;
+
 /// The T0.6 motion demo (open the app with `?demo=motion`).
 const String kMotionDemoAsset = 'assets/demo/motion.stage.json';
 
@@ -25,7 +27,10 @@ class MotionDemoHarness extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (ref.watch(motionDemoDocumentProvider)) {
-      AsyncData(:final value) => StagePlayer(document: value),
+      AsyncData(:final value) => StagePlayer(
+        document: value,
+        wheelSmoothing: demoWheelSmoothing(),
+      ),
       AsyncError(:final error) => Center(
         child: Text('Could not load the motion demo: $error'),
       ),
