@@ -24,8 +24,7 @@ ir.NodeCommon common(
   layoutChild: layoutChild,
 );
 
-/// The one place tests build text nodes. The node-level `style` changes type
-/// in T0.3b (`TextStyleOverride`); only this helper changes then.
+/// The one place tests build text nodes.
 ir.TextNode textNode(
   String id, {
   String text = '',
@@ -45,7 +44,7 @@ ir.TextNode textNode(
       [
         ir.Paragraph(spans: [ir.Span(text: text)]),
       ],
-  style: ir.TextStyle(
+  style: ir.TextStyleOverride(
     fontSize: fontSize,
     lineHeight: lineHeight,
     paragraphSpacing: paragraphSpacing,
