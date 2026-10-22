@@ -71,27 +71,15 @@ class RenderStageFrame extends RenderStageBox
   ir.AutoLayout? get _autoLayout =>
       frame.grid == null ? frame.autoLayout : null;
 
+  // `hug` means "hug the auto-layout content", so without auto layout it is
+  // treated as fixed. Sizing is per axis and comes only from `layoutChild`.
   @override
-  bool get hugsWidth {
-    final al = _autoLayout;
-    if (al == null) return false;
-    final own = al.direction == ir.LayoutDirection.horizontal
-        ? al.primarySizing
-        : al.counterSizing;
-    return own == ir.AxisSizing.hug ||
-        layoutChild.horizontalSizing == ir.Sizing.hug;
-  }
+  bool get hugsWidth =>
+      _autoLayout != null && layoutChild.horizontalSizing == ir.Sizing.hug;
 
   @override
-  bool get hugsHeight {
-    final al = _autoLayout;
-    if (al == null) return false;
-    final own = al.direction == ir.LayoutDirection.vertical
-        ? al.primarySizing
-        : al.counterSizing;
-    return own == ir.AxisSizing.hug ||
-        layoutChild.verticalSizing == ir.Sizing.hug;
-  }
+  bool get hugsHeight =>
+      _autoLayout != null && layoutChild.verticalSizing == ir.Sizing.hug;
 
   @override
   EdgeInsets get strokeOutsets => strokeOutsetsOf(frame.appearance.strokes);

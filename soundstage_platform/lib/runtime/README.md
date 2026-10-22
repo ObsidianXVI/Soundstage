@@ -93,18 +93,14 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
 
 **Sizing**
 
-1. **Effective sizing per axis (DN).** A child in an auto-layout parent uses `fill` when
-   `layoutChild` says fill. Otherwise it uses `hug` when the node hugs that axis, and `fixed`
-   otherwise.
-   - A frame hugs an axis when its own `autoLayout` sizing for that axis (primary or counter,
-     depending on direction) is `hug`, or when `layoutChild` says `hug`.
-   - Text hugs according to `autoResize` (`widthAndHeight`: both axes; `height`: height), or when
-     `layoutChild` says `hug`.
-   - Shapes, free frames and grid frames never hug. `fill` outside an auto-layout parent is ignored.
-2. **Direction-relative sizing (DN).** `primarySizing`/`counterSizing` follow the direction, so a
-   breakpoint patch that flips `direction` also changes which axis is fixed. Figma stores sizing
-   per axis. To keep an axis's sizing across a direction flip, set `layoutChild.*Sizing: hug`
-   (the demo's card row does this).
+1. **Per-axis sizing.** A node's size mode on each axis comes only from
+   `layoutChild.horizontalSizing`/`verticalSizing` (fixed | hug | fill). `fill` applies only inside
+   an auto-layout parent. `hug` on a frame means "hug the auto-layout content", so a frame
+   without auto layout (or a grid frame, until M3) treats `hug` as `fixed`. Text also hugs
+   according to `autoResize` (`widthAndHeight`: both axes; `height`: height). Shapes never hug.
+2. **Direction flips keep sizing.** Because sizing is per axis rather than relative to the
+   direction, a breakpoint patch that flips `autoLayout.direction` keeps each axis's mode (the
+   demo's card row hugs vertically in both directions). (Settled in DECISIONS.md.)
 3. **Counter-axis fill in a hugging counter axis.** It stretches to the largest non-fill sibling.
    If every child fills, they hug. In wrapped rows, counter fill takes the row's height.
 

@@ -116,8 +116,6 @@ void main() {
       autoLayout: ir.AutoLayout(
         gap: const ir.Gap.fixed(10),
         padding: ir.EdgeInsetsValue.all(10),
-        primarySizing: ir.AxisSizing.fixed,
-        counterSizing: ir.AxisSizing.fixed,
       ),
       children: [
         rect('a', common('a', w: 100, h: 50)),
@@ -162,7 +160,15 @@ void main() {
   ) async {
     final hug = frame(
       'hug',
-      common('hug', x: 20, y: 30),
+      common(
+        'hug',
+        x: 20,
+        y: 30,
+        layoutChild: const ir.LayoutChild(
+          horizontalSizing: ir.Sizing.hug,
+          verticalSizing: ir.Sizing.hug,
+        ),
+      ),
       autoLayout: ir.AutoLayout(
         direction: ir.LayoutDirection.vertical,
         padding: ir.EdgeInsetsValue.all(5),
@@ -250,6 +256,54 @@ void main() {
     expect(globalRect(tester, 'box').bottom, closeTo(base, 1e-6));
   });
 
+  testWidgets('a direction flip keeps each axis sizing (T0.4 regression)', (
+    tester,
+  ) async {
+    final row = ir.FrameNode(
+      common: const ir.NodeCommon(
+        id: 'row',
+        width: 300,
+        layoutChild: ir.LayoutChild(verticalSizing: ir.Sizing.hug),
+        breakpointOverrides: {
+          'mobile': {'autoLayout.direction': ir.IrValue.enumValue('vertical')},
+        },
+      ),
+      autoLayout: const ir.AutoLayout(gap: ir.Gap.fixed(10)),
+      children: [
+        rect('a', common('a', w: 50, h: 20)),
+        rect('b', common('b', w: 50, h: 20)),
+      ],
+    );
+    final root = frame(
+      'root',
+      common('root', w: 1440, h: 900),
+      children: [row],
+    );
+    await pumpScene(tester, docWithRoot(root), viewport: const Size(1440, 900));
+    expect(globalRect(tester, 'row'), const Rect.fromLTWH(0, 0, 300, 20));
+    await pumpScene(tester, docWithRoot(root), viewport: const Size(390, 844));
+    // Width stays fixed at 300, height keeps hugging (now 20 + 10 + 20).
+    expect(globalRect(tester, 'row'), const Rect.fromLTWH(0, 0, 300, 50));
+  });
+
+  testWidgets('hug without auto layout behaves as fixed', (tester) async {
+    final f = frame(
+      'f',
+      common(
+        'f',
+        w: 120,
+        h: 80,
+        layoutChild: const ir.LayoutChild(
+          horizontalSizing: ir.Sizing.hug,
+          verticalSizing: ir.Sizing.hug,
+        ),
+      ),
+    );
+    final root = frame('root', common('root', w: 1440, h: 900), children: [f]);
+    await pumpScene(tester, docWithRoot(root), viewport: const Size(1440, 900));
+    expect(globalRect(tester, 'f'), const Rect.fromLTWH(0, 0, 120, 80));
+  });
+
   testWidgets('a breakpoint patch turns the row vertical on mobile', (
     tester,
   ) async {
@@ -282,11 +336,15 @@ void main() {
   ) async {
     final root = frame(
       'root',
-      common('root', w: 1440, h: 10),
+      common(
+        'root',
+        w: 1440,
+        h: 10,
+        layoutChild: const ir.LayoutChild(verticalSizing: ir.Sizing.hug),
+      ),
       autoLayout: ir.AutoLayout(
         direction: ir.LayoutDirection.vertical,
         padding: ir.EdgeInsetsValue.all(20),
-        counterSizing: ir.AxisSizing.fixed,
       ),
       children: [
         rect(
@@ -319,8 +377,6 @@ void main() {
       'row',
       common('row', w: 200, h: 100),
       autoLayout: const ir.AutoLayout(
-        primarySizing: ir.AxisSizing.fixed,
-        counterSizing: ir.AxisSizing.fixed,
       ),
       children: [
         rect('a', common('a', w: 50, h: 50)),

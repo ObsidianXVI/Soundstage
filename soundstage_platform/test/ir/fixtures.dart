@@ -106,8 +106,6 @@ const autoLayout = AutoLayout(
   primaryAlign: PrimaryAlign.end,
   counterAlign: CounterAlign.baseline,
   rowAlign: RowAlign.center,
-  primarySizing: AxisSizing.fixed,
-  counterSizing: AxisSizing.fixed,
   strokesIncludedInLayout: true,
   reverseZIndex: true,
 );
@@ -755,7 +753,6 @@ StageDocument compositeDocument() {
         wrap: true,
         gap: Gap.fixed(24),
         counterAxisGap: Gap.fixed(24),
-        primarySizing: AxisSizing.fixed,
       ),
       children: [
         card,

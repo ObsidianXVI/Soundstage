@@ -75,8 +75,9 @@ in `DECISIONS_NEEDED.md`.
 - **Actions** address timelines by `clockId`. `audioCue` names its `audioTrackId`.
 - **Easing presets:** `ease`, `easeIn`, `easeOut`, `easeInOut`, and the `…Back` variants
   (curves land in T0.3).
-- **Defaults:** node geometry 0, `AutoLayout` sizing `hug`/`hug` (Figma's default when auto
-  layout is added), `Scene.kind` `flow`, grid placement indices 0-based, `Stroke.align`
+- **Defaults:** node geometry 0, `Scene.kind` `flow`, `LayoutChild` sizing `fixed`/`fixed` (a frame's size mode is per axis and lives only
+  in `layoutChild`; `hug` means hug the auto-layout content and is treated as fixed without it),
+  grid placement indices 0-based, `Stroke.align`
   `inside`, `miterLimit` 4.
 - **Migrations** reject a missing or non-integer `schemaVersion` instead of guessing.
 

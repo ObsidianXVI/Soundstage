@@ -548,19 +548,6 @@ void _frameProps(_Builder b) {
     (a) => a.rowAlign,
     (a, v) => a.copyWith(rowAlign: v),
   );
-  final axisC = enumC(AxisSizing.values);
-  alField(
-    'primarySizing',
-    axisC,
-    (a) => a.primarySizing,
-    (a, v) => a.copyWith(primarySizing: v),
-  );
-  alField(
-    'counterSizing',
-    axisC,
-    (a) => a.counterSizing,
-    (a, v) => a.copyWith(counterSizing: v),
-  );
   alField(
     'strokesIncludedInLayout',
     boolC,

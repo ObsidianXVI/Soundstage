@@ -18,10 +18,6 @@ enum CounterAlign { start, center, end, baseline }
 @JsonEnum()
 enum RowAlign { start, center, end }
 
-/// Auto-layout frame sizing along an axis.
-@JsonEnum()
-enum AxisSizing { fixed, hug }
-
 @JsonEnum()
 enum GridAutoFlow { row, column }
 
@@ -54,8 +50,6 @@ abstract class AutoLayout with _$AutoLayout {
     @Default(PrimaryAlign.start) PrimaryAlign primaryAlign,
     @Default(CounterAlign.start) CounterAlign counterAlign,
     @Default(RowAlign.start) RowAlign rowAlign,
-    @Default(AxisSizing.hug) AxisSizing primarySizing,
-    @Default(AxisSizing.hug) AxisSizing counterSizing,
     @Default(false) bool strokesIncludedInLayout,
 
     /// First child paints on top.
