@@ -591,7 +591,7 @@ These are requirements, not aspirations. Each one has a test or a measured budge
   | Budget | Target |
   |---|---|
   | Scroll an animated pinned scene, desktop Chrome | 60 fps, no frame > 16 ms |
-  | Animator work per frame, 200 active tracks | < 2 ms, zero allocations |
+  | Animator work per frame, 200 active tracks | < 2 ms; evaluators allocation-free; ≤ 4 boxed doubles/frame on the VM JIT for the full push |
   | Widget rebuilds during scroll playback | 0 |
   | Full resolve, 2,000-node document | < 16 ms |
   | Re-resolve after a single-property edit | < 2 ms |
