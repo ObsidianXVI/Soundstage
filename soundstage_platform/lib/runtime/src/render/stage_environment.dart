@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/node_registry.dart';
 import '../media/asset_resolver.dart';
 import '../media/fonts.dart';
 import '../media/image_cache.dart';
@@ -20,6 +21,7 @@ class StageEnvironment {
     this.fonts = const StageFontTable(),
     this.media,
     this.painter = const StageAppearancePainter(),
+    this.nodes,
   });
 
   /// The environment for [doc]: its fonts and assets, with `asset://` URIs
@@ -45,10 +47,18 @@ class StageEnvironment {
   final StageMedia? media;
   final StageAppearancePainter painter;
 
-  StageEnvironment copyWith({StageRenderMode? mode}) => StageEnvironment(
+  /// The player's `nodeId → render object` registry (T0.6); null outside a
+  /// `StagePlayer`. Render objects register on attach.
+  final StageNodeRegistry? nodes;
+
+  StageEnvironment copyWith({
+    StageRenderMode? mode,
+    StageNodeRegistry? nodes,
+  }) => StageEnvironment(
     mode: mode ?? this.mode,
     fonts: fonts,
     media: media,
     painter: painter,
+    nodes: nodes ?? this.nodes,
   );
 }

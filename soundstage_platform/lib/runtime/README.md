@@ -56,8 +56,8 @@ Pure functions with no render objects, so they can be unit-tested (`test/runtime
   and the painter. Use `StageEnvironment.forDocument(doc, mode:)`.
 - `StageNodeWidget(node:)` maps a `ResolvedNode` subtree to render-object widgets, keyed by node id.
 - `StageSceneView(scene:, viewportSize:, breakpoint:)`: a pinned scene's root is sized to the
-  viewport. A flow scene's root takes the viewport width and its own vertical sizing. T0.6 wraps
-  this in slivers and clocks.
+  viewport. A flow scene's root takes the viewport width and its own vertical sizing. `StagePlayer` wraps
+  it in a `SliverStageScene`.
 
 ## The paint seam (`src/paint/`)
 
@@ -90,6 +90,66 @@ text drop shadows (one to three `saveLayer`s each).
 - `StageMedia` combines the two.
 - `StageFontTable` maps `fontFamilyId` to a family name. Font loading is T0.7; until then
   unloaded families render in the default font.
+
+## Motion (T0.6: `src/scenes/`, `src/clocks/`, `src/animator/`)
+
+**StagePlayer** (`scenes/stage_player.dart`):
+`StagePlayer(document:, mode:, viewportOverride:, initialSceneId:, clockOverrides:, environment:, clockFactories:, controller:, lazyWindow:)`.
+- Resolves with a long-lived `ir.Resolver` for the viewport's breakpoint, and re-resolves only when the
+  breakpoint or the document (by identity) changes.
+- Renders a `CustomScrollView` with one `SliverStageScene` per scene. The scroll view's cache extent
+  equals the lazy window.
+- `StagePlayerController` exposes `timeline(id)`, `playTimeline` / `pauseTimeline` / `seekTimeline`,
+  `clockValue(id)`, `nodes` (the node registry, which is also the edit overlay's geometry registry) and
+  `scrollController`.
+
+**Scene slivers** (`scenes/sliver_stage_scene.dart`):
+- Pinned extent is `vh × (1 + scrollLength)`. The stage is held at the top through the pin range, and
+  scrolls normally before and after it.
+- Flow extent is the laid-out stage height at viewport width.
+- Progress is computed in `performLayout` from `SliverConstraints` (pure functions `pinnedSceneProgress`
+  and `flowSceneProgress`). It is pushed to the animator inside `invokeLayoutCallback`, so
+  layout-class values for the scene's own nodes apply in the same frame.
+- Laziness: the sliver is an `AbstractLayoutBuilder<bool>` whose layout info is "inside the lazy
+  window". It builds its stage only while the scene is within `lazyWindow` viewports of the visible
+  range, so the only widget builds during scrolling happen when a scene crosses the window boundary.
+  A scene leaving the window releases its decoded images (`StageMedia.releaseAsset`) unless another
+  windowed scene uses them. A scene entering prefetches them.
+
+**Clocks** (`clocks/`):
+- `StageClockSource` has `value`, `isActive`, `advance(dt)` and `sceneVisibilityChanged`. Built in:
+  scene scroll, timeline (`StageTimelineSource`: play/pause/seek, `none` / `loop` / `pingPong`,
+  `rate`, triggers) and pointer.
+- **Plug point:** `StageClockFactories(audio:, behavior:)`. A T0.7 audio source implements
+  `StageClockSource` (`value` = playback position in seconds, `isActive` = playing) and calls
+  `StageAnimator.notifyClockChanged()` after seeks. Without a factory, `audio` and `behavior` clocks
+  hold 0.
+- `StageSmoother` is a critically damped follower, integrated in closed form.
+
+**Compiled tracks** (`animator/compiled_track.dart`, pure Dart):
+- Each resolved track becomes a `CompiledTrack`: times and components in `Float64List`s, with easing
+  pre-solved per segment (`compiled_easing.dart`).
+- Bezier and spring curves use the oracle's arithmetic with constants solved at compile time, so
+  outputs match `ir.evaluateTrack` exactly (tested for every value type the registry animates).
+- Kinds: scalar, vector, colour (OKLab), step (holds a keyframe index, so it never boxes), and boxed
+  (paints, effects; these interpolate through the registry and allocate).
+
+**Animator** (`animator/stage_animator.dart`):
+- Groups tracks by clock and binds each target once, when its render object attaches to the
+  `StageNodeRegistry`.
+- `opacity` and `motion.*` tracks write `RenderStageBox` typed slots (`setAnimatedSlot`): paint only,
+  allocation-free. Every other property goes through the box's `nodeAnimator`, which re-renders the
+  node from its resolved base through the registry, invalidating paint or layout by what changed.
+- One `Ticker`, running only while a timeline or audio clock is active or a smoothed clock hasn't
+  settled.
+- Edit mode freezes clocks at `clockOverrides`, makes pointer and behaviour clocks inert, and never
+  ticks.
+
+**Animated-override layer** (`render/render_stage_box.dart`):
+- `setAnimatedSlot(slot, value)` / `animatedSlot(slot)`, with `RenderStageBox.slotForPath`.
+- `effectiveOpacity`, and `paintTransform` reads the slots.
+- `baseNode` (resolved) vs `node` (rendered), `nodeAnimator`, `refreshAnimatedNode()`.
+- Debug counters: `debugLayoutCount` / `debugPaintCount`.
 
 ## Behaviour notes
 
@@ -209,3 +269,38 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     stack below, inside the node). Node blend modes isolate the node in a `saveLayer`;
     descendants that make their own compositing layers (repaint boundaries, blurs) paint
     outside that group, so a blended group avoids them. Masks and video appearance are M3.
+
+**Motion (T0.6)** (DN = question for DECISIONS_NEEDED)
+
+25. **Smoothing constant (DN).** `smoothing` seconds maps to `ω = 2 / smoothing`, the convention of
+    Unity's `SmoothDamp`: roughly the time to arrive (41% of a step remains after `smoothing`, 9% after
+    `2·smoothing`). Settling snaps at 1e-5.
+26. **Timeline triggers (DN).**
+    - `sceneEnter` plays while the scene is visible and pauses when it leaves. Re-entering resumes,
+      and a finished `loop: none` timeline restarts from 0.
+    - `autoplay` plays from player start, off screen too.
+    - `interaction` waits for `play()`.
+    - A tick advances at most 0.1 s, so a stalled or hidden tab doesn't jump.
+27. **Pointer clocks.**
+    - Hover only (mouse). The value is −1…1 across the frame's own box: no rotation or motion, but
+      including the pin and scroll offsets.
+    - It returns to 0 outside the frame or when the pointer leaves the player.
+    - Scrolling under a still pointer doesn't update it.
+28. **Which tracks are allocation-free (DN).**
+    - Every numeric and colour evaluator is allocation-free, and so is the push of `opacity` and
+      `motion.*`.
+    - Any other property (e.g. `fills.<id>.color`, `effects.<id>.radius`, `width`) re-renders the node
+      through the registry: one node copy per changed node per frame. That is because the paint
+      pipeline (T0.5) consumes IR paints and effects. Typed paint overrides need a hook in
+      `StageAppearancePainter`.
+29. **Text style tracks (DN).** `style.*` and `content.*` tracks apply to `TextNode.style`, but the
+    runtime renders from the resolver's merged `ResolvedNode.paragraphs`, so they have no visible
+    effect yet. They need a runtime re-merge of animated span styles, or a resolver hook.
+30. **Cross-scene scroll clocks.** A `sceneScroll` clock whose `sceneId` is a different scene applies
+    on the next tick (one frame later), because a sliver may only mutate its own subtree during
+    layout.
+31. **Lazy flow extents.** A flow scene that has never been built reports its root's stored height.
+    Once laid out, it keeps its measured height while unbuilt.
+32. **Composited updates.** Motion and opacity changes repaint the node's own repaint boundary (re-record
+    its picture). Using `updateCompositedLayer` to change only the layer is a possible follow-up.
+33. Vertical, top-to-bottom scrolling only.
