@@ -1,0 +1,19 @@
+# Miscellaneous
+*.log
+*.swp
+.DS_Store
+.history
+
+# Local secrets
+.env
+.env.*
+
+# Agent configuration and working records (kept local, as in Letterpress)
+.claude/
+.agents/
+.codex/
+.gemini/
+/_dev
+
+# Firebase
+.firebase/
