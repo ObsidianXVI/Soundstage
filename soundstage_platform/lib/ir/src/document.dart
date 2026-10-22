@@ -6,6 +6,7 @@ import 'breakpoint.dart';
 import 'components.dart';
 import 'migrations/migrate.dart';
 import 'nodes/node.dart';
+import 'nodes/text.dart';
 import 'scene.dart';
 import 'tokens.dart';
 import 'values/geometry.dart';
@@ -32,6 +33,8 @@ abstract class StageMeta with _$StageMeta {
 
 /// A Soundstage story (architecture §3).
 ///
+/// `defaultTextStyle` is the base of every text style cascade (§7).
+///
 /// Maps keyed by id: `assets`, `fonts`, `components`, `variantSets`.
 /// `scenes` are in reading order. `overlay` is persistent chrome drawn over
 /// every scene.
@@ -44,6 +47,7 @@ abstract class StageDocument with _$StageDocument {
     @Default(kStageSchemaVersion) int schemaVersion,
     @Default(StageMeta()) StageMeta meta,
     @Default(TokenSystem()) TokenSystem tokens,
+    @Default(TextStyle()) TextStyle defaultTextStyle,
     @Default(<String, Asset>{}) Map<String, Asset> assets,
     @Default(<String, FontFamily>{}) Map<String, FontFamily> fonts,
     @Default(<String, ComponentDef>{}) Map<String, ComponentDef> components,

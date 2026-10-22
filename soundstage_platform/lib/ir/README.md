@@ -40,7 +40,7 @@ in `DECISIONS_NEEDED.md`.
 - **Appearance per kind.** Frames, shapes and videos hold an `Appearance` (fills, stroke,
   effects, corners, style ids). On a video, fills paint behind the video (visible in `fit`
   letterboxing and before the first frame). Text holds a `TextAppearance` (stroke, effects,
-  `strokeStyleId`, `effectStyleId`): its fills are `TextStyle.fills`, and it has no corners.
+  `strokeStyleId`, `effectStyleId`): its fills come from the text style cascade, and it has no corners.
   Property paths are the same on every kind (`strokes.weight`, `effects.<effectId>.blur`), so
   the registry hides the difference.
 - **`clipContent`** is on `FrameNode`, not `Appearance`, because shapes don't clip.
@@ -57,6 +57,13 @@ in `DECISIONS_NEEDED.md`.
 - **Interactions** (`NodeCommon.interactions`) and **component bindings**
   (`NodeCommon.componentBindings`) are on every node. `behavior` and `modeOverrides` are
   frame-only.
+- **Text styles are layered.** `StageDocument.defaultTextStyle` (a complete `TextStyle`) is the
+  base. A text node's `textStyleId` names a complete `TextStyleDef`, which replaces the default
+  (token bindings resolved in the node's modes). `TextNode.style` is a `TextStyleOverride` (all
+  fields nullable, null = inherit) layered over that; then the paragraph style
+  (spacing/indent/list) and the span override. `style.*` paths read/write the override fields
+  and `IrValue.none()` clears one. The resolved node's own `style` is emptied and `textStyleId`
+  cleared: the runtime reads only `ResolvedNode.paragraphs`.
 - **Text** has `ParagraphStyle` (align, spacing, indent and list style, all nullable) and a
   default fill of opaque black (`kDefaultTextFills`). `TextDecorationStyle.doubleLine`
   serialises as `"double"`.

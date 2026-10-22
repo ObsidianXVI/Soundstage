@@ -451,16 +451,14 @@ class _Pass {
 
   // ---- Nodes -------------------------------------------------------------------
 
-  /// Applies [patch] to [n], reporting against [id] and recording written
-  /// `style.*` paths in [touched].
-  Node _patch(Node n, Patch patch, String id, Set<String> touched) {
+  /// Applies [patch] to [n], reporting against [id].
+  Node _patch(Node n, Patch patch, String id) {
     final local = <IrDiagnostic>[];
     final out = applyPatch(
       n,
       patch,
       diagnostics: local,
       registry: registry,
-      onApplied: touched.add,
     );
     for (final d in local) {
       diagnostics.add(d.copyWith(nodeId: id));
@@ -481,13 +479,12 @@ class _Pass {
     // Override key relative to the enclosing instance: the root is addressed
     // by its own (component) id.
     final key = placement != null ? node.id : id.substring(scope.prefix.length);
-    final touched = <String>{};
     var n = node;
 
     // 1. Breakpoint patches (§3.1).
     for (final bp in cascade) {
       final patch = n.common.breakpointOverrides[bp.id];
-      if (patch != null) n = _patch(n, patch, id, touched);
+      if (patch != null) n = _patch(n, patch, id);
     }
 
     // 2. Component prop bindings (§9).
@@ -506,14 +503,14 @@ class _Pass {
           patch[path] = v;
         }
       });
-      n = _patch(n, patch, id, touched);
+      n = _patch(n, patch, id);
     }
 
     // 3. Instance placement (component root only), then overrides.
     if (placement != null && n is FrameNode) n = _place(n, placement);
     if (inst != null) {
       for (final patch in inst.overrides[key] ?? const <Patch>[]) {
-        n = _patch(n, patch, id, touched);
+        n = _patch(n, patch, id);
       }
     }
 
@@ -527,21 +524,21 @@ class _Pass {
     }
 
     // 6. Token bindings.
-    for (final p in n.common.bindings.keys) {
-      if (p.startsWith('style.')) touched.add(p);
-    }
     n = _bindTokens(n, modes, id);
 
     // 7. Styles.
     List<ResolvedParagraph>? paragraphs;
+    List<Paint>? textFills;
     n = _applyPaintAndEffectStyles(n, id);
     if (n is TextNode) {
-      final base = _textBaseStyle(n, modes, id, touched);
-      n = n.copyWith(style: base, textStyleId: null);
-      paragraphs = _paragraphs(n);
+      final merged = mergeTextStyle(_namedTextStyle(n, modes, id), n.style);
+      paragraphs = _paragraphs(n, merged);
+      textFills = merged.fills;
+      // Consumers read the merged result from `paragraphs`.
+      n = n.copyWith(style: const TextStyleOverride(), textStyleId: null);
     }
 
-    _checkAssets(n, id);
+    _checkAssets(n, id, textFills);
 
     // 8. Children.
     final childScope = scope.withModes(modes);
@@ -782,32 +779,29 @@ class _Pass {
     return s?.effects;
   }
 
-  /// The node's base text style. Without a `textStyleId` it is the node's
-  /// own `style`. With one, it is the named style (its token bindings
-  /// resolved in this node's modes) with the node's *local* style values on
-  /// top: the `style.*` paths written by breakpoint patches, prop bindings,
-  /// instance overrides and token bindings at this node.
-  TextStyle _textBaseStyle(
-    TextNode n,
-    Map<String, String> modes,
-    String id,
-    Set<String> touched,
-  ) {
+  /// The base of a text node's cascade: the named style (`textStyleId`, its
+  /// token bindings resolved in this node's [modes]) or, without one, the
+  /// document's default text style. A named style is complete, so it replaces
+  /// the default. The node's `style` override and the spans are layered on top.
+  TextStyle _namedTextStyle(TextNode n, Map<String, String> modes, String id) {
     final styleId = n.textStyleId;
-    if (styleId == null) return n.style;
+    if (styleId == null) return doc.defaultTextStyle;
     final def = doc.tokens.textStyles[styleId];
     if (def == null) {
       _diag(
         IrDiagnosticKind.missingStyle,
-        'Text style "$styleId" does not exist; using the node style.',
+        'Text style "$styleId" does not exist; using the document default.',
         nodeId: id,
         path: 'textStyleId',
       );
-      return n.style;
+      return doc.defaultTextStyle;
     }
-    var carrier = TextNode(
+    if (def.bindings.isEmpty) return def.style;
+    // Bound fields are written (through the registry) into a carrier that
+    // holds the style's own values as a full override.
+    Node carrier = TextNode(
       common: NodeCommon(id: id),
-      style: def.style,
+      style: _fullOverride(def.style),
     );
     def.bindings.forEach((rel, ref) {
       final value = _tokenValue(ref, modes, id, 'textStyles.$styleId.$rel');
@@ -821,33 +815,20 @@ class _Pass {
           path: 'textStyles.$styleId.$rel',
         );
       } else {
-        carrier = next as TextNode;
+        carrier = next;
       }
     });
-    for (final path in touched) {
-      if (!path.startsWith('style.')) continue;
-      final value = registry.get(n, path);
-      Node? next = value == null ? null : registry.trySet(carrier, path, value);
-      if (next == null) {
-        // E.g. `style.fills.<id>.color` where the named style has no such
-        // paint: take the whole top-level field from the node.
-        final top = path.split('.').take(2).join('.');
-        final whole = registry.get(n, top);
-        next = whole == null ? null : registry.trySet(carrier, top, whole);
-      }
-      if (next != null) carrier = next as TextNode;
-    }
-    return carrier.style;
+    return mergeTextStyle(def.style, (carrier as TextNode).style);
   }
 
-  List<ResolvedParagraph> _paragraphs(TextNode n) => [
+  List<ResolvedParagraph> _paragraphs(TextNode n, TextStyle merged) => [
     for (final p in n.content)
       () {
         final ps = p.style;
-        final base = n.style.copyWith(
-          paragraphSpacing: ps?.paragraphSpacing ?? n.style.paragraphSpacing,
-          paragraphIndent: ps?.paragraphIndent ?? n.style.paragraphIndent,
-          listStyle: ps?.listStyle ?? n.style.listStyle,
+        final base = merged.copyWith(
+          paragraphSpacing: ps?.paragraphSpacing ?? merged.paragraphSpacing,
+          paragraphIndent: ps?.paragraphIndent ?? merged.paragraphIndent,
+          listStyle: ps?.listStyle ?? merged.listStyle,
         );
         return ResolvedParagraph(
           alignHorizontal: ps?.alignHorizontal ?? n.alignHorizontal,
@@ -868,7 +849,7 @@ class _Pass {
 
   // ---- Output ------------------------------------------------------------------
 
-  void _checkAssets(Node n, String id) {
+  void _checkAssets(Node n, String id, List<Paint>? textFills) {
     void check(String? assetId, String path) {
       if (assetId == null || doc.assets.containsKey(assetId)) return;
       _diag(
@@ -895,7 +876,7 @@ class _Pass {
         paints(appearance.fills, 'fills');
         paints(appearance.strokes.paints, 'strokes.paints');
       case TextNode():
-        paints(n.style.fills, 'style.fills');
+        paints(textFills, 'style.fills');
         paints(n.appearance.strokes.paints, 'strokes.paints');
         for (final (pi, p) in n.content.indexed) {
           for (final (si, s) in p.spans.indexed) {
@@ -930,6 +911,25 @@ class _Pass {
     };
   }
 }
+
+/// [s] expressed as an override that sets every field.
+TextStyleOverride _fullOverride(TextStyle s) => TextStyleOverride(
+  fontFamilyId: s.fontFamilyId,
+  fontWeight: s.fontWeight,
+  italic: s.italic,
+  fontVariations: s.fontVariations,
+  fontSize: s.fontSize,
+  lineHeight: s.lineHeight,
+  letterSpacing: s.letterSpacing,
+  paragraphSpacing: s.paragraphSpacing,
+  paragraphIndent: s.paragraphIndent,
+  textCase: s.textCase,
+  decoration: s.decoration,
+  fills: s.fills,
+  openType: s.openType,
+  baselineShift: s.baselineShift,
+  listStyle: s.listStyle,
+);
 
 /// [base] with every non-null field of [o] applied. Map fields
 /// (`fontVariations`, `openType`) merge key-wise, the override winning.

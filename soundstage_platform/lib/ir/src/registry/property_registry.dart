@@ -140,7 +140,7 @@ List<Node> _prototypes() {
         strokes: Stroke(paints: paints),
         effects: effects,
       ),
-      style: TextStyle(fills: paints),
+      style: TextStyleOverride(fills: paints),
       content: [
         Paragraph(spans: [Span(text: '')]),
       ],
