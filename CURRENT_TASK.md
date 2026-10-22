@@ -1,12 +1,12 @@
 # CURRENT TASK
 
 ## Release · Feature · Task
-M0 Foundations and runtime spike → T0.3 IR operations
+M0 Foundations and runtime spike → T0.4 Runtime layout and text
 
-Spec: `_dev/features/m0.md` (T0.3). Blueprint: `docs/architecture.md` §3–§13. Roadmap: `docs/roadmap.md`.
+Spec: `_dev/features/m0.md` (T0.4). Blueprint: `docs/architecture.md` §3–§13. Roadmap: `docs/roadmap.md`.
 
 ## Status
-READY — T0.2 done; T0.3 not started.
+READY — T0.3 done; T0.4 not started.
 
 ## What was done
 - T0.1 (done): freezed 3.2.5 / json_serializable / flutter_riverpod 3.4.3 / build_runner added;
@@ -25,6 +25,19 @@ READY — T0.2 done; T0.3 not started.
   `lib/ir/README.md`, and three file-format questions are in DECISIONS_NEEDED.md #6–#8.
   Note: this build_runner ignores `--delete-conflicting-outputs`, so use plain
   `dart run build_runner build`.
+- T0.3 (done, `dev-high`): Part A added `TextAppearance` (stroke, effects, style ids) on text and
+  `Appearance` on video (schema stays 1). `PropertyRegistry.standard` has ~290 descriptors built
+  from lenses/codecs, with `lookup` → `PropertyMatch` (descriptor + params). `applyPatch` returns
+  `IrDiagnostic`s for bad paths. `breakpointCascade`/`activeBreakpoint`/`breakpointForWidth`.
+  Interpolation (OKLab, stop-wise paints, field-wise effects), easing (bezier solver, CSS + Back
+  presets, settle-time spring, steps, hold) and `evaluateTrack` (reference oracle). `Resolver` /
+  `resolveDocument` → `ResolvedDocument { breakpoint, scenes[ResolvedScene], overlay, nodeIndex,
+  diagnostics }` of `ResolvedNode { id (namespaced), node (concrete, children empty), children,
+  sourceComponentId, instanceId, paragraphs (merged span styles), modes, isPlaceholder }`. Built
+  per §17.1–17.2: per-node steps over an immutable scope, identity-keyed caches, never throws.
+  593 tests on the VM; 591 IR tests on Chrome (purity test needs dart:io). DECISIONS_NEEDED
+  #6–#10 added (text style vs local style, instance placement/precedence, patches vs bindings,
+  unaddressable paths, spring duration).
 
 ## Definition of done (T0.2) — met
 - [x] Every model in architecture §3–§12 as freezed + JSON, under `lib/ir/src/`
@@ -36,18 +49,22 @@ READY — T0.2 done; T0.3 not started.
 - [x] Committed
 
 ## Definition of done (T0.3)
-See `_dev/features/m0.md` T0.3: PropertyRegistry with descriptor get/set round-trip test,
-applyPatch + breakpoint cascade (desktop-first and mobile-first), interpolators (OKLab), easing
-(incl. CSS `ease` samples), track evaluation, resolver → ResolvedTree (instances, variants,
-modes, aliases with cycle detection, style refs incl. `Appearance.*StyleId`).
-- [ ] Registry + patches + cascade
-- [ ] Interpolation + easing + track eval
-- [ ] Resolver
-- [ ] Tests, `flutter analyze` clean, committed
+- [x] Part A: TextNode strokes + effects (`TextAppearance`), VideoNode `Appearance`; round-trip tests; README
+- [x] PropertyRegistry: a descriptor per §4.2/§5/§6/§7 property (stacks by id, gradient stops, image fields, text, `style.*`, span/paragraph paths, whole stacks); lookup → (descriptor, params); unknown → null
+- [x] `applyPatch` via the registry (`none` clears; unknown/inapplicable → diagnostics, never throws)
+- [x] Breakpoint cascade (desktop-first and mobile-first) + `breakpointForWidth`
+- [x] Interpolation (number, OKLab colour, paint stacks stop-wise with structure check, shadows/blurs, insets/radii/points/sizes, step otherwise)
+- [x] Easing (linear, bezier Newton+bisection 1e-6, CSS presets + Back, analytic spring ending at 1, steps, hold)
+- [x] `evaluateTrack` per §10.2
+- [x] Resolver §11.3 steps 2–5 → `ResolvedDocument` (instances, variants, props, overrides, namespaced ids, cycles, cascade, modes, aliases, styles, keyframe token refs, diagnostics)
+- [x] Tests listed in the T0.3 brief; existing tests and purity test green; Chrome run of `test/ir`
+- [x] `flutter analyze` clean; committed in logical steps; records updated
 
 ## Blocked on / decisions needed
-Nothing blocking. Eight open questions in `DECISIONS_NEEDED.md`, each with a provisional answer
-(#6 clock declarations and #7 style references affect T0.3/T0.6).
+Nothing blocking. Ten open questions in `DECISIONS_NEEDED.md`, each with a provisional answer
+(#6–#10 come from T0.3 and affect M1/M2 editor behaviour).
 
 ## Next task after this one
-T0.4 Runtime layout and text.
+T0.4 Runtime layout and text: build on `ResolvedDocument`/`ResolvedNode` (render from
+`ResolvedNode.node` + `children`; text from `paragraphs`). T0.3b (validator, fuzz tests,
+benchmarks per architecture §17–§18) is a separate follow-up.
