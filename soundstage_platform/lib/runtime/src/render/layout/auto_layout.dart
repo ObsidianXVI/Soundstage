@@ -124,7 +124,10 @@ List<int> stagePaintOrder(int count, {required bool reverseZIndex}) => [
     maxX = math.max(maxX, px);
     maxY = math.max(maxY, py);
   }
-  return (size: Size(maxX - minX, maxY - minY), boxOffset: Offset(-minX, -minY));
+  return (
+    size: Size(maxX - minX, maxY - minY),
+    boxOffset: Offset(-minX, -minY),
+  );
 }
 
 /// The first baseline of a frame whose children were placed at [boxes]
@@ -320,8 +323,7 @@ AutoLayoutResult computeAutoLayout({
   }
 
   // Step 7 (counter axis): row extents, with baseline alignment.
-  final baseline =
-      a.h && layout.counterAlign == ir.CounterAlign.baseline;
+  final baseline = a.h && layout.counterAlign == ir.CounterAlign.baseline;
   final rowExtents = <double>[];
   final baselineTops = <_Item, double>{};
   for (final row in rows) {
@@ -484,11 +486,7 @@ Size _sizeChild(
   _Axes a, {
   required double? main,
   required double? cross,
-}) => sizeStageChild(
-  c,
-  width: a.h ? main : cross,
-  height: a.h ? cross : main,
-);
+}) => sizeStageChild(c, width: a.h ? main : cross, height: a.h ? cross : main);
 
 /// Sizes [c] for a definite [width]/[height] (null = natural), applying the
 /// child's min/max (architecture §4.4 step 3).

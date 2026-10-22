@@ -217,11 +217,10 @@ void main() {
     });
 
     test('step 5: a fill text child rewraps at its share', () {
-      final res = run(
-        row(),
-        [fixed(60, 10), textLike(8, hz: StageAxisSizing.fill)],
-        width: 100,
-      );
+      final res = run(row(), [
+        fixed(60, 10),
+        textLike(8, hz: StageAxisSizing.fill),
+      ], width: 100);
       // 40 px share → 4 glyphs a line → 2 lines.
       expectRect(res.boxes[1], r(60, 0, 40, 40));
       expect(res.size, const Size(100, 40));
@@ -333,10 +332,13 @@ void main() {
         inner,
       ]);
       expectRect(res.boxes[1], r(10, 17, 20, 28));
-      expect(firstBaselineOf([fixed(10, 50, baseline: (_) => 40), inner], [
-        res.boxes[0],
-        res.boxes[1],
-      ]), 40);
+      expect(
+        firstBaselineOf(
+          [fixed(10, 50, baseline: (_) => 40), inner],
+          [res.boxes[0], res.boxes[1]],
+        ),
+        40,
+      );
     });
 
     test('step 3: fill on the counter axis takes the content box', () {
@@ -349,8 +351,7 @@ void main() {
       expectRect(res.boxes[0], r(0, 5, 20, 40));
     });
 
-    test('counter fill in a hugging counter axis stretches to the tallest',
-        () {
+    test('counter fill in a hugging counter axis stretches to the tallest', () {
       final res = run(row(), [
         fixed(20, 30),
         fixed(20, 10, vt: StageAxisSizing.fill),
@@ -411,15 +412,11 @@ void main() {
     });
 
     test('step 8: fill children in a wrapped row split that row', () {
-      final res = run(
-        row(wrap: true, gap: const ir.Gap.fixed(10)),
-        [
-          fixed(60, 10),
-          fixed(0, 10, hz: StageAxisSizing.fill, minW: 50),
-          fixed(0, 10, hz: StageAxisSizing.fill),
-        ],
-        width: 100,
-      );
+      final res = run(row(wrap: true, gap: const ir.Gap.fixed(10)), [
+        fixed(60, 10),
+        fixed(0, 10, hz: StageAxisSizing.fill, minW: 50),
+        fixed(0, 10, hz: StageAxisSizing.fill),
+      ], width: 100);
       // 60 + 10 + 50 > 100 → the min-width fill wraps; it and the last fill
       // share row 2: (100 − 10) / 2 = 45 < 50 → frozen at 50, other gets 40.
       expectRect(res.boxes[0], r(0, 0, 60, 10));
@@ -433,21 +430,18 @@ void main() {
     });
 
     test('strokesIncludedInLayout inflates by the outside strokes', () {
-      final res = run(
-        row(strokes: true, gap: const ir.Gap.fixed(10)),
-        [
-          fixed(20, 20, strokes: const EdgeInsets.all(2)),
-          fixed(20, 20),
-        ],
-      );
+      final res = run(row(strokes: true, gap: const ir.Gap.fixed(10)), [
+        fixed(20, 20, strokes: const EdgeInsets.all(2)),
+        fixed(20, 20),
+      ]);
       expectRect(res.boxes[0], r(2, 2, 20, 20));
       expectRect(res.boxes[1], r(34, 0, 20, 20));
       expect(res.size, const Size(54, 24));
       // Without the flag strokes take no space.
-      final off = run(
-        row(gap: const ir.Gap.fixed(10)),
-        [fixed(20, 20, strokes: const EdgeInsets.all(2)), fixed(20, 20)],
-      );
+      final off = run(row(gap: const ir.Gap.fixed(10)), [
+        fixed(20, 20, strokes: const EdgeInsets.all(2)),
+        fixed(20, 20),
+      ]);
       expectRect(off.boxes[1], r(30, 0, 20, 20));
     });
 
@@ -547,10 +541,7 @@ void main() {
         size: 100.0,
       ));
       expect(place(AxisConstraint.end, min: 50), (offset: 90.0, size: 50.0));
-      expect(place(AxisConstraint.center, max: 20), (
-        offset: 65.0,
-        size: 20.0,
-      ));
+      expect(place(AxisConstraint.center, max: 20), (offset: 65.0, size: 20.0));
       expect(place(AxisConstraint.scale, max: 40), (offset: 20.0, size: 40.0));
     });
     test('a hugging child keeps its margins at its content size', () {
