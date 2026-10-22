@@ -485,7 +485,9 @@ class _Pass {
       return null;
     }
     final match = registry.lookup(t.property);
-    if (match == null || match.get(target.node) == null) {
+    if (match == null ||
+        (match.get(target.node) == null &&
+            match.get(_textStyleCarrier(target)) == null)) {
       _diag(
         match == null
             ? IrDiagnosticKind.unknownPath
@@ -524,6 +526,58 @@ class _Pass {
       keyframes: [for (final (_, k) in indexed) k],
     );
   }
+
+  /// For a text target: the node with its merged styles written back as
+  /// complete overrides (node style from the first span, every span's
+  /// merged style on the span), so `style.*` and span-style tracks address
+  /// fields the merge supplies (e.g. the default `text` fill) and not only
+  /// fields the node overrides itself. Other nodes are returned as is.
+  Node _textStyleCarrier(ResolvedNode target) {
+    final n = target.node;
+    final paras = target.paragraphs;
+    if (n is! TextNode || paras == null) return n;
+    TextStyle? first;
+    for (final p in paras) {
+      if (p.spans.isNotEmpty) {
+        first = p.spans.first.style;
+        break;
+      }
+    }
+    return n.copyWith(
+      style: _fullOverride(first ?? doc.defaultTextStyle),
+      content: [
+        for (final (pi, p) in n.content.indexed)
+          p.copyWith(
+            spans: [
+              for (final (si, sp) in p.spans.indexed)
+                pi < paras.length && si < paras[pi].spans.length
+                    ? sp.copyWith(
+                        style: _fullOverride(paras[pi].spans[si].style),
+                      )
+                    : sp,
+            ],
+          ),
+      ],
+    );
+  }
+
+  static TextStyleOverride _fullOverride(TextStyle s) => TextStyleOverride(
+    fontFamilyId: s.fontFamilyId,
+    fontWeight: s.fontWeight,
+    italic: s.italic,
+    fontVariations: s.fontVariations,
+    fontSize: s.fontSize,
+    lineHeight: s.lineHeight,
+    letterSpacing: s.letterSpacing,
+    paragraphSpacing: s.paragraphSpacing,
+    paragraphIndent: s.paragraphIndent,
+    textCase: s.textCase,
+    decoration: s.decoration,
+    fills: s.fills,
+    openType: s.openType,
+    baselineShift: s.baselineShift,
+    listStyle: s.listStyle,
+  );
 
   // ---- Nodes -------------------------------------------------------------------
 

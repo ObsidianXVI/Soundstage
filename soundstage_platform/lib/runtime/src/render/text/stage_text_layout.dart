@@ -7,6 +7,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../../media/fonts.dart';
 import '../../paint/text_variant.dart';
+import 'text_reveal.dart';
 import 'text_style_mapping.dart';
 
 /// Extra width given to painters so text laid out at exactly its measured
@@ -24,6 +25,7 @@ class StageTextSettings {
     this.maxLines,
     this.truncation = ir.TextTruncation.none,
     this.alignVertical = ir.TextAlignVertical.top,
+    this.leadingTrim = ir.LeadingTrim.none,
   });
 
   factory StageTextSettings.of(ir.TextNode node) => StageTextSettings(
@@ -31,12 +33,14 @@ class StageTextSettings {
     maxLines: node.maxLines,
     truncation: node.truncation,
     alignVertical: node.alignVertical,
+    leadingTrim: node.leadingTrim,
   );
 
   final ir.TextAutoResize autoResize;
   final int? maxLines;
   final ir.TextTruncation truncation;
   final ir.TextAlignVertical alignVertical;
+  final ir.LeadingTrim leadingTrim;
 
   /// Whether lines past [maxLines] or the box height become an ellipsis:
   /// the `truncate` auto-resize mode, or `truncation: ending` in any mode.
@@ -50,11 +54,12 @@ class StageTextSettings {
       other.autoResize == autoResize &&
       other.maxLines == maxLines &&
       other.truncation == truncation &&
-      other.alignVertical == alignVertical;
+      other.alignVertical == alignVertical &&
+      other.leadingTrim == leadingTrim;
 
   @override
   int get hashCode =>
-      Object.hash(autoResize, maxLines, truncation, alignVertical);
+      Object.hash(autoResize, maxLines, truncation, alignVertical, leadingTrim);
 }
 
 /// Lays out and paints resolved rich text (architecture §7).
@@ -70,12 +75,96 @@ class StageTextSettings {
 class StageTextLayout {
   StageTextLayout({
     required List<ir.ResolvedParagraph> paragraphs,
-    required StageFontTable fonts,
+    required this.fonts,
     required this.settings,
   }) : _paras = _build(paragraphs, fonts);
 
   final StageTextSettings settings;
+  final StageFontTable fonts;
   final List<_Para> _paras;
+
+  /// The paragraphs the layout was built (or last restyled) from.
+  List<ir.ResolvedParagraph> get paragraphs => [
+    for (final p in _paras) p.source,
+  ];
+
+  /// Whether any span uses document font [familyId] (relayout on load).
+  bool usesFamily(String familyId) {
+    for (final p in _paras) {
+      for (final s in p.source.spans) {
+        if (s.style.fontFamilyId == familyId) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Replaces the paragraphs whose entry in [next] is not identical to the
+  /// current one (animated text styles). Each replaced paragraph rebuilds
+  /// its `TextSpan`s, reusing the mapped style of every span whose IR style
+  /// is unchanged; unchanged paragraphs keep their painters. The layout is
+  /// redone on the next [layout] / [relayout]. [next] must have as many
+  /// paragraphs as the current layout.
+  void restyle(List<ir.ResolvedParagraph> next) {
+    assert(next.length == _paras.length);
+    var changed = false;
+    for (var i = 0; i < _paras.length && i < next.length; i++) {
+      final old = _paras[i];
+      if (identical(old.source, next[i])) continue;
+      _paras[i] = _rebuildPara(old, next[i], fonts);
+      old.dispose();
+      changed = true;
+    }
+    if (!changed) return;
+    _laidOut = false;
+    _complexGroups = null;
+    _simpleFill = null;
+    _opaque = null;
+    _revealGeometry = null;
+  }
+
+  /// Lays out again at the last [layout]'s width and box height if the text
+  /// changed since (a paint-only restyle).
+  void relayout() {
+    if (_laidOut) return;
+    layout(width: _width, boxHeight: _boxHeight);
+  }
+
+  /// Whether the layout is current.
+  bool get isLaidOut => _laidOut;
+
+  double _trimTop = 0;
+
+  /// How much `leadingTrim: capHeight` removed above the first line (0
+  /// without trim).
+  double get leadingTrimTop => _trimTop;
+
+  /// The reveal painting the text (TextReveal); null paints it whole.
+  StageTextRevealPaint? reveal;
+
+  List<RevealUnitGeometry>? _revealGeometry;
+  ir.TextRevealUnit? _revealUnit;
+
+  /// Per visible paragraph, its reveal unit boxes for [unit].
+  List<RevealUnitGeometry> revealGeometryFor(ir.TextRevealUnit unit) {
+    final cached = _revealGeometry;
+    if (cached != null && _revealUnit == unit) return cached;
+    _revealUnit = unit;
+    return _revealGeometry = [
+      for (final p in _paras)
+        p.visible
+            ? revealGeometry(p.painter, unit)
+            : RevealUnitGeometry(const []),
+    ];
+  }
+
+  /// The number of reveal units for [unit] (after layout).
+  int revealUnitCount(ir.TextRevealUnit unit) {
+    var n = 0;
+    for (final g in revealGeometryFor(unit)) {
+      n += g.length;
+    }
+    return n;
+  }
 
   double? _width;
   double? _boxHeight;
@@ -95,6 +184,7 @@ class StageTextLayout {
     _laidOut = true;
     _width = width;
     _boxHeight = boxHeight;
+    _revealGeometry = null;
 
     var w = width;
     if (w == null) {
@@ -160,7 +250,64 @@ class StageTextLayout {
       p.offset = Offset(p.gutter, y);
       y += p.painter.height;
     }
-    _size = Size(w, y);
+    final (top, bottom) = _leadingTrim();
+    _trimTop = top;
+    if (top != 0) {
+      for (final p in _paras) {
+        p.offset = p.offset.translate(0, -top);
+      }
+    }
+    _size = Size(w, math.max(0, y - top - bottom));
+  }
+
+  /// `leadingTrim: capHeight` (architecture §7, best effort): trims the
+  /// first line's top down to the cap height of its first span's font and
+  /// the last line's bottom up to its baseline. Needs the font's OS/2
+  /// `sCapHeight` (v2+); without it there is no trim and a font diagnostic.
+  (double, double) _leadingTrim() {
+    if (settings.leadingTrim != ir.LeadingTrim.capHeight) return (0, 0);
+    _Para? first;
+    _Para? last;
+    for (final p in _paras) {
+      if (!p.visible) continue;
+      first ??= p;
+      last = p;
+    }
+    if (first == null || last == null) return (0, 0);
+    ir.TextStyle? style;
+    for (final s in first.source.spans) {
+      if (s.text.isNotEmpty) {
+        style = s.style;
+        break;
+      }
+    }
+    if (style == null) return (0, 0);
+    final id = style.fontFamilyId;
+    final face = fonts.faceFor(id, style.fontWeight, style.italic);
+    final capEm = face?.metrics?.capHeightEm;
+    if (capEm == null) {
+      if (id == null || !fonts.families.containsKey(id)) {
+        fonts.report(
+          id ?? '(default)',
+          'leadingTrim: capHeight needs a document font with OS/2 metrics; '
+          'not trimmed',
+        );
+      } else if (face != null) {
+        fonts.report(
+          id,
+          'leadingTrim: capHeight needs OS/2 v2+ sCapHeight; not trimmed',
+        );
+      }
+      return (0, 0);
+    }
+    final firstLines = first.painter.computeLineMetrics();
+    final lastLines = identical(first, last)
+        ? firstLines
+        : last.painter.computeLineMetrics();
+    if (firstLines.isEmpty || lastLines.isEmpty) return (0, 0);
+    final top = firstLines.first.baseline - capEm * style.fontSize;
+    final bottom = last.painter.height - lastLines.last.baseline;
+    return (top, bottom);
   }
 
   /// Vertical offset of the text block inside a box of [boxHeight]
@@ -195,12 +342,25 @@ class StageTextLayout {
     StageTextVariant? variant,
   }) {
     final dy = alignOffset(boxHeight);
-    for (final p in _paras) {
+    final r = reveal;
+    final geometry = r == null ? null : revealGeometryFor(r.unit);
+    var unit = 0;
+    for (final (i, p) in _paras.indexed) {
       if (!p.visible) continue;
       final at = offset + p.offset + Offset(0, dy);
       final v = variant == null ? null : p.variant(variant);
       final painter = v?.painter ?? p.painter;
-      painter.paint(canvas, at);
+      if (r == null || geometry == null) {
+        painter.paint(canvas, at);
+      } else {
+        paintRevealed(canvas, painter, at, geometry[i], unit, r);
+        unit += geometry[i].length;
+        // Markers appear with the paragraph's first unit.
+        if (geometry[i].length == 0 ||
+            r.unitProgress(unit - geometry[i].length) <= 0) {
+          continue;
+        }
+      }
       final marker = v == null ? p.marker : v.marker;
       if (marker != null) {
         final base = painter.computeDistanceToActualBaseline(
@@ -216,9 +376,11 @@ class StageTextLayout {
 
   /// The distinct fill stacks of spans that need a glyph mask (gradient,
   /// image or stacked fills), in order of first use.
-  late final List<List<ir.Paint>> complexFillGroups = _complexGroups();
+  List<List<ir.Paint>> get complexFillGroups =>
+      _complexGroups ??= _computeComplexGroups();
+  List<List<ir.Paint>>? _complexGroups;
 
-  List<List<ir.Paint>> _complexGroups() {
+  List<List<ir.Paint>> _computeComplexGroups() {
     final out = <List<ir.Paint>>[];
     for (final p in _paras) {
       for (final s in p.source.spans) {
@@ -232,7 +394,8 @@ class StageTextLayout {
   }
 
   /// Whether any span has a visible simple (single solid) fill.
-  late final bool hasSimpleFill = _hasSimpleFill();
+  bool get hasSimpleFill => _simpleFill ??= _hasSimpleFill();
+  bool? _simpleFill;
 
   bool _hasSimpleFill() {
     for (final p in _paras) {
@@ -249,7 +412,8 @@ class StageTextLayout {
 
   /// Whether every visible span is an opaque solid (shadows then need no
   /// knock-out behind the glyphs).
-  late final bool fillsAreOpaque = _fillsAreOpaque();
+  bool get fillsAreOpaque => _opaque ??= _fillsAreOpaque();
+  bool? _opaque;
 
   bool _fillsAreOpaque() {
     for (final p in _paras) {
@@ -312,6 +476,38 @@ class StageTextLayout {
     return out;
   }
 
+  /// [old]'s paragraph rebuilt for [para] (same list position and ordinal).
+  /// Spans whose IR style is identical to before reuse their mapped style.
+  static _Para _rebuildPara(
+    _Para old,
+    ir.ResolvedParagraph para,
+    StageFontTable fonts,
+  ) {
+    final spans = para.spans;
+    final first = spans.isEmpty ? const ir.TextStyle() : spans.first.style;
+    final reuse = Map<ir.TextStyle, TextStyle>.identity();
+    for (final s in old.source.spans) {
+      final mapped = old.mapped[s.style];
+      if (mapped != null) reuse[s.style] = mapped;
+    }
+    TextPainter? marker;
+    var gutter = 0.0;
+    if (para.listStyle != ir.ListStyle.none) {
+      marker = _markerPainter(para, old.ordinal, fonts, null)..layout();
+      final fs = first.fontSize;
+      gutter = math.max(1.5 * fs, marker.width + 0.5 * fs);
+    }
+    return _Para(
+      source: para,
+      fonts: fonts,
+      ordinal: old.ordinal,
+      painter: _textPainter(para, fonts, null, null, reuse),
+      spacing: para.paragraphSpacing,
+      marker: marker,
+      gutter: gutter,
+    );
+  }
+
   static TextPainter _markerPainter(
     ir.ResolvedParagraph para,
     int ordinal,
@@ -342,11 +538,21 @@ class StageTextLayout {
     ir.ResolvedParagraph para,
     StageFontTable fonts,
     StageTextVariant? variant,
-    TextStyle? baseStyle,
-  ) {
+    TextStyle? baseStyle, [
+    Map<ir.TextStyle, TextStyle>? reuse,
+  ]) {
     final spans = para.spans;
     final first = spans.isEmpty ? const ir.TextStyle() : spans.first.style;
-    final base = baseStyle ?? stageTextStyle(first, fonts, variant: variant);
+    TextStyle mapped(ir.TextStyle s) {
+      if (variant != null) return stageTextStyle(s, fonts, variant: variant);
+      final hit = reuse?[s];
+      if (hit != null) return hit;
+      final m = stageTextStyle(s, fonts);
+      reuse?[s] = m;
+      return m;
+    }
+
+    final base = baseStyle ?? mapped(first);
     final children = <InlineSpan>[];
     final indent = para.paragraphIndent;
     final hasText = spans.any((s) => s.text.isNotEmpty);
@@ -364,7 +570,7 @@ class StageTextLayout {
       children.add(
         TextSpan(
           text: applyTextCase(s.text, s.style.textCase, startsWord: startsWord),
-          style: stageTextStyle(s.style, fonts, variant: variant),
+          style: mapped(s.style),
         ),
       );
       if (s.text.isNotEmpty) {
@@ -420,6 +626,28 @@ class _Para {
 
   final ir.ResolvedParagraph source;
   final StageFontTable fonts;
+
+  /// The mapped style of each span's IR style, from the painter's spans
+  /// (identity-keyed lookups first; see [StageTextLayout.restyle]).
+  late final Map<ir.TextStyle, TextStyle> mapped = _mappedStyles();
+
+  Map<ir.TextStyle, TextStyle> _mappedStyles() {
+    final out = Map<ir.TextStyle, TextStyle>.identity();
+    final root = painter.text;
+    if (root is! TextSpan) return out;
+    final children = root.children;
+    if (children == null) return out;
+    var i = 0;
+    for (final c in children) {
+      if (c is! TextSpan) continue;
+      if (i >= source.spans.length) break;
+      final style = c.style;
+      if (style != null) out[source.spans[i].style] = style;
+      i++;
+    }
+    return out;
+  }
+
   final int ordinal;
   final TextPainter painter;
   final double spacing;

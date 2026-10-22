@@ -9,6 +9,7 @@ import '../render/render_stage_box.dart';
 import '../render/stage_environment.dart';
 import 'compiled_track.dart';
 import 'node_registry.dart';
+import 'text_style_tracks.dart';
 
 /// Writes animated values into render objects (architecture §14, §17.1).
 ///
@@ -112,6 +113,7 @@ class StageAnimator implements StageNodeListener {
       for (final b in list) {
         final box = b.box;
         if (box != null && b.slot >= 0) box.setAnimatedSlot(b.slot, double.nan);
+        b.unbindTyped();
       }
     }
     for (final t in _nodeTargets.values) {
@@ -198,14 +200,27 @@ class StageAnimator implements StageNodeListener {
     final list = _byTarget[box.nodeId];
     if (list == null) return;
     for (final b in list) {
+      b.unbindTyped();
       b.box = box;
       b.track.evaluate(b.clock.value);
-      if (b.slot >= 0) box.setAnimatedSlot(b.slot, b.track.scalar);
+      if (b.slot >= 0) {
+        box.setAnimatedSlot(b.slot, b.track.scalar);
+      } else if (box is StageTypedTrackHost) {
+        // Typed hosts (text styles) apply the track themselves.
+        final host = box as StageTypedTrackHost;
+        final handle = host.bindTrack(b.track);
+        if (handle != null) {
+          b
+            ..host = host
+            ..handle = handle;
+        }
+      }
     }
     final target = _nodeTargets[box.nodeId];
     if (target != null) {
       target.box = box;
-      box.nodeAnimator = target.animate;
+      final untyped = target.bindings.any((b) => b.handle == null);
+      box.nodeAnimator = untyped ? target.animate : null;
     }
   }
 
@@ -214,7 +229,10 @@ class StageAnimator implements StageNodeListener {
     final list = _byTarget[box.nodeId];
     if (list == null) return;
     for (final b in list) {
-      if (identical(b.box, box)) b.box = null;
+      if (identical(b.box, box)) {
+        b.unbindTyped();
+        b.box = null;
+      }
     }
     final target = _nodeTargets[box.nodeId];
     if (target != null && identical(target.box, box)) target.box = null;
@@ -398,6 +416,8 @@ class StageAnimator implements StageNodeListener {
       if (!b.track.evaluate(v)) continue;
       if (b.slot >= 0) {
         box.setAnimatedSlot(b.slot, b.track.scalar);
+      } else if (b.handle != null) {
+        b.host!.trackChanged(b.handle!);
       } else {
         final target = b.node!;
         if (!target.dirty) {
@@ -468,6 +488,17 @@ class _Binding {
   final _Clock clock;
   RenderStageBox? box;
   _NodeTarget? node;
+
+  /// A typed host applying this track itself, and its handle.
+  StageTypedTrackHost? host;
+  Object? handle;
+
+  void unbindTyped() {
+    final h = handle;
+    if (h != null) host?.unbindTrack(h);
+    host = null;
+    handle = null;
+  }
 }
 
 /// A node with node-level (non-slot) animated properties.
@@ -484,6 +515,7 @@ class _NodeTarget {
   ir.Node _apply(ir.Node resolved) {
     var n = resolved;
     for (final b in bindings) {
+      if (b.handle != null) continue;
       final v = b.track.value;
       final match = b.track.match;
       if (v == null || match == null) continue;

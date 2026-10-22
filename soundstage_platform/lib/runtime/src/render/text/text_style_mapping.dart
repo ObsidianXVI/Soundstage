@@ -107,6 +107,39 @@ List<FontFeature> fontFeatures(ir.TextStyle style) {
   return out;
 }
 
+/// The font variations for [s] rendered with [face]: the style's own
+/// `fontVariations`, plus, on a variable face, the axes CSS and Figma set
+/// automatically unless the style sets them:
+/// - `wght` = the style's weight (clamped to the axis),
+/// - `opsz` = the font size (optical sizing "auto"),
+/// - italic on a face that is not italic: `ital` = 1, else `slnt` = the
+///   axis minimum (the most slanted).
+List<FontVariation> fontVariationsFor(ir.TextStyle s, StageFontFace? face) {
+  final out = <FontVariation>[
+    for (final MapEntry(:key, :value) in s.fontVariations.entries)
+      if (key.length == 4) FontVariation(key, value),
+  ];
+  if (face == null || !face.face.variable) return out;
+  final own = s.fontVariations;
+  void auto(String tag, double v) {
+    final a = face.axis(tag);
+    if (a == null || own.containsKey(tag)) return;
+    out.add(FontVariation(tag, v.clamp(a.min, a.max)));
+  }
+
+  auto('wght', s.fontWeight.toDouble());
+  auto('opsz', s.fontSize);
+  if (s.italic && !face.italic) {
+    if (face.axis('ital') != null) {
+      auto('ital', 1);
+    } else {
+      final slnt = face.axis('slnt');
+      if (slnt != null) auto('slnt', slnt.min);
+    }
+  }
+  return out;
+}
+
 /// Maps a resolved IR text style to a Flutter [TextStyle] (architecture §7).
 ///
 /// With a [variant] the glyphs are painted for a mask, a stroke or a shadow
@@ -117,10 +150,8 @@ TextStyle stageTextStyle(
   StageTextVariant? variant,
 }) {
   final features = fontFeatures(s);
-  final variations = [
-    for (final MapEntry(:key, :value) in s.fontVariations.entries)
-      if (key.length == 4) FontVariation(key, value),
-  ];
+  final face = fonts.faceFor(s.fontFamilyId, s.fontWeight, s.italic);
+  final variations = fontVariationsFor(s, face);
   final d = s.decoration;
   final v = variant;
   final decorated =
@@ -142,10 +173,14 @@ TextStyle stageTextStyle(
             ..strokeJoin = v.join
             ..strokeMiterLimit = v.miterLimit)
         : null,
-    fontFamily: fonts.familyName(s.fontFamilyId),
+    fontFamily: face?.name ?? fonts.fallbackFamily(s.fontFamilyId),
     fontSize: s.fontSize,
-    fontWeight: FontWeight(s.fontWeight.clamp(1, 1000)),
-    fontStyle: s.italic ? FontStyle.italic : FontStyle.normal,
+    fontWeight: face == null
+        ? FontWeight(s.fontWeight.clamp(1, 1000))
+        : (face.axis('wght') != null
+              ? FontWeight.w400
+              : FontWeight(face.weight.clamp(1, 1000))),
+    fontStyle: (face?.italic ?? s.italic) ? FontStyle.italic : FontStyle.normal,
     letterSpacing: letterSpacingPx(s.letterSpacing, s.fontSize),
     height: lineHeightMultiplier(s.lineHeight, s.fontSize),
     leadingDistribution: TextLeadingDistribution.even,

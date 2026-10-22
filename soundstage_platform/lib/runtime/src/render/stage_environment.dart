@@ -18,10 +18,11 @@ enum StageRenderMode { play, edit }
 class StageEnvironment {
   const StageEnvironment({
     this.mode = StageRenderMode.play,
-    this.fonts = const StageFontTable(),
+    this._fonts,
     this.media,
     this.painter = const StageAppearancePainter(),
     this.nodes,
+    this.audioTracks = const {},
   });
 
   /// The environment for [doc]: its fonts and assets, with `asset://` URIs
@@ -31,17 +32,33 @@ class StageEnvironment {
     StageRenderMode mode = StageRenderMode.play,
     AssetBundle? bundle,
     StageImageCache? imageCache,
-  }) => StageEnvironment(
-    mode: mode,
-    fonts: StageFontTable.fromDocument(doc),
-    media: StageMedia(
-      resolver: StageAssetResolver(assets: doc.assets, customBundle: bundle),
-      cache: imageCache,
-    ),
-  );
+    StageFontRegistrar? registerFont,
+  }) {
+    final resolver = StageAssetResolver(
+      assets: doc.assets,
+      customBundle: bundle,
+    );
+    return StageEnvironment(
+      mode: mode,
+      fonts: StageFontTable.fromDocument(
+        doc,
+        resolver: resolver,
+        register: registerFont,
+      ),
+      media: StageMedia(resolver: resolver, cache: imageCache),
+      audioTracks: {for (final t in doc.audioTracks) t.id: t},
+    );
+  }
 
   final StageRenderMode mode;
-  final StageFontTable fonts;
+  final StageFontTable? _fonts;
+
+  /// The document's fonts ([StageFontTable.none] when not given).
+  StageFontTable get fonts => _fonts ?? StageFontTable.none;
+
+  /// The document's audio tracks by id (lyrics behaviours read their
+  /// `LyricsDoc` here).
+  final Map<String, ir.AudioTrack> audioTracks;
 
   /// Null when images are not available (images paint nothing).
   final StageMedia? media;
@@ -56,9 +73,10 @@ class StageEnvironment {
     StageNodeRegistry? nodes,
   }) => StageEnvironment(
     mode: mode ?? this.mode,
-    fonts: fonts,
+    fonts: _fonts,
     media: media,
     painter: painter,
     nodes: nodes ?? this.nodes,
+    audioTracks: audioTracks,
   );
 }

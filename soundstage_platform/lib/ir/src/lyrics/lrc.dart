@@ -211,7 +211,9 @@ LrcParseResult parseLrc(String source) {
   if (lead.trim().isNotEmpty) addWord(lead, lineStart, timeOf(matches.first));
   for (var i = 0; i < matches.length; i++) {
     final m = matches[i];
-    final chunkEnd = i + 1 < matches.length ? matches[i + 1].start : body.length;
+    final chunkEnd = i + 1 < matches.length
+        ? matches[i + 1].start
+        : body.length;
     final chunk = body.substring(m.end, chunkEnd);
     final next = i + 1 < matches.length ? timeOf(matches[i + 1]) : null;
     addWord(chunk, timeOf(m), next);
