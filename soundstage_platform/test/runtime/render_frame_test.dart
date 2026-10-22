@@ -257,9 +257,7 @@ void main() {
       common: const ir.NodeCommon(
         id: 'row',
         breakpointOverrides: {
-          'mobile': {
-            'autoLayout.direction': ir.IrValue.enumValue('vertical'),
-          },
+          'mobile': {'autoLayout.direction': ir.IrValue.enumValue('vertical')},
         },
       ),
       autoLayout: const ir.AutoLayout(gap: ir.Gap.fixed(10)),

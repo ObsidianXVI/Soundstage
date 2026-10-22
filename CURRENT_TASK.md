@@ -1,12 +1,12 @@
 # CURRENT TASK
 
 ## Release · Feature · Task
-M0 Foundations and runtime spike → T0.4 Runtime layout and text
+M0 Foundations and runtime spike → T0.5 Runtime paint
 
-Spec: `_dev/features/m0.md` (T0.4). Blueprint: `docs/architecture.md` §3–§13. Roadmap: `docs/roadmap.md`.
+Spec: `_dev/features/m0.md` (T0.5). Blueprint: `docs/architecture.md` §3–§13. Roadmap: `docs/roadmap.md`.
 
 ## Status
-READY — T0.3 done; T0.4 not started.
+READY — T0.4 done; T0.5 not started. T0.3b runs in parallel in a separate worktree.
 
 ## What was done
 - T0.1 (done): freezed 3.2.5 / json_serializable / flutter_riverpod 3.4.3 / build_runner added;
@@ -39,6 +39,26 @@ READY — T0.3 done; T0.4 not started.
   #6–#10 added (text style vs local style, instance placement/precedence, patches vs bindings,
   unaddressable paths, spring duration).
 
+- T0.4 (done, `dev-high`): `lib/runtime/` renders `ResolvedDocument`s. The pure layout core is
+  `computeAutoLayout` (§4.4 steps 1–10) plus `resolveAxisConstraint`/`resolveConstraints`
+  (§4.3), covered by a 43-case layout table with exact rects. `RenderStageBox` is the base:
+  dry-layout measurement, rotation/flip about the centre with rotated-footprint placement,
+  paint-only `motion` at paint and hit test, `identical()` invalidation, and fault containment
+  (an error box in edit, nothing in play). On top of it sit `RenderStageFrame`,
+  `RenderStageText` (per-paragraph painters, §7 mapping, every autoResize mode, truncation, list
+  markers, indent, first baseline), `RenderStageShape` and `RenderStageScene`.
+  `StageAppearancePainter` is the T0.5 seam (solid fills, image `fill` with focal point, basic
+  strokes). Media is `asset://` resolution plus a decoded-image LRU. `StageNodeWidget` and
+  `StageSceneView` map resolved scenes to render objects. `assets/demo/static.stage.json` (3
+  scenes, tablet and mobile patches) and procedural images come from `tool/gen_demo_images.dart`.
+  The Riverpod dev harness is in `lib/app/`. Verified in Chrome at 390, 834 and 1440
+  (`_dev/screens/t0.4/`).
+  - 692 VM tests pass (99 runtime). On Chrome, 95 runtime tests pass and 4 demo tests are
+    skipped, because the web test runner never completes a `rootBundle` load.
+  - Behaviour notes are in `lib/runtime/README.md`. Four questions were added to
+    DECISIONS_NEEDED (T0.4-1…4). The most important is T0.4-1: auto-layout sizing is
+    direction-relative, so a breakpoint patch that flips `direction` changes which axis is fixed.
+
 ## Definition of done (T0.2) — met
 - [x] Every model in architecture §3–§12 as freezed + JSON, under `lib/ir/src/`
 - [x] `IrValue`, `StageColor`, ids, geometry value types
@@ -60,11 +80,27 @@ READY — T0.3 done; T0.4 not started.
 - [x] Tests listed in the T0.3 brief; existing tests and purity test green; Chrome run of `test/ir`
 - [x] `flutter analyze` clean; committed in logical steps; records updated
 
+## Definition of done (T0.4)
+- [x] Pure layout core under `lib/runtime/src/render/layout/`: `auto_layout.dart` (§4.4 steps 1–10: hug, fill split with min/max freeze loop, gap auto incl. n=1, negative gaps, primary/counter alignment, baseline across nested frames, wrap rows with rowAlign and counterAxisGap, strokesIncludedInLayout, rotated bounding boxes, hidden/absolute skipped, reverseZIndex paint order) and `constraints.dart` (§4.3, five constraints per axis against R vs P, then min/max). Grid frames lay out as free.
+- [x] Render objects: `StageParentData`, `RenderStageFrame` (reference size = stored size, scene root = breakpoint `designSize`), `RenderStageText` (§7 mapping), `RenderStageShape` (rectangle, ellipse incl. arc, line, polygon, star). Rotation/flip about the centre with rotated-bbox placement; paint-only `motion` at paint and hit test; `identical()`-based updates (layout vs paint invalidation); repaint boundaries per §17.1; no default `saveLayer`.
+- [x] Text: per-paragraph `TextPainter`s, paragraph spacing, first-line indent, list markers with hanging indent, line height/letter spacing mapping, `TextLeadingDistribution.even`, text case (smallCaps via `smcp`), OpenType features, font variations, decorations, baseline shift, all autoResize modes incl. truncate, horizontal (incl. justified) and vertical alignment, first baseline, font table → family with fallback, first visible solid fill as colour.
+- [x] Minimal paint seam `StageAppearancePainter` (solid fills, basic solid stroke inside/center/outside, uniform/per-corner radii, clip content, opacity) and image fills (`asset://` resolution, size-bounded decoded `ui.Image` LRU, `fill` scale mode + focal point).
+- [x] Widgets: `StageNodeWidget` (ResolvedNode subtree → render-object widgets keyed by id) and `StageSceneView` (pinned: viewport-sized root; flow: viewport width, own vertical sizing).
+- [x] Fault containment (§17.2): layout/paint exceptions caught at the render-object boundary, reported via `FlutterError.reportError`, sized from stored geometry, error box in `edit`, nothing in `play`; placeholders behave the same.
+- [x] Dev harness in `lib/app/` loads `assets/demo/static.stage.json`, resolves at the viewport width (re-resolves on breakpoint change), stacks scenes in a `SingleChildScrollView`.
+- [x] Demo document with the listed content (pinned hero with focal-point image, constrained title, scrim; flow column of rich text with list; tag wrap; fill card row with min/max; baseline row; rotated element; mobile patch) and bundled images with a source README.
+- [x] Tests in `test/runtime/`: layout table (every §4.4 step/edge case, every §4.3 constraint at a resized parent, exact rects), render-level frame rects, text mapping, fault containment, demo renders without exceptions/overflow at 390/834/1440.
+- [x] Visual check via chrome-devtools at 390/834/1440, screenshots in `_dev/screens/t0.4/`.
+- [x] `flutter analyze` clean; `flutter test` green; `flutter test --platform chrome test/runtime` run; `lib/runtime/README.md` behaviour notes; DECISIONS_NEEDED for ambiguities; records updated; committed in logical steps.
+
 ## Blocked on / decisions needed
-Nothing blocking. Ten open questions in `DECISIONS_NEEDED.md`, each with a provisional answer
-(#6–#10 come from T0.3 and affect M1/M2 editor behaviour).
+Nothing blocking. Open questions in `DECISIONS_NEEDED.md` each have a provisional answer.
+T0.4-1 (direction-relative auto-layout sizing) should be settled before the M1 inspector.
 
 ## Next task after this one
-T0.4 Runtime layout and text: build on `ResolvedDocument`/`ResolvedNode` (render from
-`ResolvedNode.node` + `children`; text from `paragraphs`). T0.3b (validator, fuzz tests,
-benchmarks per architecture §17–§18) is a separate follow-up.
+T0.5 Runtime paint: replace the internals of `StageAppearancePainter`
+(`lib/runtime/src/paint/appearance_painter.dart`) behind its existing signatures. That covers
+gradients, every image scale mode, crop, tile, rotation and filters, per-side and dashed strokes,
+effects, corner smoothing, blend modes, and text paint stacks via `srcIn` (in
+`RenderStageText.paintStage`). Text strokes and effects are also T0.5. See the "Paint seam" and
+"Behaviour notes" sections of `lib/runtime/README.md`.
