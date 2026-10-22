@@ -83,6 +83,7 @@ final class CompiledEasing {
   final Float64List params;
 
   /// Segment [seg]'s easing at progress [x] (the oracle's `applyEasing`).
+  @pragma('vm:prefer-inline')
   double ease(int seg, double x) {
     if (x.isNaN) return 0;
     final u = x < 0 ? 0.0 : (x > 1 ? 1.0 : x);
@@ -142,6 +143,7 @@ void _bezierCoefficients(
 }
 
 /// The oracle's Newton–Raphson + bisection solver, inlined (no closures).
+@pragma('vm:prefer-inline')
 double _bezier(
   double ax,
   double bx,
@@ -206,8 +208,10 @@ void _springParams(Float64List p, int o, double m, double k, double c) {
   p[o + 3] = _springResponse(w0, zeta, hi);
 }
 
+@pragma('vm:prefer-inline')
 bool _critical(double zeta) => (zeta - 1).abs() < 1e-6;
 
+@pragma('vm:prefer-inline')
 double _springResponse(double w0, double zeta, double tau) {
   if (_critical(zeta)) return 1 - math.exp(-w0 * tau) * (1 + w0 * tau);
   if (zeta < 1) {

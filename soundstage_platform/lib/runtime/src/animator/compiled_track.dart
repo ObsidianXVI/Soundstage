@@ -5,6 +5,7 @@
 // Pure Dart (no Flutter imports), so it can be benchmarked and
 // allocation-profiled on its own (`test/bench/animator_bench.dart`).
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:soundstage_platform/ir/ir.dart' as ir;
@@ -223,8 +224,42 @@ final class CompiledTrack {
   /// Output component [i].
   double component(int i) => out[i];
 
+  /// Whether every keyframe and segment evaluates in [out] (scalar, vector
+  /// or colour values of the property's type, no registry-interpolated
+  /// segment), so the output can be written to a typed override without
+  /// boxing. Malformed tracks keep the registry path.
+  late final bool isTyped = _computeTyped();
+
+  bool _computeTyped() {
+    if (kind != TrackValueKind.scalar &&
+        kind != TrackValueKind.vector &&
+        kind != TrackValueKind.color) {
+      return false;
+    }
+    for (var i = 0; i < variants.length; i++) {
+      if (variants[i] < 0) return false;
+    }
+    for (var i = 0; i < segModes.length; i++) {
+      if (segModes[i] == _boxedSegment) return false;
+    }
+    return true;
+  }
+
+  /// For `cornerRadius` and `strokeWeight` tracks: whether the current
+  /// output is the uniform variant, as [value] would box it (a held uniform
+  /// keyframe, or a segment between two uniform keyframes).
+  /// Unlike [currentVariant] (the segment's start variant), this needs both
+  /// ends of an interpolated segment to be uniform, like the oracle.
+  bool get outputUniform {
+    final h = _held;
+    if (h >= 0) return variants[h] == 0;
+    final s = _outSeg;
+    return s < 0 || (variants[s] == 0 && variants[s + 1] == 0);
+  }
+
   /// Evaluates at clock value [t] and returns whether the output changed.
   /// Allocation-free for scalar, vector, colour and step tracks.
+  @pragma('vm:prefer-inline')
   bool evaluate(double t) {
     final ts = times;
     final n = ts.length;
@@ -268,6 +303,7 @@ final class CompiledTrack {
     return true;
   }
 
+  @pragma('vm:prefer-inline')
   bool _lerpVector(int seg, double e) {
     var changed = _held != -1 || _outSeg != seg || _boxed != null;
     _boxed = null;
@@ -286,6 +322,7 @@ final class CompiledTrack {
     return changed;
   }
 
+  @pragma('vm:prefer-inline')
   bool _lerpColor(int seg, double e) {
     // The oracle's lerpColor: endpoints exactly, else OKLab with straight
     // alpha, converted back with a component-wise gamut clamp.
@@ -322,8 +359,15 @@ final class CompiledTrack {
     return changed;
   }
 
+  @pragma('vm:prefer-inline')
   static double _enc(double v) {
-    final c = ir.linearToSrgb(v < 0 ? 0.0 : (v > 1 ? 1.0 : v));
+    // `ir.linearToSrgb`, inlined: the same arithmetic (so outputs stay
+    // identical to the oracle) without a double crossing a call into
+    // another library, which the VM's JIT boxes.
+    final x = v < 0 ? 0.0 : (v > 1 ? 1.0 : v);
+    final c = x <= 0.0031308
+        ? 12.92 * x
+        : 1.055 * math.pow(x, 1 / 2.4).toDouble() - 0.055;
     return c < 0 ? 0.0 : (c > 1 ? 1.0 : c);
   }
 

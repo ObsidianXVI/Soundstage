@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart' show Matrix4;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../media/image_cache.dart';
+import 'appearance_overrides.dart';
 import 'blend.dart';
 import 'gradient.dart';
 import 'image_filters.dart';
@@ -14,6 +15,7 @@ import 'outline.dart';
 import 'stage_color.dart';
 import 'stroke_geometry.dart';
 
+export 'appearance_overrides.dart';
 export 'outline.dart';
 
 /// Paints node appearances: the seam between render objects and the paint
@@ -36,6 +38,11 @@ export 'outline.dart';
 /// The `opacity` arguments multiply into every paint and effect colour. A
 /// render object passes the node opacity here instead of opening an
 /// opacity layer when the node has a single painted part.
+///
+/// The `overrides` arguments are the node's typed animated values
+/// ([StageAppearanceOverrides], T0.6b): each paint, effect and the stroke
+/// weight is read through them at paint time, so animating a fill colour,
+/// a gradient stop or a shadow never copies the node.
 class StageAppearancePainter {
   const StageAppearancePainter();
 
@@ -53,6 +60,7 @@ class StageAppearancePainter {
     VoidCallback? onImageReady,
     double devicePixelRatio = 1,
     double opacity = 1,
+    StageAppearanceOverrides? overrides,
   }) {
     if (!outline.closed) return;
     paintStack(
@@ -60,6 +68,8 @@ class StageAppearancePainter {
       outline.bounds,
       fills,
       opacity: opacity,
+      overrides: overrides,
+      stack: StagePaintStack.fills,
       draw: (p) => outline.fill(canvas, p),
       clipToRegion: outline.clip,
       media: media,
@@ -74,6 +84,8 @@ class StageAppearancePainter {
   /// images, which cannot be drawn through a `Paint`). [box] is the node box
   /// that gradients and images are mapped to. Without [clipToRegion], mesh
   /// and image paints are skipped (a diamond falls back to its first stop).
+  /// With [overrides] and [stack], each paint is read through the typed
+  /// overrides of that stack.
   void paintStack(
     Canvas canvas,
     Rect box,
@@ -84,8 +96,13 @@ class StageAppearancePainter {
     VoidCallback? onImageReady,
     double devicePixelRatio = 1,
     double opacity = 1,
+    StageAppearanceOverrides? overrides,
+    StagePaintStack? stack,
   }) {
-    for (final p in paints) {
+    for (final base in paints) {
+      final p = overrides == null || stack == null
+          ? base
+          : overrides.paint(stack, base);
       if (!_visible(p)) continue;
       switch (p) {
         case ir.SolidPaint():
@@ -276,8 +293,11 @@ class StageAppearancePainter {
     VoidCallback? onImageReady,
     double devicePixelRatio = 1,
     double opacity = 1,
+    StageAppearanceOverrides? overrides,
   }) {
-    var w = sideWeights(stroke.weight);
+    var w = sideWeights(
+      overrides == null ? stroke.weight : overrides.strokeWeight(stroke.weight),
+    );
     if (w.isZero || stroke.paints.isEmpty) return;
     final align = outline.closed ? stroke.align : ir.StrokeAlign.center;
     final dashed = stroke.dash.any((d) => d > 0);
@@ -292,6 +312,8 @@ class StageAppearancePainter {
         outline.bounds,
         stroke.paints,
         opacity: opacity,
+        overrides: overrides,
+        stack: StagePaintStack.strokes,
         draw: (p) => canvas.drawPath(path, p),
         clipToRegion: (c) => c.clipPath(path),
         media: media,
@@ -325,6 +347,8 @@ class StageAppearancePainter {
       outline.bounds,
       stroke.paints,
       opacity: opacity,
+      overrides: overrides,
+      stack: StagePaintStack.strokes,
       draw: (p) => canvas.drawPath(
         path,
         p
@@ -364,9 +388,11 @@ class StageAppearancePainter {
     List<ir.Effect> effects, {
     double opacity = 1,
     bool fillsOpaque = false,
+    StageAppearanceOverrides? overrides,
   }) {
     if (!outline.closed) return;
-    for (final e in effects) {
+    for (final base in effects) {
+      final e = overrides == null ? base : overrides.effect(base);
       if (e is! ir.DropShadow || !e.visible) continue;
       final shape = _spread(outline, e.spread);
       final paint = Paint()
@@ -398,9 +424,11 @@ class StageAppearancePainter {
     StageOutline outline,
     List<ir.Effect> effects, {
     double opacity = 1,
+    StageAppearanceOverrides? overrides,
   }) {
     if (!outline.closed) return;
-    for (final e in effects) {
+    for (final base in effects) {
+      final e = overrides == null ? base : overrides.effect(base);
       if (e is! ir.InnerShadow || !e.visible) continue;
       final hole = _spread(outline, -e.spread);
       final reach = outline.bounds.inflate(

@@ -153,4 +153,34 @@ void main() {
       animator.dispose();
     },
   );
+
+  test('animator push of 200 mixed paint/opacity/motion tracks allocates '
+      'nothing per frame', () async {
+    final s = service;
+    if (s == null) {
+      markTestSkipped('run with --enable-vmservice to measure allocations');
+      return;
+    }
+    final (:animator, :boxes) = boundMixedAnimator();
+    expect(animator.boundTrackCount, 200);
+    final clock = _sweepValues();
+    void run(int frames) {
+      for (var f = 0; f < frames; f++) {
+        animator.sceneScrolled(
+          's',
+          progress: clock[f % clock.length],
+          visible: true,
+        );
+      }
+    }
+
+    run(10 * _frames); // warm up: let the optimising JIT settle
+    final rates = await _perFrame(s, isolate, run);
+    final total = _report('animator, 200 mixed tracks', rates);
+    expect(total, lessThan(_maxPerFrame), reason: '$rates');
+    for (final b in boxes) {
+      expect(identical(b.node, b.baseNode), isTrue);
+    }
+    animator.dispose();
+  });
 }

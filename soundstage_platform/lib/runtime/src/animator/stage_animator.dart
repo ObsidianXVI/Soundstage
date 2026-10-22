@@ -20,11 +20,16 @@ import 'text_style_tracks.dart';
 ///   (through the [StageNodeRegistry]); tracks of scenes outside the lazy
 ///   window have no target and cost nothing.
 /// - `opacity` and `motion.*` tracks write typed slots on the render object
-///   ([RenderStageBox.setAnimatedSlot], allocation-free, paint only). Every
-///   other property goes through the node's [RenderStageBox.nodeAnimator],
-///   which re-applies the node's animated values through the property
-///   registry (allocates a node copy per changed node per frame; paint or
-///   layout invalidation by what changed).
+///   ([RenderStageBox.setAnimatedSlot], allocation-free; a repaint boundary
+///   only updates its composited layers).
+/// - Every other track is offered to a [StageTypedTrackHost] render object,
+///   which may apply it itself in typed form: frames and shapes take the
+///   numeric and colour appearance tracks (typed paint overrides, read by
+///   the paint seam at paint time), text takes its style tracks.
+/// - Every other property goes through the node's
+///   [RenderStageBox.nodeAnimator], which re-applies the node's animated
+///   values through the property registry (allocates a node copy per
+///   changed node per frame; paint or layout invalidation by what changed).
 /// - **One ticker.** It runs only while something moves by itself: a
 ///   playing timeline, an active audio source, or a smoothed clock that has
 ///   not settled. Each tick advances sources, applies smoothing, and
@@ -357,11 +362,13 @@ class StageAnimator implements StageNodeListener {
 
   /// A source changed from outside the ticker. Unsmoothed clocks evaluate
   /// now when [immediate]; others are picked up by the next tick.
+  @pragma('vm:prefer-inline')
   void _external(_Clock c, {required bool immediate}) {
     if (mode == StageRenderMode.edit) return;
     if (c.smoother.smoothing <= 0 && immediate) {
-      c.smoother.reset(c.source.value);
-      _setValue(c, c.source.value);
+      final v = c.source.value;
+      c.smoother.reset(v);
+      _setValue(c, v);
     } else {
       c.pending = true;
     }
@@ -452,6 +459,7 @@ class StageAnimator implements StageNodeListener {
     _flush();
   }
 
+  @pragma('vm:prefer-inline')
   void _setValue(_Clock c, double v) {
     c.value = v;
     if (c.evaluatedAt == v) return;
@@ -463,7 +471,7 @@ class StageAnimator implements StageNodeListener {
       if (box == null) continue;
       if (!b.track.evaluate(v)) continue;
       if (b.slot >= 0) {
-        box.setAnimatedSlot(b.slot, b.track.scalar);
+        box.setAnimatedSlotFrom(b.slot, b.track.out, 0);
       } else if (b.handle != null) {
         b.host!.trackChanged(b.handle!);
       } else {
@@ -539,6 +547,7 @@ class _Binding {
   /// The typed slot (`opacity`, `motion.*`), or −1 for node-level.
   final int slot;
   final _Clock clock;
+
   RenderStageBox? box;
   _NodeTarget? node;
 
