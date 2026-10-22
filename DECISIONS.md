@@ -70,3 +70,17 @@
   Rationale: overrides the v1 spec's frames-and-shapes-only limit. Text shadows over imagery and
   rounded video are everyday immersive-design needs, and Figma supports both. Added before the
   property registry exists, so it costs one model change instead of a migration later.
+
+- **The IR stays the source of truth; code is never the source of truth.** (User asked whether
+  raw code could replace the IR; agreed to keep the IR as long as it is not unnecessary, and that
+  it is performant, reliable and scalable.)
+  Rationale: the editor needs a structured in-memory model regardless. Code as the source of
+  truth would add a Dart parse/print round-trip, require a compile per edit (no live canvas) and
+  a Flutter build per publish, and lose the structure that undo, overrides, instances and
+  keyframes depend on. The `.stage.script` text format stays optional (M5). "Export to Flutter"
+  (one-way) is planned for M5 to cover ownership.
+
+- **Performance, reliability and scalability are specified requirements** (architecture §17,
+  budgets §18): compiled allocation-free tracks, identity-based caching and incremental
+  resolution, lazy scenes, contained render faults, never-failing document loads, crash-safe
+  autosave, immutable published versions, CDN-only reader path, chunked published documents.

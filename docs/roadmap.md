@@ -13,6 +13,7 @@ before the editor is built on top.
 | T0.1 | Project foundations: dependencies, `lib/` skeleton, lint config, codegen, test setup | orchestrator |
 | T0.2 | IR models: every model in §3–§12 as freezed + JSON, `schemaVersion` 1, migration scaffold, ids | dev-high |
 | T0.3 | IR operations: PropertyRegistry, patches, breakpoint cascade, interpolators, easing, track evaluation, resolver → ResolvedTree | dev-high |
+| T0.3b | Validator, fuzz tests, benchmark harness (§17–§18) | dev-moderate |
 | T0.4 | Runtime layout and text: `RenderStageFrame` (free + constraints + auto layout incl. wrap/baseline), `RenderStageText` (§7), `RenderStageShape`; the layout test table | dev-high |
 | T0.5 | Runtime paint: paint stacks, gradients, image scale modes + focal point + filters, strokes, effects, corner smoothing, blend modes, clip, motion transform | dev-moderate |
 | T0.6 | Runtime motion: `StagePlayer`, pinned/flow scene slivers, clocks + smoothing, animator writing to render objects | dev-high |
@@ -60,8 +61,11 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
 - T4.1 Firebase Auth, Firestore metadata, Storage documents and assets (Terraform-provisioned).
 - T4.2 Publish/version flow, `/s/<slug>` player route, asset CDN variants.
 - T4.3 Static HTML snapshots for SEO and link previews.
+- T4.4 Chunked published documents (manifest + per-scene chunks, lazy fetch), §17.3.
 
 ## M5 — Later
 - `.stage.script` as a text view of the IR, for diffs and LLM-assisted editing.
 - Multi-author accounts, collaboration.
 - Letterpress embedding (`StagePlayer` inside an `LPModule`).
+- **Export to Flutter:** a one-way generator from a story to a standalone Dart widget tree, for
+  ownership and no lock-in. The IR stays the source of truth.

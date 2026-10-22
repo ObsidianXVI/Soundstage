@@ -515,7 +515,69 @@ of draggable line/word blocks. Scrubbing updates the canvas live.
   pointer. Player route `/s/<slug>`. A static HTML snapshot per published story (meta/OG tags and
   the story's text) for search engines and link previews.
 
-## 17. Testing and budgets
+## 17. Performance, reliability, scalability
+
+These are requirements, not aspirations. Each one has a test or a measured budget (§18).
+
+### 17.1 Performance
+
+- **The IR is a boundary, not a hot path.** Nothing per-frame touches `IrValue`, `PropertyPath`
+  strings or the registry. At resolve time the runtime **compiles** each track into a typed
+  evaluator (keyframe times and values in `Float64List`s, pre-solved easing, a direct setter on the
+  target render object). The per-frame loop allocates nothing.
+- **Clock-indexed evaluation.** Tracks are grouped by clock. A frame evaluates only the groups
+  whose clock value changed. A scene that is not on screen evaluates nothing.
+- **Identity, not equality.** freezed's `==` is a deep comparison, O(tree). Hot paths (resolver
+  caches, render-object updates, editor diffing) compare with `identical()`. Edits copy only the
+  path from the root to the changed node (structural sharing), so unchanged subtrees keep their
+  identity.
+- **Incremental resolution.** The resolver memoises per node, keyed by the identity of the node's
+  inputs (node, applicable patches, active modes, referenced component and tokens). A
+  single-property edit re-resolves only the path to that node. Token or component edits
+  invalidate only their dependents (a reverse-dependency index). M0 may resolve whole documents,
+  but the API must not preclude this.
+- **Lazy scenes.** Only scenes within ±1 viewport of the reading position have render trees.
+  Media decodes ahead of need (the next scene) and is released behind it. A size-bounded LRU
+  holds decoded images.
+- **Cheap compositing.** Animated nodes are repaint boundaries. `saveLayer` is used only where
+  semantics require it (group opacity over overlapping children, non-normal blend modes, layer and
+  background blur, masks), never by default.
+- **Right-sized media.** Image variants are picked by rendered width × DPR. Placeholders (dominant
+  colour or blurhash) paint immediately. Modern formats are used where the browser decodes them.
+
+### 17.2 Reliability
+
+- **Documents never fail to open.** Loading runs migrations, then a validator that checks
+  referential integrity (ids, component/asset/token/clock references, unique ids). Problems become
+  diagnostics. The resolver never throws: a missing reference renders as a visible placeholder in
+  the editor and is skipped in the player.
+- **Render faults are contained.** A node that fails to lay out or paint renders an error box (in
+  the editor) or nothing (in the player). It never takes down the scene or the story.
+- **Determinism.** The same document, viewport and clock values always produce the same frame.
+  Golden tests rely on this.
+- **No lost work.** Autosave is debounced and crash-safe: write a new revision, then move the
+  pointer. Keep a revision history. Undo history survives a reload in the same session.
+- **Immutable publishing.** A published version is frozen. The player supports every
+  `schemaVersion` up to its own through migrations, so old stories keep playing after runtime
+  updates.
+- **Fuzzed boundaries.** Property-based tests generate random documents and patches for JSON
+  round-trip, migration, validation and resolution (no throws, deterministic output).
+
+### 17.3 Scalability
+
+- **Readers cost nothing server-side.** A published story is static JSON plus assets on a CDN,
+  played by a static web app. Reader load scales with the CDN, not with any server we run.
+- **Long stories.** Published documents are split per scene (a small manifest plus scene chunks
+  and a shared library chunk for tokens, components, fonts and the asset table). The player
+  fetches scene chunks as the reader approaches them. The editor loads the whole document.
+- **Large documents in the editor.** Target: a 5,000-node story stays interactive. That relies on
+  incremental resolution, virtualised panels (layers and timeline lists build lazily), and a
+  canvas that only builds the active scene.
+- **Authors later.** Story metadata in Firestore and documents and assets in Storage, partitioned
+  by `authorId` from day one, so multi-author is a permissions change rather than a data
+  migration.
+
+## 18. Testing and budgets
 
 - `ir`: JSON round-trip for every model, migrations, registry get/set for every descriptor, patch
   cascade, interpolators, easing curves, resolver (instances, breakpoints, modes, tokens).
@@ -526,5 +588,14 @@ of draggable line/word blocks. Scrubbing updates the canvas live.
 - `editor`: command and undo/redo tests, `SetProperty` routing tests, panel widget tests.
 - Visual and feel checks through the `chrome-devtools` MCP. Performance traces of pinned-scene
   scrolling.
-- **Budgets:** 60 fps while scrolling an animated pinned scene in desktop Chrome; animator work
-  < 2 ms per frame at 200 active tracks; zero widget rebuilds during scroll playback.
+- **Budgets** (benchmarks under `test/bench/`, run in Chrome, checked at each milestone):
+
+  | Budget | Target |
+  |---|---|
+  | Scroll an animated pinned scene, desktop Chrome | 60 fps, no frame > 16 ms |
+  | Animator work per frame, 200 active tracks | < 2 ms, zero allocations |
+  | Widget rebuilds during scroll playback | 0 |
+  | Full resolve, 2,000-node document | < 16 ms |
+  | Re-resolve after a single-property edit | < 2 ms |
+  | Editor drag on a 5,000-node document | 60 fps |
+  | Load and first paint of the first scene (published, fast 4G) | < 2.5 s |
