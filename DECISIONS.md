@@ -84,3 +84,31 @@
   budgets §18): compiled allocation-free tracks, identity-based caching and incremental
   resolution, lazy scenes, contained render faults, never-failing document loads, crash-safe
   autosave, immutable published versions, CDN-only reader path, chunked published documents.
+
+- **A text node's `style` becomes a `TextStyleOverride`** (all fields nullable), layered over the
+  named text style (`textStyleId`), or over the document's default text style when there is none.
+  Spans then override the result. (Overrides T0.3's provisional "named style wins, stored style is a
+  detached fallback".)
+  Rationale: explicit local overrides are unambiguous (CSS cascade semantics), the inspector can
+  show exactly which fields are overridden and offer reset, and the file-format change is free
+  before anything is published. Implemented in T0.3b.
+
+- **Instance expansion** (T0.3, accepted as built): the instance supplies name, visibility, lock,
+  geometry, rotation, flips, motion, layoutChild, mask and blendMode (when set). Its opacity
+  multiplies with the component root's, and interactions from both apply. Order per inner node:
+  component node → its breakpoint patches → prop bindings → instance overrides, inner to outer
+  (the outermost instance wins). Override keys are inner ids relative to the instance.
+  Rationale: Figma-like. Multiplying opacity avoids needing "unset" on an instance's always-present
+  opacity.
+
+- **A concrete value in a patch detaches the token binding on that path; a `tokenRef` value binds
+  it** (T0.3, accepted).
+
+- **Not patchable or animatable in v1** (T0.3, accepted): grid track lists, shape kind, behaviours,
+  `modeOverrides`, interactions, span links. Auto layout and grid are toggled by boolean paths
+  `autoLayout` and `grid`, which are mutually exclusive. `effects.<id>.blur` addresses a shadow's
+  blur or a blur effect's radius.
+
+- **Spring easing fits the keyframe interval** (T0.3, accepted): the interval maps to the spring's
+  settle time (envelope within 1e-3), normalised to end at exactly 1. Spring parameters shape the
+  bounce, and keyframe spacing sets the duration. That's what a timeline user expects.
