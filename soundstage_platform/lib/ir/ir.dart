@@ -13,11 +13,13 @@ library;
 export 'package:json_annotation/json_annotation.dart'
     show CheckedFromJsonException;
 
+export 'src/animation/interpolate.dart';
 export 'src/assets.dart';
 export 'src/audio.dart';
 export 'src/behaviors.dart';
 export 'src/breakpoint.dart';
 export 'src/components.dart';
+export 'src/diagnostics.dart';
 export 'src/document.dart';
 export 'src/interactions.dart';
 export 'src/migrations/migrate.dart';
@@ -31,6 +33,10 @@ export 'src/nodes/node_common.dart';
 export 'src/nodes/paint.dart';
 export 'src/nodes/stroke.dart';
 export 'src/nodes/text.dart';
+export 'src/registry/patch.dart';
+export 'src/registry/property_descriptor.dart';
+export 'src/registry/property_registry.dart';
+export 'src/resolve/breakpoints.dart';
 export 'src/scene.dart';
 export 'src/tokens.dart';
 export 'src/values/geometry.dart';
