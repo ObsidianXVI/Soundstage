@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'demo_harness.dart';
+import 'motion_demo.dart';
 
 /// Root of the Soundstage web app.
 ///
@@ -11,10 +12,15 @@ class SoundstageApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    final demo = Uri.base.queryParameters['demo'];
+    return MaterialApp(
       title: 'Soundstage',
       debugShowCheckedModeBanner: false,
-      home: Scaffold(body: DemoHarness()),
+      home: Scaffold(
+        body: demo == 'motion'
+            ? const MotionDemoHarness()
+            : const DemoHarness(),
+      ),
     );
   }
 }
