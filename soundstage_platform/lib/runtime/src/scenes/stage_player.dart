@@ -7,6 +7,7 @@ import '../animator/node_registry.dart';
 import '../animator/stage_animator.dart';
 import '../clocks/clock_source.dart';
 import '../clocks/timeline_clock.dart';
+import '../media/audio.dart';
 import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
 import '../widgets/stage_node_widget.dart';
@@ -54,6 +55,9 @@ class StagePlayerController {
 ///   tests) instead of the available space.
 /// - [initialSceneId] scrolls to that scene's start after the first layout.
 /// - [clockFactories] plugs in `audio` (T0.7) and `behavior` (M3) clocks.
+/// - [audio] plays the document's audio tracks: its clock sources back
+///   `audio` clocks (unless [clockFactories] sets its own), seeks re-read
+///   clocks at once, and scene visibility drives scene-scoped tracks.
 /// - Scrolling never rebuilds widgets or calls `setState`: scenes publish
 ///   progress from layout, and the animator writes into render objects.
 ///   The only builds are a scene entering or leaving the lazy window
@@ -68,6 +72,7 @@ class StagePlayer extends StatefulWidget {
     this.clockOverrides = const {},
     this.environment,
     this.clockFactories = const StageClockFactories(),
+    this.audio,
     this.controller,
     this.lazyWindow = 1,
     this.physics,
@@ -86,6 +91,9 @@ class StagePlayer extends StatefulWidget {
   /// registry and [mode].
   final StageEnvironment? environment;
   final StageClockFactories clockFactories;
+
+  /// The document's audio (T0.7); null = silent, `audio` clocks hold 0.
+  final StageAudioService? audio;
   final StagePlayerController? controller;
 
   /// Viewports around the visible range whose scenes keep a render tree.
@@ -123,6 +131,16 @@ class _StagePlayerState extends State<StagePlayer>
     _env = _environmentFor(widget);
     _animator = _newAnimator();
     _attachController(widget.controller);
+    widget.audio?.addSeekListener(_audioSeeked);
+  }
+
+  void _audioSeeked() => _animator.notifyClockChanged();
+
+  StageClockFactories get _factories {
+    final f = widget.clockFactories;
+    final audio = widget.audio;
+    if (audio == null || f.audio != null) return f;
+    return StageClockFactories(audio: audio.clockSource, behavior: f.behavior);
   }
 
   StageEnvironment _environmentFor(StagePlayer w) =>
@@ -134,7 +152,7 @@ class _StagePlayerState extends State<StagePlayer>
     vsync: this,
     mode: widget.mode,
     clockOverrides: widget.clockOverrides,
-    factories: widget.clockFactories,
+    factories: _factories,
   );
 
   void _attachController(StagePlayerController? c) {
@@ -162,7 +180,12 @@ class _StagePlayerState extends State<StagePlayer>
         (widget.environment == null &&
             !identical(old.document, widget.document));
     if (envChanged) _env = _environmentFor(widget);
+    if (!identical(old.audio, widget.audio)) {
+      old.audio?.removeSeekListener(_audioSeeked);
+      widget.audio?.addSeekListener(_audioSeeked);
+    }
     if (old.mode != widget.mode ||
+        !identical(old.audio, widget.audio) ||
         !identical(old.clockFactories, widget.clockFactories)) {
       _detachController(old.controller);
       _animator.dispose();
@@ -183,6 +206,7 @@ class _StagePlayerState extends State<StagePlayer>
 
   @override
   void dispose() {
+    widget.audio?.removeSeekListener(_audioSeeked);
     _detachController(widget.controller);
     _animator.dispose();
     _scroll.dispose();
@@ -221,11 +245,16 @@ class _StagePlayerState extends State<StagePlayer>
           estimatedExtent: scene.root.node.common.height,
           windowViewports: widget.lazyWindow,
           content: (scene, viewport, resolved.breakpoint),
-          onLayout: (progress, {required visible}) => _animator.sceneScrolled(
-            scene.id,
-            progress: progress,
-            visible: visible,
-          ),
+          onLayout: (progress, {required visible}) {
+            _animator.sceneScrolled(
+              scene.id,
+              progress: progress,
+              visible: visible,
+            );
+            if (widget.mode == StageRenderMode.play) {
+              widget.audio?.sceneVisibilityChanged(scene.id, visible: visible);
+            }
+          },
           builder: (context, inWindow) {
             _sceneWindowChanged(scene.id, inWindow, viewport.width);
             if (!inWindow) return const SizedBox.shrink();
@@ -344,6 +373,36 @@ Set<String> sceneAssetIds(ir.ResolvedScene scene) {
   }
 
   paints(scene.background);
+  visit(scene.root);
+  return out;
+}
+
+/// Document font family ids a resolved scene's text uses (the enter gate
+/// waits for them).
+Set<String> sceneFontFamilyIds(ir.ResolvedScene scene) {
+  final out = <String>{};
+  void visit(ir.ResolvedNode n) {
+    for (final p in n.paragraphs ?? const <ir.ResolvedParagraph>[]) {
+      for (final s in p.spans) {
+        final id = s.style.fontFamilyId;
+        if (id != null) out.add(id);
+      }
+    }
+    final b = n.node;
+    if (b is ir.FrameNode) {
+      final behavior = b.behavior;
+      if (behavior is ir.LyricsBehavior) {
+        for (final o in [behavior.activeStyle, behavior.inactiveStyle]) {
+          final id = o.fontFamilyId;
+          if (id != null) out.add(id);
+        }
+      }
+    }
+    for (final c in n.children) {
+      visit(c);
+    }
+  }
+
   visit(scene.root);
   return out;
 }

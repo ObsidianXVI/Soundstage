@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:ui' as ui;
 
@@ -180,6 +181,26 @@ class StageMedia {
   /// lazy window).
   void prefetch(String assetId, {double? targetWidth}) {
     image(assetId, targetWidth: targetWidth);
+  }
+
+  /// Completes when [assetId] is decoded (now or later), or after [timeout]
+  /// when it is missing, fails or is slow (the enter gate never blocks on
+  /// a broken image).
+  Future<void> ready(
+    String assetId, {
+    double? targetWidth,
+    Duration timeout = const Duration(seconds: 8),
+  }) {
+    final done = Completer<void>();
+    void finish() {
+      if (!done.isCompleted) done.complete();
+    }
+
+    if (image(assetId, targetWidth: targetWidth, onReady: finish) != null ||
+        resolver.asset(assetId) == null) {
+      finish();
+    }
+    return done.future.timeout(timeout, onTimeout: () {});
   }
 
   /// Releases every decoded rendition (original and variants) of [assetId]

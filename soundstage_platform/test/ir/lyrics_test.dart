@@ -11,13 +11,14 @@ void main() {
       expect(r.diagnostics, isEmpty);
       expect(r.metadata, {'ti': 'Song', 'ar': 'Someone'});
       expect([for (final l in r.doc.lines) l.start], [1.5, 2.25, 4, 63.125]);
-      expect([for (final l in r.doc.lines) l.text], [
-        'One',
-        'Two',
-        'Four',
-        'Three',
-      ]);
-      expect(r.doc.lines.every((l) => l.end == null && l.words.isEmpty), isTrue);
+      expect(
+        [for (final l in r.doc.lines) l.text],
+        ['One', 'Two', 'Four', 'Three'],
+      );
+      expect(
+        r.doc.lines.every((l) => l.end == null && l.words.isEmpty),
+        isTrue,
+      );
     });
 
     test('colon fraction variant', () {
@@ -27,11 +28,10 @@ void main() {
 
     test('several timestamps on one line', () {
       final r = parseLrc('[00:10.00][00:30.00]Chorus\n[00:20.00]Verse');
-      expect([for (final l in r.doc.lines) (l.start, l.text)], [
-        (10.0, 'Chorus'),
-        (20.0, 'Verse'),
-        (30.0, 'Chorus'),
-      ]);
+      expect(
+        [for (final l in r.doc.lines) (l.start, l.text)],
+        [(10.0, 'Chorus'), (20.0, 'Verse'), (30.0, 'Chorus')],
+      );
     });
 
     test('offset shifts earlier, clamped at 0', () {
@@ -57,19 +57,22 @@ void main() {
       final l = r.doc.lines.single;
       expect(l.start, 10);
       expect(l.text, 'Hello bright world');
-      expect([for (final w in l.words) (w.text, w.start, w.end)], [
-        ('Hello', 10.0, 10.5),
-        ('bright', 10.5, 11.25),
-        ('world', 11.25, 12.0),
-      ]);
+      expect(
+        [for (final w in l.words) (w.text, w.start, w.end)],
+        [
+          ('Hello', 10.0, 10.5),
+          ('bright', 10.5, 11.25),
+          ('world', 11.25, 12.0),
+        ],
+      );
     });
 
     test('lead text before the first word time starts at the line', () {
       final l = parseLrc('[00:01.00]Oh <00:01.40>yes').doc.lines.single;
-      expect([for (final w in l.words) (w.text, w.start)], [
-        ('Oh', 1.0),
-        ('yes', 1.4),
-      ]);
+      expect(
+        [for (final w in l.words) (w.text, w.start)],
+        [('Oh', 1.0), ('yes', 1.4)],
+      );
     });
 
     test('malformed lines produce diagnostics and never throw', () {
