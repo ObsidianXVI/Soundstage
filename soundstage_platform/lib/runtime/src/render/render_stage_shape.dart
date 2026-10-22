@@ -1,6 +1,8 @@
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/compiled_track.dart';
+import '../animator/text_style_tracks.dart' show StageTypedTrackHost;
 import '../paint/appearance_compositor.dart';
 import 'render_stage_box.dart';
 import 'render_stage_frame.dart' show stageDevicePixelRatio;
@@ -13,7 +15,7 @@ import 'shape_geometry.dart';
 /// Until their runtimes land, video (M3) and embed (M3) nodes also render
 /// through this box: a video paints its appearance (fills show behind where
 /// the video will be), an embed paints nothing.
-class RenderStageShape extends RenderStageBox {
+class RenderStageShape extends RenderStageBox implements StageTypedTrackHost {
   RenderStageShape({
     required super.node,
     required super.environment,
@@ -33,6 +35,15 @@ class RenderStageShape extends RenderStageBox {
 
   @override
   bool get supportsAppearanceOverrides => true;
+
+  @override
+  Object? bindTrack(CompiledTrack track) => bindAppearanceTrack(track);
+
+  @override
+  void trackChanged(Object handle) => appearanceTrackChanged(handle);
+
+  @override
+  void unbindTrack(Object handle) => unbindAppearanceTrack(handle);
 
   @override
   EdgeInsets get strokeOutsets {

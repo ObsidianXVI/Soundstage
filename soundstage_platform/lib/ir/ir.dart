@@ -24,6 +24,8 @@ export 'src/components.dart';
 export 'src/diagnostics.dart';
 export 'src/document.dart';
 export 'src/interactions.dart';
+export 'src/lyrics/lrc.dart';
+export 'src/lyrics/lyrics_timing.dart';
 export 'src/migrations/migrate.dart';
 export 'src/motion.dart';
 export 'src/nodes/appearance.dart';

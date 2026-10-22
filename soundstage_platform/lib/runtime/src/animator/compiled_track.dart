@@ -207,6 +207,17 @@ final class CompiledTrack {
   /// Whether [evaluate] has run.
   bool get evaluated => _held != -2;
 
+  /// The value-type variant of the current output (e.g. 0 = px, 1 =
+  /// percent for line height and letter spacing); −1 when the output is a
+  /// value that cannot interpolate (read [value]) or before [evaluate].
+  int get currentVariant {
+    final h = _held;
+    if (h == -2) return -1;
+    if (h >= 0) return variants[h];
+    if (_boxed != null || _outSeg < 0) return -1;
+    return variants[_outSeg];
+  }
+
   /// The first output component (the value of a scalar track).
   double get scalar => out[0];
 
@@ -237,6 +248,8 @@ final class CompiledTrack {
   /// For `cornerRadius` and `strokeWeight` tracks: whether the current
   /// output is the uniform variant, as [value] would box it (a held uniform
   /// keyframe, or a segment between two uniform keyframes).
+  /// Unlike [currentVariant] (the segment's start variant), this needs both
+  /// ends of an interpolated segment to be uniform, like the oracle.
   bool get outputUniform {
     final h = _held;
     if (h >= 0) return variants[h] == 0;

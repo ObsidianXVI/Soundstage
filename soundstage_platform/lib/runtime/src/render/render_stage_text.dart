@@ -1,12 +1,16 @@
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/compiled_track.dart';
+import '../animator/text_style_tracks.dart';
+import '../media/fonts.dart';
 import '../paint/appearance_compositor.dart';
 import 'render_stage_box.dart';
 import 'render_stage_frame.dart' show stageDevicePixelRatio;
 import 'stage_environment.dart';
 import 'text/stage_text_layout.dart';
 import 'text/text_paint.dart';
+import 'text/text_reveal.dart';
 
 /// Rich text (architecture §7), laid out from the resolved paragraphs only
 /// (the resolver has merged every span's style; this never merges styles).
@@ -16,7 +20,7 @@ import 'text/text_paint.dart';
 /// `truncate` keep the stored box. A width imposed by the parent (fill,
 /// stretch constraints, max width) wraps the text. A `hug` layoutChild
 /// sizing also makes the node hug that axis.
-class RenderStageText extends RenderStageBox {
+class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
   RenderStageText({
     required ir.TextNode node,
     required this._paragraphs,
@@ -32,6 +36,7 @@ class RenderStageText extends RenderStageBox {
   set paragraphs(List<ir.ResolvedParagraph> value) {
     if (identical(value, _paragraphs)) return;
     _paragraphs = value;
+    _animDirty = true;
     _resetLayouts();
     markNeedsCompositingBitsUpdate();
     markStageLayoutDirty();
@@ -45,11 +50,128 @@ class RenderStageText extends RenderStageBox {
   StageTextLayout get _measure => _measureLayout ??= _newLayout();
   StageTextLayout get _paint => _paintLayout ??= _newLayout();
 
-  StageTextLayout _newLayout() => StageTextLayout(
-    paragraphs: _paragraphs,
-    fonts: environment.fonts,
-    settings: _settings,
-  );
+  StageTextLayout _newLayout() {
+    _syncAnimated();
+    return StageTextLayout(
+      paragraphs: _rendered,
+      fonts: environment.fonts,
+      settings: _settings,
+    );
+  }
+
+  // ---- Animated text styles (T0.7) ----------------------------------------------
+
+  final StageTextAnimation _animation = StageTextAnimation();
+  bool _animDirty = false;
+  late List<ir.ResolvedParagraph> _rendered = _paragraphs;
+
+  /// The paragraphs as rendered: the resolved paragraphs with animated
+  /// style channels applied.
+  List<ir.ResolvedParagraph> get renderedParagraphs {
+    _syncAnimated();
+    return _rendered;
+  }
+
+  /// Re-merges animated span styles if a channel changed, and restyles the
+  /// existing layouts (only the affected paragraphs rebuild).
+  void _syncAnimated() {
+    if (!_animDirty) return;
+    _animDirty = false;
+    final next = _animation.apply(_paragraphs, text);
+    if (identical(next, _rendered)) return;
+    _rendered = next;
+    if (next.length != (_paintLayout ?? _measureLayout)?.paragraphs.length) {
+      _resetLayouts();
+      return;
+    }
+    _measureLayout?.restyle(next);
+    _paintLayout?.restyle(next);
+  }
+
+  /// Number of typed text-style channels bound (tests).
+  int get animatedChannelCount => _animation.length;
+
+  @override
+  Object? bindTrack(CompiledTrack track) {
+    final c = TextStyleChannel.compile(track);
+    if (c == null) return null;
+    _animation.add(c);
+    trackChanged(c);
+    return c;
+  }
+
+  @override
+  void trackChanged(Object handle) {
+    if (handle is! TextStyleChannel) return;
+    _animDirty = true;
+    applyInvalidation(handle.invalidation);
+  }
+
+  @override
+  void unbindTrack(Object handle) {
+    if (handle is! TextStyleChannel || !_animation.remove(handle)) return;
+    _animDirty = true;
+    // Unbinding while detaching (the node leaves the tree) invalidates
+    // nothing: the node lays out again when it re-attaches.
+    if (!_detaching) applyInvalidation(StageInvalidation.layout);
+  }
+
+  // ---- Fonts (T0.7) -------------------------------------------------------------
+
+  StageFontTable? _listening;
+
+  void _listenFonts() {
+    final f = environment.fonts;
+    if (identical(f, _listening)) return;
+    _listening?.removeListener(_fontLoaded);
+    _listening = f;
+    f.addListener(_fontLoaded);
+  }
+
+  void _fontLoaded(String familyId) {
+    if (!attached) return;
+    final l = _paintLayout ?? _measureLayout;
+    if (l != null && !l.usesFamily(familyId)) return;
+    _resetLayouts();
+    markStageLayoutDirty();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _listenFonts();
+  }
+
+  bool _detaching = false;
+
+  @override
+  void detach() {
+    _listening?.removeListener(_fontLoaded);
+    _listening = null;
+    _detaching = true;
+    try {
+      super.detach();
+    } finally {
+      _detaching = false;
+    }
+  }
+
+  // ---- TextReveal (T0.7) --------------------------------------------------------
+
+  StageTextRevealPaint? _reveal;
+
+  /// The reveal painting this text (set by the animator's TextReveal
+  /// driver); null paints the text whole. Paint only.
+  StageTextRevealPaint? get reveal => _reveal;
+  set reveal(StageTextRevealPaint? value) {
+    if (identical(value, _reveal)) return;
+    _reveal = value;
+    if (!_detaching) markNeedsPaint();
+  }
+
+  /// The number of reveal units of the laid-out text for [unit].
+  int revealUnitCount(ir.TextRevealUnit unit) =>
+      hasSize ? _paint.revealUnitCount(unit) : 0;
 
   void _resetLayouts() {
     _measureLayout?.dispose();
@@ -99,12 +221,14 @@ class RenderStageText extends RenderStageBox {
   ) {
     if (!identical(old.fonts, next.fonts)) {
       _resetLayouts();
+      if (attached) _listenFonts();
       return StageInvalidation.layout;
     }
     return StageInvalidation.paint;
   }
 
   Size _resolve(BoxConstraints c, StageTextLayout l) {
+    _syncAnimated();
     double? width;
     if (c.hasTightWidth) {
       width = c.maxWidth;
@@ -139,7 +263,11 @@ class RenderStageText extends RenderStageBox {
   Size performStageLayout() => _resolve(constraints, _paint);
 
   /// The first baseline of the laid-out text, from the top of the box.
-  double? get firstBaseline => _paint.firstBaseline(size.height);
+  double? get firstBaseline {
+    _syncAnimated();
+    _paint.relayout();
+    return _paint.firstBaseline(size.height);
+  }
 
   /// The laid-out text (tests).
   StageTextLayout get textLayout => _paint;
@@ -159,6 +287,13 @@ class RenderStageText extends RenderStageBox {
   @override
   void paintStage(PaintingContext context, Offset offset) {
     final env = environment;
+    _syncAnimated();
+    // A paint-only restyle (colour) keeps the box size; the restyled
+    // paragraphs lay out again at the same width.
+    _paint
+      ..relayout()
+      ..reveal = _reveal;
+    _reveal?.beginPaint();
     paintStageText(
       context: context,
       offset: offset,
@@ -176,6 +311,7 @@ class RenderStageText extends RenderStageBox {
 
   @override
   void dispose() {
+    _listening?.removeListener(_fontLoaded);
     _layers.dispose();
     _resetLayouts();
     super.dispose();

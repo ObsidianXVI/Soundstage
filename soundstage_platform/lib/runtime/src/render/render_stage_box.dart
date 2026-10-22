@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/compiled_track.dart';
 import '../paint/appearance_overrides.dart';
 import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
@@ -226,6 +227,44 @@ abstract class RenderStageBox extends RenderBox {
     _appearanceOverridesChanged(layout: path.affectsLayout);
     return channel;
   }
+
+  /// Removes the typed paint override [channel].
+  void removeAppearanceOverride(StageAppearanceChannel channel) {
+    final o = _appearanceOverrides;
+    if (o == null) return;
+    o.remove(channel);
+    _appearanceOverridesChanged(layout: channel.path.affectsLayout);
+  }
+
+  // The `StageTypedTrackHost` side of typed paint overrides: frames and
+  // shapes implement the host interface (shared with text styles, T0.7)
+  // with these.
+
+  /// Binds [track] as a typed paint override when its property has one and
+  /// every keyframe is typed; returns the handle, or null (the registry
+  /// path then applies it).
+  @protected
+  Object? bindAppearanceTrack(CompiledTrack track) {
+    if (!supportsAppearanceOverrides || !track.isTyped) return null;
+    final path = StageAppearancePath.parse(track.track.property);
+    if (path == null || path.stride != track.stride) return null;
+    final binding = _AppearanceTrack(addAppearanceOverride(path), track);
+    binding.pull();
+    return binding;
+  }
+
+  /// The bound track's output changed: copies it into its channel and
+  /// invalidates. Allocation-free.
+  @protected
+  void appearanceTrackChanged(Object handle) {
+    final binding = handle as _AppearanceTrack;
+    binding.pull();
+    appearanceOverrideChanged(binding.channel);
+  }
+
+  @protected
+  void unbindAppearanceTrack(Object handle) =>
+      removeAppearanceOverride((handle as _AppearanceTrack).channel);
 
   /// Removes every typed paint override.
   void clearAppearanceOverrides() {
@@ -952,4 +991,14 @@ abstract class RenderStageBox extends RenderBox {
         ),
       );
   }
+}
+
+/// A track bound to a typed paint override channel.
+final class _AppearanceTrack {
+  _AppearanceTrack(this.channel, this.track);
+
+  final StageAppearanceChannel channel;
+  final CompiledTrack track;
+
+  void pull() => channel.write(track.out, uniform: track.outputUniform);
 }

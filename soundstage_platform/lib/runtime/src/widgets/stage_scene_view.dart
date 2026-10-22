@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/behavior_drivers.dart';
 import '../render/render_stage_scene.dart';
 import '../render/stage_environment.dart';
 import 'stage_node_widget.dart';
@@ -58,7 +59,11 @@ class StageSceneView extends StatelessWidget {
         key: ValueKey<String>(root.id),
         node: root,
         referenceSize: referenceSizeFor(scene, breakpoint),
-        repaintBoundaryIds: {root.id, for (final t in scene.tracks) t.target},
+        repaintBoundaryIds: {
+          root.id,
+          for (final t in scene.tracks) t.target,
+          ...behaviorTargetIds(scene),
+        },
       ),
     );
   }

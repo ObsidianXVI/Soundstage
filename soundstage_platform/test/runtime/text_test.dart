@@ -36,7 +36,7 @@ StageTextLayout layoutOf(
 }) {
   final l = StageTextLayout(
     paragraphs: paragraphs,
-    fonts: const StageFontTable(),
+    fonts: StageFontTable.none,
     settings: settings,
   )..layout(width: width, boxHeight: boxHeight);
   addTearDown(l.dispose);
@@ -99,11 +99,17 @@ void main() {
             ),
           ],
         ),
-        const StageFontTable({
-          'serif': ir.FontFamily(id: 'serif', name: 'Fraunces'),
+        StageFontTable(const {
+          'serif': ir.FontFamily(
+            id: 'serif',
+            name: 'Fraunces',
+            fallback: ir.FontFallback.serif,
+          ),
         }),
       );
-      expect(s.fontFamily, 'Fraunces');
+      // Not loaded (no faces): the generic fallback (fonts_test covers
+      // loaded families).
+      expect(s.fontFamily, 'serif');
       expect(s.fontWeight, const FontWeight(450));
       expect(s.fontStyle, FontStyle.italic);
       expect(s.fontSize, 20);
@@ -129,7 +135,7 @@ void main() {
     });
 
     test('fonts fall back to the default family when unknown', () {
-      const fonts = StageFontTable();
+      final fonts = StageFontTable();
       expect(fonts.familyName('missing'), isNull);
       expect(fonts.fallback('missing'), ir.FontFallback.sans);
       expect(

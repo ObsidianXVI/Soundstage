@@ -88,8 +88,23 @@ text drop shadows (one to three `saveLayer`s each).
 - `StageImageCache` is a byte-bounded LRU of decoded `ui.Image`s (default 128 MiB). A miss loads
   once and notifies listeners. It evicts and disposes images only when a load completes.
 - `StageMedia` combines the two.
-- `StageFontTable` maps `fontFamilyId` to a family name. Font loading is T0.7; until then
-  unloaded families render in the default font.
+- `StageFontTable` (T0.7) maps `fontFamilyId` to the engine family a text style renders with and
+  loads the document's font files with Flutter's `FontLoader` (`registerFontWithFontLoader`).
+  - Each face registers as `ss-<familyId>-<fnv1a of id + faces>-<faceIndex>`, once per process.
+  - `faceFor(id, weight, italic)` picks a face by CSS font matching (`pickFace`). Looking up an
+    unloaded family starts loading it (`loadOnDemand`), and `ensureLoaded(ids)` awaits families.
+  - Until a family loads, text uses its generic fallback (`fallbackFamily`: platform default for
+    sans, `serif`, `monospace`). When it loads, listeners are told and only the text render
+    objects whose spans use it reset their layouts and relayout.
+  - `fontVariationsFor` adds `wght` (the weight), `opsz` (the font size) and `ital`/`slnt` (italic
+    on a non-italic face) on variable faces unless the style sets them. A variable `wght` face is
+    laid out with `FontWeight.w400` and a static face with its own weight, so the engine never
+    synthesises bold on top.
+  - `parseFontMetrics` (`font_metrics.dart`, pure Dart) reads `head`/`OS/2`. Problems (missing
+    assets, no OS/2 v2+) are `diagnostics`, never exceptions.
+- `StageAudioService` (`audio.dart`, T0.7) plays the document's `AudioTrack`s on `just_audio`
+  (`JustAudioBackend`; `StageAudioBackend` is the test seam). See notes 37–40.
+- `StageMedia.ready(assetId)` completes when an image is decoded, or after a timeout.
 
 ## Motion (T0.6: `src/scenes/`, `src/clocks/`, `src/animator/`)
 
@@ -144,6 +159,21 @@ text drop shadows (one to three `saveLayer`s each).
   settled.
 - Edit mode freezes clocks at `clockOverrides`, makes pointer and behaviour clocks inert, and never
   ticks.
+
+**Typed track hosts** (T0.7, `animator/text_style_tracks.dart`): a render object implementing
+`StageTypedTrackHost` is offered every non-slot track when it binds (`bindTrack` → handle,
+`trackChanged`, `unbindTrack`). `RenderStageText` takes `style.*` and
+`content.<p>.spans.<s>.style.*` tracks as `TextStyleChannel`s (note 34). Those tracks never go
+through the node animator.
+
+**Behaviour drivers** (T0.7, `animator/behavior_drivers.dart`): `TextRevealDriver` and
+`LyricsDriver` follow a clock like tracks and bind to render objects through the registry. Lyrics
+bring their own audio clock (`__lyrics/<frameId>`, frozen through `clockOverrides` in edit mode).
+Their targets are repaint boundaries (`behaviorTargetIds`).
+
+**Audio and the gate** (T0.7): `StagePlayer(audio:)` uses the service's clock sources for
+`audio` clocks, re-reads clocks when the service seeks or starts, and reports scene visibility to
+it. `StageEnterGate(document:, environment:, audio:, child:)` wraps the player.
 
 **Animated-override layer** (`render/render_stage_box.dart`):
 - `setAnimatedSlot(slot, value)` / `animatedSlot(slot)`, with `RenderStageBox.slotForPath`.
@@ -286,16 +316,14 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
       including the pin and scroll offsets.
     - It returns to 0 outside the frame or when the pointer leaves the player.
     - Scrolling under a still pointer doesn't update it.
-28. **Which tracks are allocation-free (DN).**
+28. **Which tracks are allocation-free (DN).** (Text style tracks: see note 34.)
     - Every numeric and colour evaluator is allocation-free, and so is the push of `opacity` and
       `motion.*`.
     - Any other property (e.g. `fills.<id>.color`, `effects.<id>.radius`, `width`) re-renders the node
       through the registry: one node copy per changed node per frame. That is because the paint
       pipeline (T0.5) consumes IR paints and effects. Typed paint overrides need a hook in
       `StageAppearancePainter`.
-29. **Text style tracks (DN).** `style.*` and `content.*` tracks apply to `TextNode.style`, but the
-    runtime renders from the resolver's merged `ResolvedNode.paragraphs`, so they have no visible
-    effect yet. They need a runtime re-merge of animated span styles, or a resolver hook.
+29. **Text style tracks.** Superseded by note 34 (T0.7): they render.
 30. **Cross-scene scroll clocks.** A `sceneScroll` clock whose `sceneId` is a different scene applies
     on the next tick (one frame later), because a sliver may only mutate its own subtree during
     layout.
@@ -304,3 +332,75 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
 32. **Composited updates.** Motion and opacity changes repaint the node's own repaint boundary (re-record
     its picture). Using `updateCompositedLayer` to change only the layer is a possible follow-up.
 33. Vertical, top-to-bottom scrolling only.
+
+**Fonts, audio and text behaviours (T0.7)** (DN = question for DECISIONS_NEEDED)
+
+34. **Animated text styles.** `style.*` and `content.<p>.spans.<s>.style.*` tracks compile to
+    `TextStyleChannel`s on the text render object.
+    - Precedence: a node-level channel writes the node override, so it reaches only spans (and,
+      for `paragraphSpacing`/`paragraphIndent`, paragraphs) that do not set the field
+      themselves. Span-level channels win.
+    - Typed fields read the compiled track's output directly: `fontSize`, `fontWeight`,
+      `letterSpacing`, `lineHeight`, `paragraphSpacing`, `paragraphIndent`,
+      `fontVariations.<tag>`, `fills.<id>.color` and `fills.<id>.opacity`. Other fields (discrete
+      ones like `textCase`, and structured ones) apply the track's `IrValue` through the
+      registry, only when their value changes.
+    - Invalidation comes from the descriptor: fills and decoration colour repaint (the restyled
+      paragraph lays out again at the same width at paint, the box does not), everything else
+      relayouts.
+    - Cost: nothing when no value changed. On a change, only the affected spans re-merge, only
+      their paragraphs rebuild their `TextSpan`s and painters, and unchanged spans reuse their
+      mapped `TextStyle`. Measured (`test/bench/text_style_bench.dart`, VM, two channels on a
+      two-paragraph heading): ~33 µs and ~91 Dart allocations per change (≈27 boxed doubles and
+      15 FFI pointers inside the engine's paragraph builder; 1.7 `TextSpan`s).
+    - `style.fills.<id>.*` addresses the paint with that id in each reached span's merged fills,
+      so a colour track can animate the default `text` fill. The resolver accepts such tracks
+      (it checks text style paths against the merged styles).
+35. **TextReveal (DN).**
+    - The units of every text node inside the frame (depth first) form one sequence.
+      Characters are grapheme clusters; whitespace is never a unit; lines come from layout.
+    - Timing: unit duration `d = max(1 − (n − 1)·stagger, stagger)`, total `T = (n − 1)·stagger
+      + d`, unit `i` at `clamp((p·T − i·stagger)/d)`. A stagger too large to fit compresses
+      time so the reveal still ends with the range.
+    - Default look (fixed; the behaviour has no look fields): opacity 0 → 1 and a rise from 0.4
+      of the unit's line height, both easeOutCubic. List markers appear with their paragraph's
+      first unit. Clipping is to the unit's line box, so italic overhang at a unit edge may be
+      cut while it animates.
+    - Paint only: finished units draw in one clipped pass, each unit in progress in its own
+      alpha layer. Strokes, shadows and gradient fills reveal the same way.
+36. **Lyrics (DN).**
+    - The frame's first text child is the template: its first span's style, its paragraph's
+      alignment, its width and position. The stack replaces it; other children render
+      normally. Line spacing is the template's paragraph spacing.
+    - Each line's slot is as tall as the taller of its inactive and active renderings, so layout
+      never changes with time. Lines cross-fade over 0.25 s from their start and after their end
+      (the next line's start when `end` is null).
+    - Scrolling: `center` puts the started line's centre at the frame's centre (the first line
+      before anything starts), `top` aligns it to the stack's own top, `none` never scrolls. It
+      eases (easeInOutCubic) over 0.6 s from the line's start, driven by audio time, so seeks are
+      exact. Through instrumental breaks it stays on the last line.
+    - Word-timed lines: the active line shows sung words in the active style and the rest in the
+      active layout with the inactive fills, sweeping linearly through the current word.
+    - The stack hugs its height; give the frame a fixed size and `clipContent`.
+37. **Audio clock.** It advances by wall time × speed while playing. Each new player position
+    report sets a drift that closes at 5/s; the clock never runs backwards; a drift over 0.25 s
+    (seek, loop wrap, stall) jumps. Paused, it is the player's position.
+38. **Audio scope (DN).** Nothing plays before the gate's gesture. Story `autoplay` tracks start at
+    unlock. Scene `autoplay` tracks fade in while their scene is on screen (any part visible) and
+    fade out and pause when it leaves; re-entering resumes. Non-autoplay tracks wait for `play()`
+    (interactions, M3) and pause on leave.
+39. **Fades.** `fadeIn` on every start, `fadeOut` on every pause and before the end of a track
+    that does not loop. Volume is linear in time (no curve), stepped on a 32 ms timer.
+40. **Enter gate.** Shows the document's title, description and cover over a dark scrim, in the
+    document's default font. It starts preloading the first scene's fonts and images, the cover
+    and the audio at once. Activation (tap, Enter, Space) unlocks audio inside the gesture, then
+    waits for the preload (showing "Loading…"; images time out after 8 s) and fades out over
+    0.6 s. Screen readers get one button, "Enter the stage: <title>".
+41. **Fonts.** Weight/italic selection follows CSS (italic faces first, then the CSS weight
+    order). Variable faces get `opsz` = font size automatically (Figma's and CSS's optical
+    sizing). Until loaded, text uses the generic fallback; `leadingTrim` then has no metrics and
+    trims nothing until the relayout after load.
+42. **leadingTrim: capHeight.** Trims the first line from its top to `sCapHeight × fontSize` above
+    its baseline (first non-empty span of the first visible paragraph), and the last line below
+    its baseline. Without OS/2 v2+ (or a document font) there is no trim and a font diagnostic.
+

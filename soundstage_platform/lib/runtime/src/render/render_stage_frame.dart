@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../animator/compiled_track.dart';
+import '../animator/text_style_tracks.dart' show StageTypedTrackHost;
 import '../paint/appearance_compositor.dart';
 import '../paint/appearance_painter.dart';
 import '../paint/blend.dart';
@@ -48,7 +50,8 @@ class StageFrameLayout {
 class RenderStageFrame extends RenderStageBox
     with
         ContainerRenderObjectMixin<RenderStageBox, StageParentData>,
-        RenderBoxContainerDefaultsMixin<RenderStageBox, StageParentData> {
+        RenderBoxContainerDefaultsMixin<RenderStageBox, StageParentData>
+    implements StageTypedTrackHost {
   RenderStageFrame({
     required ir.FrameNode node,
     required super.environment,
@@ -85,6 +88,15 @@ class RenderStageFrame extends RenderStageBox
 
   @override
   bool get supportsAppearanceOverrides => true;
+
+  @override
+  Object? bindTrack(CompiledTrack track) => bindAppearanceTrack(track);
+
+  @override
+  void trackChanged(Object handle) => appearanceTrackChanged(handle);
+
+  @override
+  void unbindTrack(Object handle) => unbindAppearanceTrack(handle);
 
   @override
   EdgeInsets get strokeOutsets {

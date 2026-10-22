@@ -226,6 +226,9 @@ final class StageAppearanceOverrides {
 
   void clear() => _channels.clear();
 
+  /// Removes [channel].
+  void remove(StageAppearanceChannel channel) => _channels.remove(channel);
+
   // ---- Structural queries (allocation-free) --------------------------------
 
   /// Whether paint [id] of [stack] has any override (its colour, opacity or
