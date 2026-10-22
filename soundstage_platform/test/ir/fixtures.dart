@@ -90,6 +90,13 @@ const appearance = Appearance(
   effectStyleId: 'esShadow',
 );
 
+const textAppearance = TextAppearance(
+  strokes: stroke,
+  effects: [dropShadow, layerBlur],
+  strokeStyleId: 'psOutline',
+  effectStyleId: 'esTextShadow',
+);
+
 const autoLayout = AutoLayout(
   direction: LayoutDirection.vertical,
   wrap: true,
@@ -270,6 +277,7 @@ FrameNode fullFrame(String id, {List<Node> children = const []}) => FrameNode(
 
 TextNode fullText(String id) => TextNode(
   common: common(id),
+  appearance: textAppearance,
   content: const [
     paragraph,
     Paragraph(spans: [Span(text: 'Second')]),
@@ -306,6 +314,7 @@ InstanceNode fullInstance(String id) => InstanceNode(
 VideoNode fullVideo(String id) => VideoNode(
   common: common(id),
   assetId: 'aVideo',
+  appearance: appearance,
   scaleMode: ImageScaleMode.fit,
   focalPoint: const StagePoint(x: 0.2, y: 0.8),
   cropRect: const StageRect(x: 0.1, width: 0.8),

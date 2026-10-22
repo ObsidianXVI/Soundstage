@@ -67,7 +67,8 @@ sealed class InstanceSource with _$InstanceSource {
 /// A layer in a scene (architecture §4.1).
 ///
 /// Every variant holds [NodeCommon] (§4.2) plus its kind-specific fields;
-/// frames and shapes also hold an [Appearance]. The `type` discriminators
+/// frames, shapes and videos also hold an [Appearance], and text holds a
+/// [TextAppearance] (stroke and effects). The `type` discriminators
 /// are part of the file format.
 @Freezed(unionKey: 'type')
 sealed class Node with _$Node {
@@ -88,10 +89,12 @@ sealed class Node with _$Node {
     @Default(<String, String>{}) Map<String, String> modeOverrides,
   }) = FrameNode;
 
-  /// Rich text (architecture §7).
+  /// Rich text (architecture §7). `appearance` holds the text's stroke and
+  /// effects; its fills are in `style.fills`.
   @FreezedUnionValue('text')
   const factory Node.text({
     required NodeCommon common,
+    @Default(TextAppearance()) TextAppearance appearance,
     @Default(<Paragraph>[]) List<Paragraph> content,
     String? textStyleId,
     @Default(TextStyle()) TextStyle style,
@@ -124,10 +127,13 @@ sealed class Node with _$Node {
   }) = InstanceNode;
 
   /// Video, with the same `scaleMode` + `focalPoint` semantics as images (§6).
+  /// `appearance` gives it corners, a stroke and effects; its fills paint
+  /// behind the video.
   @FreezedUnionValue('video')
   const factory Node.video({
     required NodeCommon common,
     required String assetId,
+    @Default(Appearance()) Appearance appearance,
     @Default(ImageScaleMode.fill) ImageScaleMode scaleMode,
     @Default(StagePoint(x: 0.5, y: 0.5)) StagePoint focalPoint,
     StageRect? cropRect,

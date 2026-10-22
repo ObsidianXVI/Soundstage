@@ -21,8 +21,9 @@ Models are freezed + json_serializable. Run
 
 ## Modelling notes
 
-Choices the spec left open, made to match Figma where possible. The ones that affect the file
-format are also in `DECISIONS_NEEDED.md` (#6–#8).
+Choices the spec left open, made to match Figma where possible. The clock list, style references
+and text/video appearance were confirmed and are recorded in `DECISIONS.md`; open questions are
+in `DECISIONS_NEEDED.md`.
 
 - **Clocks.** `Scene.clocks: [Clock]` holds every clock kind (`sceneScroll`, `timeline`,
   `audio`, `pointer`, `behavior`), each with an `id` and `smoothing`. The spec's
@@ -36,6 +37,12 @@ format are also in `DECISIONS_NEEDED.md` (#6–#8).
 - **Style references.** `Appearance.fillStyleId/strokeStyleId/effectStyleId` point at
   `TokenSystem.paintStyles/effectStyles`, mirroring Figma. The spec defines the style maps but no
   reference field. `TextStyleDef.bindings` carries the token bindings of a text style's fields.
+- **Appearance per kind.** Frames, shapes and videos hold an `Appearance` (fills, stroke,
+  effects, corners, style ids). On a video, fills paint behind the video (visible in `fit`
+  letterboxing and before the first frame). Text holds a `TextAppearance` (stroke, effects,
+  `strokeStyleId`, `effectStyleId`): its fills are `TextStyle.fills`, and it has no corners.
+  Property paths are the same on every kind (`strokes.weight`, `effects.<effectId>.blur`), so
+  the registry hides the difference.
 - **`clipContent`** is on `FrameNode`, not `Appearance`, because shapes don't clip.
 - **Either/or fields became small unions:** `InstanceSource` (`component` | `variant`),
   `ShapeGeometry` (`rectangle` | `ellipse` | `line` | `polygon` | `star`, each with its own

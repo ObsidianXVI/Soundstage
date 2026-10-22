@@ -89,6 +89,10 @@ void main() {
       backgroundBlur,
     ], Effect.fromJson);
     rt('Appearance', const [Appearance(), appearance], Appearance.fromJson);
+    rt('TextAppearance', const [
+      TextAppearance(),
+      textAppearance,
+    ], TextAppearance.fromJson);
   });
 
   group('layout', () {
