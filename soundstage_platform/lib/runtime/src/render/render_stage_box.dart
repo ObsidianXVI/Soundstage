@@ -96,23 +96,173 @@ abstract class RenderStageBox extends RenderBox {
   });
 
   ir.Node _node;
+
+  /// The node as rendered: the resolved node with any animated node-level
+  /// overrides applied ([nodeAnimator]).
   ir.Node get node => _node;
+
+  /// Sets the resolved node. With a [nodeAnimator], the rendered node is
+  /// the animator's output for it.
   set node(ir.Node value) {
+    if (identical(value, _baseNode)) return;
+    _baseNode = value;
+    final animate = _nodeAnimator;
+    _setRenderedNode(animate == null ? value : animate(value));
+  }
+
+  void _setRenderedNode(ir.Node value) {
     if (identical(value, _node)) return;
     final old = _node;
     _node = value;
-    if (_compositingOpacity(old.common.opacity) !=
-        _compositingOpacity(value.common.opacity)) {
+    if (_compositingOpacity(_effectiveOpacityOf(old)) !=
+        _compositingOpacity(_effectiveOpacityOf(value))) {
       markNeedsCompositingBitsUpdate();
     }
     applyInvalidation(invalidationFor(old, value));
   }
+
+  // ---- Animated overrides (T0.6, architecture §14) -------------------------------
+  //
+  // Two layers sit over the resolved node while tracks play:
+  //
+  // - Typed slots for the compositing-class properties (`opacity` and
+  //   `motion.*`), written by the animator with [setAnimatedSlot] without
+  //   allocating, and read directly at paint and hit test.
+  // - A node animator for every other property: a function from the
+  //   resolved node to the rendered node (the animator applies its tracks'
+  //   current values through the property registry), re-run by
+  //   [refreshAnimatedNode] and whenever the resolved node changes.
+
+  late ir.Node _baseNode = _node;
+
+  /// The resolved node, before animated overrides.
+  ir.Node get baseNode => _baseNode;
+
+  ir.Node Function(ir.Node resolved)? _nodeAnimator;
+
+  /// Sets (or clears, with null) the node-level animated override and
+  /// re-renders the node through it.
+  set nodeAnimator(ir.Node Function(ir.Node resolved)? value) {
+    if (identical(value, _nodeAnimator)) return;
+    _nodeAnimator = value;
+    refreshAnimatedNode();
+  }
+
+  /// Re-applies the node animator to the resolved node (after the
+  /// animator's values changed). Invalidates by what changed (paint or
+  /// layout), like a resolved-node update.
+  void refreshAnimatedNode() {
+    final animate = _nodeAnimator;
+    _setRenderedNode(animate == null ? _baseNode : animate(_baseNode));
+  }
+
+  /// Slot indices of the typed overrides.
+  static const int slotOpacity = 0;
+  static const int slotTranslateX = 1;
+  static const int slotTranslateY = 2;
+  static const int slotScaleX = 3;
+  static const int slotScaleY = 4;
+  static const int slotRotate = 5;
+  static const int slotSkewX = 6;
+  static const int slotSkewY = 7;
+  static const int slotOriginX = 8;
+  static const int slotOriginY = 9;
+  static const int slotCount = 10;
+
+  /// The typed slot for [path] (`opacity`, `motion.*`), or −1.
+  static int slotForPath(String path) => switch (path) {
+    'opacity' => slotOpacity,
+    'motion.translateX' => slotTranslateX,
+    'motion.translateY' => slotTranslateY,
+    'motion.scaleX' => slotScaleX,
+    'motion.scaleY' => slotScaleY,
+    'motion.rotate' => slotRotate,
+    'motion.skewX' => slotSkewX,
+    'motion.skewY' => slotSkewY,
+    'motion.originX' => slotOriginX,
+    'motion.originY' => slotOriginY,
+    _ => -1,
+  };
+
+  /// NaN = not overridden. Allocated on first use.
+  Float64List? _slots;
+
+  /// The animated value in [slot], or NaN when it is not overridden.
+  double animatedSlot(int slot) => _slots?[slot] ?? double.nan;
+
+  /// Overrides [slot] with [value] (NaN clears it). Repaints this node's
+  /// repaint boundary; never relayouts. Allocation-free after the first
+  /// call.
+  void setAnimatedSlot(int slot, double value) {
+    final slots = _slots ??= Float64List(slotCount)
+      ..fillRange(0, slotCount, double.nan);
+    final old = slots[slot];
+    if (old == value || (old.isNaN && value.isNaN)) return;
+    if (slot == slotOpacity) {
+      final before = _compositingOpacity(_effectiveOpacityOf(_node));
+      slots[slot] = value;
+      if (before != _compositingOpacity(_effectiveOpacityOf(_node))) {
+        markNeedsCompositingBitsUpdate();
+      }
+    } else {
+      slots[slot] = value;
+    }
+    markNeedsPaint();
+  }
+
+  /// Clears every typed override.
+  void clearAnimatedSlots() {
+    final slots = _slots;
+    if (slots == null) return;
+    for (var i = 0; i < slotCount; i++) {
+      setAnimatedSlot(i, double.nan);
+    }
+  }
+
+  double _slotOr(int slot, double base) {
+    final slots = _slots;
+    if (slots == null) return base;
+    final v = slots[slot];
+    return v.isNaN ? base : v;
+  }
+
+  double _effectiveOpacityOf(ir.Node n) =>
+      _slotOr(slotOpacity, n.common.opacity);
+
+  /// The opacity as rendered (animated or resolved).
+  double get effectiveOpacity => _effectiveOpacityOf(_node);
+
+  // ---- Registry (T0.6) ----------------------------------------------------------
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _environment.nodes?.attachNode(this);
+  }
+
+  @override
+  void detach() {
+    _environment.nodes?.detachNode(this);
+    super.detach();
+  }
+
+  /// Test counters: how many times stage nodes ran layout and paint.
+  @visibleForTesting
+  static int debugLayoutCount = 0;
+
+  /// See [debugLayoutCount].
+  @visibleForTesting
+  static int debugPaintCount = 0;
 
   StageEnvironment _environment;
   StageEnvironment get environment => _environment;
   set environment(StageEnvironment value) {
     if (identical(value, _environment)) return;
     final old = _environment;
+    if (attached && !identical(old.nodes, value.nodes)) {
+      old.nodes?.detachNode(this);
+      value.nodes?.attachNode(this);
+    }
     _environment = value;
     applyInvalidation(environmentInvalidation(old, value));
   }
@@ -244,6 +394,10 @@ abstract class RenderStageBox extends RenderBox {
 
   @override
   void performLayout() {
+    assert(() {
+      debugLayoutCount++;
+      return true;
+    }());
     try {
       _maybeInjectFault(StageFaultPhase.layout);
       size = _placeholder
@@ -299,32 +453,37 @@ abstract class RenderStageBox extends RenderBox {
   Matrix4? get paintTransform {
     final c = common;
     final m = c.motion;
+    final tx = _slotOr(slotTranslateX, m.translateX);
+    final ty = _slotOr(slotTranslateY, m.translateY);
+    final sx = _slotOr(slotScaleX, m.scaleX);
+    final sy = _slotOr(slotScaleY, m.scaleY);
+    final rot = _slotOr(slotRotate, m.rotate);
+    final kx = _slotOr(slotSkewX, m.skewX);
+    final ky = _slotOr(slotSkewY, m.skewY);
     final geo = c.rotation % 360 != 0 || c.flipX || c.flipY;
     final mot =
-        m.translateX != 0 ||
-        m.translateY != 0 ||
-        m.scaleX != 1 ||
-        m.scaleY != 1 ||
-        m.rotate % 360 != 0 ||
-        m.skewX != 0 ||
-        m.skewY != 0;
+        tx != 0 ||
+        ty != 0 ||
+        sx != 1 ||
+        sy != 1 ||
+        rot % 360 != 0 ||
+        kx != 0 ||
+        ky != 0;
     if (!geo && !mot) return null;
     final w = size.width;
     final h = size.height;
     final result = Matrix4.identity();
     if (mot) {
-      final ox = m.originX * w;
-      final oy = m.originY * h;
+      final ox = _slotOr(slotOriginX, m.originX) * w;
+      final oy = _slotOr(slotOriginY, m.originY) * h;
       final skew = Matrix4.identity()
-        ..setEntry(0, 1, math.tan(_rad(m.skewX)))
-        ..setEntry(1, 0, math.tan(_rad(m.skewY)));
+        ..setEntry(0, 1, math.tan(_rad(kx)))
+        ..setEntry(1, 0, math.tan(_rad(ky)));
       result
-        ..multiply(
-          Matrix4.translationValues(ox + m.translateX, oy + m.translateY, 0),
-        )
-        ..multiply(Matrix4.rotationZ(_rad(m.rotate)))
+        ..multiply(Matrix4.translationValues(ox + tx, oy + ty, 0))
+        ..multiply(Matrix4.rotationZ(_rad(rot)))
         ..multiply(skew)
-        ..multiply(Matrix4.diagonal3Values(m.scaleX, m.scaleY, 1))
+        ..multiply(Matrix4.diagonal3Values(sx, sy, 1))
         ..multiply(Matrix4.translationValues(-ox, -oy, 0));
     }
     if (geo) {
@@ -343,12 +502,12 @@ abstract class RenderStageBox extends RenderBox {
 
   // ---- Paint --------------------------------------------------------------------
 
-  double get _opacity => common.opacity.clamp(0.0, 1.0);
+  double get _opacity => effectiveOpacity.clamp(0.0, 1.0);
 
   static bool _compositingOpacity(double o) => o > 0 && o < 1;
 
   @override
-  bool get alwaysNeedsCompositing => _compositingOpacity(common.opacity);
+  bool get alwaysNeedsCompositing => _compositingOpacity(effectiveOpacity);
 
   final LayerHandle<TransformLayer> _transformLayer =
       LayerHandle<TransformLayer>();
@@ -361,6 +520,10 @@ abstract class RenderStageBox extends RenderBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    assert(() {
+      debugPaintCount++;
+      return true;
+    }());
     if (!common.visible) return;
     if (_layoutFault || _placeholder) {
       _paintFaultBox(context, offset);
