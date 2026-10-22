@@ -1,3 +1,7 @@
+// Reads bundled font files with dart:io, so it runs on the VM only.
+@TestOn('vm')
+library;
+
 import 'dart:io';
 import 'dart:typed_data';
 
