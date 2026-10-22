@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
 import 'stage_environment.dart';
 
@@ -100,9 +101,9 @@ abstract class RenderStageBox extends RenderBox {
   set node(ir.Node value) {
     if (identical(value, _node)) return;
     final old = _node;
+    final couldNeedCompositing = alwaysNeedsCompositing;
     _node = value;
-    if (_compositingOpacity(old.common.opacity) !=
-        _compositingOpacity(value.common.opacity)) {
+    if (couldNeedCompositing != alwaysNeedsCompositing) {
       markNeedsCompositingBitsUpdate();
     }
     applyInvalidation(invalidationFor(old, value));
@@ -347,8 +348,37 @@ abstract class RenderStageBox extends RenderBox {
 
   static bool _compositingOpacity(double o) => o > 0 && o < 1;
 
+  /// Whether a group opacity below 1 needs an opacity layer. A subclass
+  /// with a single painted part returns false and multiplies [paintOpacity]
+  /// into that part's colour instead (Figma's group opacity only differs
+  /// from per-paint opacity where parts overlap).
+  @protected
+  bool get opacityNeedsLayer => true;
+
+  /// The opacity a subclass must apply to its own paints: the node's
+  /// opacity when it folds opacity into its paints ([opacityNeedsLayer] is
+  /// false), else 1 because a layer applies it.
+  @protected
+  double get paintOpacity =>
+      opacityNeedsLayer || isolatesBlend ? 1.0 : _opacity;
+
+  /// Whether the node paints compositing layers of its own (layer or
+  /// background blur), which makes it need compositing.
+  @protected
+  bool get hasEffectLayers => false;
+
+  /// Whether the node is composited in an isolated group with a non-normal
+  /// blend mode, using a `saveLayer` whose paint carries the blend mode and
+  /// the opacity. A frame's default `passThrough` and `normal` never do.
+  @protected
+  bool get isolatesBlend => blendNeedsIsolation(node.effectiveBlendMode);
+
   @override
-  bool get alwaysNeedsCompositing => _compositingOpacity(common.opacity);
+  bool get alwaysNeedsCompositing =>
+      (_compositingOpacity(common.opacity) &&
+          opacityNeedsLayer &&
+          !isolatesBlend) ||
+      hasEffectLayers;
 
   final LayerHandle<TransformLayer> _transformLayer =
       LayerHandle<TransformLayer>();
@@ -384,7 +414,10 @@ abstract class RenderStageBox extends RenderBox {
 
   void _paintWithOpacity(PaintingContext context, Offset offset) {
     final o = _opacity;
-    if (o < 1) {
+    if (isolatesBlend) {
+      _opacityLayer.layer = null;
+      _paintBlended(context, offset, o);
+    } else if (o < 1 && opacityNeedsLayer) {
       _opacityLayer.layer = context.pushOpacity(
         offset,
         (o * 255).round(),
@@ -395,6 +428,23 @@ abstract class RenderStageBox extends RenderBox {
       _opacityLayer.layer = null;
       _paintGuarded(context, offset);
     }
+  }
+
+  /// Paints into a `saveLayer` that blends with the backdrop using the
+  /// node's blend mode and opacity. The group is one canvas layer, so
+  /// descendants that start compositing layers of their own (repaint
+  /// boundaries, opacity layers, blurs) paint outside it; keep blended
+  /// groups free of those.
+  void _paintBlended(PaintingContext context, Offset offset, double opacity) {
+    final canvas = context.canvas;
+    canvas.saveLayer(
+      null,
+      Paint()
+        ..blendMode = flutterBlendMode(node.effectiveBlendMode)
+        ..color = Color.fromARGB((opacity * 255).round(), 255, 255, 255),
+    );
+    _paintGuarded(context, offset);
+    if (identical(context.canvas, canvas)) canvas.restore();
   }
 
   void _paintGuarded(PaintingContext context, Offset offset) {

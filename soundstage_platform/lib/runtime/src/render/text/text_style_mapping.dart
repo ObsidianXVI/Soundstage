@@ -3,6 +3,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../../media/fonts.dart';
 import '../../paint/stage_color.dart';
+import '../../paint/text_variant.dart';
 
 /// Flutter's decoration thickness is a multiple of the font's own
 /// thickness, which is unknown until font metrics are read (T0.7). The
@@ -107,16 +108,40 @@ List<FontFeature> fontFeatures(ir.TextStyle style) {
 }
 
 /// Maps a resolved IR text style to a Flutter [TextStyle] (architecture §7).
-TextStyle stageTextStyle(ir.TextStyle s, StageFontTable fonts) {
+///
+/// With a [variant] the glyphs are painted for a mask, a stroke or a shadow
+/// instead of in the span's own fill colour (see `StageTextVariant`).
+TextStyle stageTextStyle(
+  ir.TextStyle s,
+  StageFontTable fonts, {
+  StageTextVariant? variant,
+}) {
   final features = fontFeatures(s);
   final variations = [
     for (final MapEntry(:key, :value) in s.fontVariations.entries)
       if (key.length == 4) FontVariation(key, value),
   ];
   final d = s.decoration;
-  final decorated = d.kind != ir.TextDecorationKind.none;
+  final v = variant;
+  final decorated =
+      d.kind != ir.TextDecorationKind.none && (v?.drawsDecorations ?? true);
+  final variantColor = v?.colorFor(s);
+  final isStroke = v?.kind == TextVariantKind.stroke;
+  // Decorations follow the glyph colour when it is overridden.
+  final overridden =
+      v != null &&
+      variantColor != null &&
+      (v.kind != TextVariantKind.base || !isSimpleTextFill(s.fills));
   return TextStyle(
-    color: textColor(s.fills),
+    color: isStroke ? null : (v != null ? variantColor : textColor(s.fills)),
+    foreground: isStroke
+        ? (Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = v!.width
+            ..color = v.color!
+            ..strokeJoin = v.join
+            ..strokeMiterLimit = v.miterLimit)
+        : null,
     fontFamily: fonts.familyName(s.fontFamilyId),
     fontSize: s.fontSize,
     fontWeight: FontWeight(s.fontWeight.clamp(1, 1000)),
@@ -127,11 +152,13 @@ TextStyle stageTextStyle(ir.TextStyle s, StageFontTable fonts) {
     textBaseline: TextBaseline.alphabetic,
     fontFeatures: features.isEmpty ? null : features,
     fontVariations: variations.isEmpty ? null : variations,
-    decoration: switch (d.kind) {
-      ir.TextDecorationKind.none => TextDecoration.none,
-      ir.TextDecorationKind.underline => TextDecoration.underline,
-      ir.TextDecorationKind.strikethrough => TextDecoration.lineThrough,
-    },
+    decoration: !decorated
+        ? TextDecoration.none
+        : switch (d.kind) {
+            ir.TextDecorationKind.none => TextDecoration.none,
+            ir.TextDecorationKind.underline => TextDecoration.underline,
+            ir.TextDecorationKind.strikethrough => TextDecoration.lineThrough,
+          },
     decorationStyle: decorated
         ? switch (d.style) {
             ir.TextDecorationStyle.solid => TextDecorationStyle.solid,
@@ -141,7 +168,11 @@ TextStyle stageTextStyle(ir.TextStyle s, StageFontTable fonts) {
             ir.TextDecorationStyle.wavy => TextDecorationStyle.wavy,
           }
         : null,
-    decorationColor: decorated && d.color != null ? stageColor(d.color!) : null,
+    decorationColor: !decorated
+        ? null
+        : overridden
+        ? variantColor
+        : (d.color != null ? stageColor(d.color!) : null),
     decorationThickness: decorated && d.thickness != null && s.fontSize > 0
         ? d.thickness! / (s.fontSize * kAssumedDecorationThicknessEm)
         : null,

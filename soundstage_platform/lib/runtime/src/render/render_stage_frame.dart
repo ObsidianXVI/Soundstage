@@ -3,7 +3,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../paint/appearance_compositor.dart';
 import '../paint/appearance_painter.dart';
+import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
 import 'layout/constraints.dart';
 import 'render_stage_box.dart';
@@ -302,53 +304,77 @@ class RenderStageFrame extends RenderStageBox
 
   // ---- Paint --------------------------------------------------------------------
 
-  final LayerHandle<ClipRRectLayer> _clipLayer = LayerHandle<ClipRRectLayer>();
+  final StageAppearanceLayers _layers = StageAppearanceLayers();
 
   void _onImageReady() {
     if (attached) markNeedsPaint();
   }
 
+  ir.Appearance get _appearance => frame.appearance;
+
+  @override
+  bool get opacityNeedsLayer =>
+      childCount > 0 ||
+      paintedPartCount(
+            _appearance.fills,
+            _appearance.strokes,
+            _appearance.effects,
+          ) >
+          1;
+
+  @override
+  bool get hasEffectLayers => hasLayerEffects(_appearance.effects);
+
+  @override
+  bool get isolatesBlend {
+    if (super.isolatesBlend) return true;
+    // An explicit `normal` frame is an isolated group: it matters when a
+    // child blends (a `passThrough` frame lets children blend with the
+    // backdrop instead).
+    if (node.effectiveBlendMode != ir.BlendMode.normal) return false;
+    var child = firstChild;
+    while (child != null) {
+      if (blendNeedsIsolation(child.node.effectiveBlendMode)) return true;
+      child = (child.parentData! as StageParentData).nextSibling;
+    }
+    return false;
+  }
+
   @override
   void paintStage(PaintingContext context, Offset offset) {
     final env = environment;
-    final appearance = frame.appearance;
-    final outline = StageOutline.box(size, appearance.cornerRadius);
-    if (appearance.fills.isNotEmpty) {
-      final canvas = context.canvas
-        ..save()
-        ..translate(offset.dx, offset.dy);
-      env.painter.paintFills(
-        canvas,
-        outline,
-        appearance.fills,
-        media: env.media,
-        onImageReady: _onImageReady,
-        devicePixelRatio: stageDevicePixelRatio(),
-      );
-      canvas.restore();
-    }
-    if (frame.clipContent) {
-      final rrect = outline.rrect!;
-      _clipLayer.layer = context.pushClipRRect(
-        needsCompositing,
-        offset,
-        Offset.zero & size,
-        rrect,
-        _paintChildren,
-        clipBehavior: rrect.isRect ? Clip.hardEdge : Clip.antiAlias,
-        oldLayer: _clipLayer.layer,
-      );
-    } else {
-      _clipLayer.layer = null;
-      _paintChildren(context, offset);
-    }
-    if (appearance.strokes.paints.isNotEmpty) {
-      final canvas = context.canvas
-        ..save()
-        ..translate(offset.dx, offset.dy);
-      env.painter.paintStroke(canvas, outline, appearance.strokes);
-      canvas.restore();
-    }
+    final appearance = _appearance;
+    final outline = StageOutline.box(
+      size,
+      appearance.cornerRadius,
+      smoothing: appearance.cornerSmoothing,
+    );
+    paintStageAppearance(
+      context: context,
+      offset: offset,
+      painter: env.painter,
+      layers: _layers,
+      outline: outline,
+      appearance: appearance,
+      media: env.media,
+      onImageReady: _onImageReady,
+      devicePixelRatio: stageDevicePixelRatio(),
+      opacity: paintOpacity,
+      paintChildren: (ctx, off) {
+        if (frame.clipContent) {
+          _layers.pushOutlineClip(
+            needsCompositing,
+            ctx,
+            off,
+            outline,
+            _paintChildren,
+          );
+        } else {
+          _layers.releaseClip();
+          _paintChildren(ctx, off);
+        }
+      },
+    );
   }
 
   void _paintChildren(PaintingContext context, Offset offset) {
@@ -385,7 +411,7 @@ class RenderStageFrame extends RenderStageBox
 
   @override
   void dispose() {
-    _clipLayer.layer = null;
+    _layers.dispose();
     super.dispose();
   }
 }

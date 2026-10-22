@@ -9,9 +9,33 @@ import 'package:soundstage_platform/runtime/runtime.dart';
 /// The bundled demo story the M0 harness renders.
 const String kDemoDocumentAsset = 'assets/demo/static.stage.json';
 
+/// The bundled demos the harness can switch between (`?demo=<key>`).
+const Map<String, String> kDemoDocuments = {
+  'static': kDemoDocumentAsset,
+  'gallery': 'assets/demo/paint_gallery.stage.json',
+};
+
+/// The selected demo key: the `demo` query parameter, else `static`.
+class DemoSelection extends Notifier<String> {
+  @override
+  String build() {
+    final q = Uri.base.queryParameters['demo'];
+    return kDemoDocuments.containsKey(q) ? q! : 'static';
+  }
+
+  void select(String key) {
+    if (kDemoDocuments.containsKey(key)) state = key;
+  }
+}
+
+final demoSelectionProvider = NotifierProvider<DemoSelection, String>(
+  DemoSelection.new,
+);
+
 /// The demo document, loaded and migrated from the app bundle.
 final demoDocumentProvider = FutureProvider<ir.StageDocument>((ref) async {
-  final text = await rootBundle.loadString(kDemoDocumentAsset);
+  final key = ref.watch(demoSelectionProvider);
+  final text = await rootBundle.loadString(kDemoDocuments[key]!);
   final json = jsonDecode(text) as Map<String, Object?>;
   return ir.StageDocument.fromJsonMigrating(json);
 });
@@ -46,7 +70,12 @@ class DemoHarness extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (ref.watch(demoDocumentProvider)) {
-      AsyncData(:final value) => _DemoStage(document: value),
+      AsyncData(:final value) => Stack(
+        children: [
+          _DemoStage(document: value),
+          const Positioned(top: 8, right: 8, child: _DemoPicker()),
+        ],
+      ),
       AsyncError(:final error) => Center(
         child: Text('Could not load the demo document: $error'),
       ),
@@ -88,6 +117,35 @@ class _DemoStage extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// A minimal switcher between the bundled demos.
+class _DemoPicker extends ConsumerWidget {
+  const _DemoPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Material(
+      color: const Color(0xCC000000),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: DropdownButton<String>(
+          value: ref.watch(demoSelectionProvider),
+          dropdownColor: const Color(0xFF202028),
+          underline: const SizedBox.shrink(),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          items: [
+            for (final k in kDemoDocuments.keys)
+              DropdownMenuItem(value: k, child: Text(k)),
+          ],
+          onChanged: (k) {
+            if (k != null) ref.read(demoSelectionProvider.notifier).select(k);
+          },
+        ),
+      ),
     );
   }
 }

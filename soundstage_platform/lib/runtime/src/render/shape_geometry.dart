@@ -20,10 +20,15 @@ StageOutline shapeOutline(
   ir.ShapeGeometry geometry,
   Size size, {
   ir.CornerRadius cornerRadius = const ir.CornerRadius.uniform(),
+  double cornerSmoothing = 0,
 }) {
   final bounds = Offset.zero & size;
   return switch (geometry) {
-    ir.RectangleGeometry() => StageOutline.box(size, cornerRadius),
+    ir.RectangleGeometry() => StageOutline.box(
+      size,
+      cornerRadius,
+      smoothing: cornerSmoothing,
+    ),
     ir.EllipseGeometry() => StageOutline.path(
       ellipsePath(geometry, bounds),
       bounds: bounds,

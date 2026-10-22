@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart' show SizedBox, WidgetSpan;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../../media/fonts.dart';
+import '../../paint/text_variant.dart';
 import 'text_style_mapping.dart';
 
 /// Extra width given to painters so text laid out at exactly its measured
@@ -154,6 +156,7 @@ class StageTextLayout {
         lines += allowed;
       }
       p.visible = true;
+      p.laidOut(tw);
       p.offset = Offset(p.gutter, y);
       y += p.painter.height;
     }
@@ -183,16 +186,24 @@ class StageTextLayout {
     return null;
   }
 
-  /// Paints the text into a box at [offset] of [boxHeight].
-  void paint(Canvas canvas, Offset offset, double boxHeight) {
+  /// Paints the text into a box at [offset] of [boxHeight]: in the spans'
+  /// own fill colours, or as a [variant] (mask, stroke, shadow).
+  void paint(
+    Canvas canvas,
+    Offset offset,
+    double boxHeight, {
+    StageTextVariant? variant,
+  }) {
     final dy = alignOffset(boxHeight);
     for (final p in _paras) {
       if (!p.visible) continue;
       final at = offset + p.offset + Offset(0, dy);
-      p.painter.paint(canvas, at);
-      final marker = p.marker;
+      final v = variant == null ? null : p.variant(variant);
+      final painter = v?.painter ?? p.painter;
+      painter.paint(canvas, at);
+      final marker = v == null ? p.marker : v.marker;
       if (marker != null) {
-        final base = p.painter.computeDistanceToActualBaseline(
+        final base = painter.computeDistanceToActualBaseline(
           TextBaseline.alphabetic,
         );
         final mBase = marker.computeDistanceToActualBaseline(
@@ -203,14 +214,63 @@ class StageTextLayout {
     }
   }
 
+  /// The distinct fill stacks of spans that need a glyph mask (gradient,
+  /// image or stacked fills), in order of first use.
+  late final List<List<ir.Paint>> complexFillGroups = _complexGroups();
+
+  List<List<ir.Paint>> _complexGroups() {
+    final out = <List<ir.Paint>>[];
+    for (final p in _paras) {
+      for (final s in p.source.spans) {
+        if (s.text.isEmpty || isSimpleTextFill(s.style.fills)) continue;
+        if (!out.any((g) => listEquals(g, s.style.fills))) {
+          out.add(s.style.fills);
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Whether any span has a visible simple (single solid) fill.
+  late final bool hasSimpleFill = _hasSimpleFill();
+
+  bool _hasSimpleFill() {
+    for (final p in _paras) {
+      for (final s in p.source.spans) {
+        if (s.text.isNotEmpty &&
+            isSimpleTextFill(s.style.fills) &&
+            simpleTextColor(s.style.fills).a > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Whether every visible span is an opaque solid (shadows then need no
+  /// knock-out behind the glyphs).
+  late final bool fillsAreOpaque = _fillsAreOpaque();
+
+  bool _fillsAreOpaque() {
+    for (final p in _paras) {
+      for (final s in p.source.spans) {
+        if (s.text.isEmpty) continue;
+        if (!isSimpleTextFill(s.style.fills) ||
+            simpleTextColor(s.style.fills).a < 1) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   /// The visible paragraphs' painters (tests and hit testing).
   Iterable<TextPainter> get visiblePainters =>
       _paras.where((p) => p.visible).map((p) => p.painter);
 
   void dispose() {
     for (final p in _paras) {
-      p.painter.dispose();
-      p.marker?.dispose();
+      p.dispose();
     }
   }
 
@@ -224,81 +284,25 @@ class StageTextLayout {
       final spans = para.spans;
       final first = spans.isEmpty ? const ir.TextStyle() : spans.first.style;
       final base = stageTextStyle(first, fonts);
-      final children = <InlineSpan>[];
-      final indent = para.paragraphIndent;
-      final hasText = spans.any((s) => s.text.isNotEmpty);
-      if (indent > 0 && hasText) {
-        children.add(
-          const WidgetSpan(
-            child: SizedBox.shrink(),
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-          ),
-        );
-      }
-      var startsWord = true;
-      for (final s in spans) {
-        children.add(
-          TextSpan(
-            text: applyTextCase(
-              s.text,
-              s.style.textCase,
-              startsWord: startsWord,
-            ),
-            style: stageTextStyle(s.style, fonts),
-          ),
-        );
-        if (s.text.isNotEmpty) {
-          startsWord = s.text.substring(s.text.length - 1).trim().isEmpty;
-        }
-      }
-      final painter = TextPainter(
-        text: TextSpan(
-          style: base,
-          text: children.isEmpty ? '' : null,
-          children: children.isEmpty ? null : children,
-        ),
-        textAlign: switch (para.alignHorizontal) {
-          ir.TextAlignHorizontal.left => TextAlign.left,
-          ir.TextAlignHorizontal.center => TextAlign.center,
-          ir.TextAlignHorizontal.right => TextAlign.right,
-          ir.TextAlignHorizontal.justified => TextAlign.justify,
-        },
-        textDirection: TextDirection.ltr,
-        textScaler: TextScaler.noScaling,
-      );
-      if (indent > 0 && hasText) {
-        painter.setPlaceholderDimensions([
-          PlaceholderDimensions(
-            size: Size(indent, 0),
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            baselineOffset: 0,
-          ),
-        ]);
-      }
-
-      TextPainter? marker;
       var gutter = 0.0;
+      var paraOrdinal = 0;
+      TextPainter? marker;
       if (para.listStyle == ir.ListStyle.none) {
         ordinal = 0;
       } else {
         final ordered = para.listStyle == ir.ListStyle.ordered;
         ordinal = ordered ? ordinal + 1 : 0;
-        marker = TextPainter(
-          text: TextSpan(
-            text: ordered ? '$ordinal.' : '•',
-            style: base.copyWith(decoration: TextDecoration.none),
-          ),
-          textDirection: TextDirection.ltr,
-          textScaler: TextScaler.noScaling,
-        )..layout();
+        paraOrdinal = ordinal;
+        marker = _markerPainter(para, ordinal, fonts, null)..layout();
         final fs = first.fontSize;
         gutter = math.max(1.5 * fs, marker.width + 0.5 * fs);
       }
       out.add(
         _Para(
-          painter: painter,
+          source: para,
+          fonts: fonts,
+          ordinal: paraOrdinal,
+          painter: _textPainter(para, fonts, null, base),
           spacing: para.paragraphSpacing,
           marker: marker,
           gutter: gutter,
@@ -307,16 +311,116 @@ class StageTextLayout {
     }
     return out;
   }
+
+  static TextPainter _markerPainter(
+    ir.ResolvedParagraph para,
+    int ordinal,
+    StageFontTable fonts,
+    StageTextVariant? variant,
+  ) {
+    final first = para.spans.isEmpty
+        ? const ir.TextStyle()
+        : para.spans.first.style;
+    final ordered = para.listStyle == ir.ListStyle.ordered;
+    return TextPainter(
+      text: TextSpan(
+        text: ordered ? '$ordinal.' : '•',
+        style: stageTextStyle(
+          first,
+          fonts,
+          variant: variant,
+        ).copyWith(decoration: TextDecoration.none),
+      ),
+      textDirection: TextDirection.ltr,
+      textScaler: TextScaler.noScaling,
+    );
+  }
+
+  /// The painter of [para], styled for [variant] (null = the spans' own
+  /// fills). [baseStyle] is passed when already computed.
+  static TextPainter _textPainter(
+    ir.ResolvedParagraph para,
+    StageFontTable fonts,
+    StageTextVariant? variant,
+    TextStyle? baseStyle,
+  ) {
+    final spans = para.spans;
+    final first = spans.isEmpty ? const ir.TextStyle() : spans.first.style;
+    final base = baseStyle ?? stageTextStyle(first, fonts, variant: variant);
+    final children = <InlineSpan>[];
+    final indent = para.paragraphIndent;
+    final hasText = spans.any((s) => s.text.isNotEmpty);
+    if (indent > 0 && hasText) {
+      children.add(
+        const WidgetSpan(
+          child: SizedBox.shrink(),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+        ),
+      );
+    }
+    var startsWord = true;
+    for (final s in spans) {
+      children.add(
+        TextSpan(
+          text: applyTextCase(s.text, s.style.textCase, startsWord: startsWord),
+          style: stageTextStyle(s.style, fonts, variant: variant),
+        ),
+      );
+      if (s.text.isNotEmpty) {
+        startsWord = s.text.substring(s.text.length - 1).trim().isEmpty;
+      }
+    }
+    final painter = TextPainter(
+      text: TextSpan(
+        style: base,
+        text: children.isEmpty ? '' : null,
+        children: children.isEmpty ? null : children,
+      ),
+      textAlign: switch (para.alignHorizontal) {
+        ir.TextAlignHorizontal.left => TextAlign.left,
+        ir.TextAlignHorizontal.center => TextAlign.center,
+        ir.TextAlignHorizontal.right => TextAlign.right,
+        ir.TextAlignHorizontal.justified => TextAlign.justify,
+      },
+      textDirection: TextDirection.ltr,
+      textScaler: TextScaler.noScaling,
+    );
+    if (indent > 0 && hasText) {
+      painter.setPlaceholderDimensions([
+        PlaceholderDimensions(
+          size: Size(indent, 0),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          baselineOffset: 0,
+        ),
+      ]);
+    }
+    return painter;
+  }
+}
+
+class _Variant {
+  _Variant(this.painter, this.marker);
+  final TextPainter painter;
+  final TextPainter? marker;
+  int rev = -1;
 }
 
 class _Para {
   _Para({
+    required this.source,
+    required this.fonts,
+    required this.ordinal,
     required this.painter,
     required this.spacing,
     required this.gutter,
     this.marker,
   });
 
+  final ir.ResolvedParagraph source;
+  final StageFontTable fonts;
+  final int ordinal;
   final TextPainter painter;
   final double spacing;
   final double gutter;
@@ -324,8 +428,47 @@ class _Para {
   Offset offset = Offset.zero;
   bool visible = true;
 
+  /// Bumped on every layout; variant painters re-layout when stale.
+  int rev = 0;
+  double _width = 0;
+  final Map<String, _Variant> _variants = {};
+
   void reset() {
     if (painter.maxLines != null) painter.maxLines = null;
     if (painter.ellipsis != null) painter.ellipsis = null;
+  }
+
+  /// Records the layout [painter] just got, so variants can repeat it.
+  void laidOut(double textWidth) {
+    rev++;
+    _width = textWidth;
+  }
+
+  /// The painter for [v], laid out like [painter].
+  _Variant variant(StageTextVariant v) {
+    final e = _variants.putIfAbsent(v.key, () {
+      TextPainter? m;
+      if (marker != null) {
+        m = StageTextLayout._markerPainter(source, ordinal, fonts, v)..layout();
+      }
+      return _Variant(StageTextLayout._textPainter(source, fonts, v, null), m);
+    });
+    if (e.rev != rev) {
+      e.rev = rev;
+      e.painter
+        ..maxLines = painter.maxLines
+        ..ellipsis = painter.ellipsis
+        ..layout(minWidth: _width, maxWidth: _width + _kWrapSlack);
+    }
+    return e;
+  }
+
+  void dispose() {
+    painter.dispose();
+    marker?.dispose();
+    for (final v in _variants.values) {
+      v.painter.dispose();
+      v.marker?.dispose();
+    }
   }
 }

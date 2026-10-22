@@ -61,20 +61,25 @@ Pure functions with no render objects, so they can be unit-tested (`test/runtime
 
 ## The paint seam (`src/paint/`)
 
-`StageAppearancePainter` has `paintFills(canvas, outline, fills, media:, onImageReady:, devicePixelRatio:)`,
-`paintStroke(canvas, outline, stroke)` and `paintErrorBox(canvas, rect)`. Render objects call
-them in local coordinates with a `StageOutline` (a rounded box or a path, open for lines).
-Clipping and opacity stay in the render objects.
+`StageAppearancePainter` (signatures extended with optional `opacity`, `media`, `onImageReady`,
+`devicePixelRatio`): `paintFills`, `paintStroke`, `paintDropShadows`, `paintInnerShadows`,
+`paintStack` (the shared paint-stack engine, also used for strokes and text masks) and
+`paintErrorBox`. They draw onto the canvas in node-local coordinates with a `StageOutline` (plain
+or smoothed rounded box, or a path; `insetBy`/`inflated` keep corners concentric). Render objects
+call `paintStageAppearance` (`appearance_compositor.dart`): background blur, then inside the
+layer blur: drop shadows, fills, inner shadows, children, stroke. Text goes through
+`paintStageText` (`render/text/text_paint.dart`). Pure geometry (testable): `placeImage`,
+`imageTransform`, `gradientBasis`/`diamondMesh`, `strokeBand`, `dashPath`, `imageFilterMatrix`,
+`smoothedRectPath` (corner smoothing, after figma-squircle's `draw.ts`/`distribute.ts`).
 
-T0.4 implements only:
-- solid fills;
-- image fills in `fill` mode with `focalPoint` (`imageFillRect`), which paint the asset's
-  placeholder colour while loading. Other scale modes paint as `fill`;
-- solid strokes with one weight (per-side weights use the largest side), aligned
-  inside/center/outside, with caps and joins.
-
-T0.5 replaces the internals (gradients, scale modes, filters, dashes, per-side strokes, effects,
-corner smoothing, blend modes, text paint stacks via `srcIn`) without changing the signatures.
+**Layer cost.** Fills, strokes, shadows, gradients, images and corner smoothing draw straight
+onto the canvas (no layer). A layer is used only for: opacity < 1 when the node has children or
+more than one painted part (otherwise opacity is folded into the paint colours); a non-normal
+blend mode, or a `normal` frame with a blending child (one `saveLayer`; `passThrough` frames
+use none); layer blur (one `ImageFilterLayer`); background blur (clip + `BackdropFilterLayer`,
+which re-blurs the backdrop every repaint, so use sparingly); clipping frames (a clip layer); text
+with gradient/image fills or non-centre/non-solid strokes (two `saveLayer`s per fill stack), and
+text drop shadows (one to three `saveLayer`s each).
 
 ## Media (`src/media/`)
 
@@ -173,3 +178,34 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     - Frame strokes paint above children.
     - Hidden children are laid out at their stored geometry but neither painted nor hit-tested.
     - Unclipped frames let overflowing children be hit; clipped frames do not.
+
+**Paint (T0.5)**
+
+18. **Gradient handles (DN).** `start` is the centre/origin, `end - start` the first axis and
+    `width - start` the second. An unset `width` (exactly 0,0) or one collinear with start/end
+    uses the perpendicular of the first axis in pixel space, so radials are circles. Angular
+    sweeps clockwise from `end`.
+19. **Diamond (DN).** Exact, no shader: concentric diamond rings at each stop, drawn as a
+    coloured triangle mesh (`drawVertices`), so it works on CanvasKit and wasm. Colour is
+    linear in the L1 norm per quadrant, which the mesh reproduces exactly.
+20. **Image filters (DN).** Colour matrix in order exposure (2^e), contrast, highlights/shadows,
+    saturation (Rec. 709), temperature (R/B +-20%), tint (G -20%). Highlights/shadows approximate
+    Figma's tone curve as a white-point scale and black-point lift acting on all tones.
+    Rotation turns clockwise; `tile` uses the asset's declared original size x `tileScale`;
+    `fit` aligns by `focalPoint`; variants are picked from the on-screen image width x DPR.
+21. **Strokes.** Box outlines without dashes use an exact filled band (even-odd), so per-side
+    weights and gradient/diamond/image stroke paints work. Dashed, round/bevel-joined or
+    non-box strokes use a native stroke (inside/outside by clipping a double-width stroke); there
+    diamond paints fall back to their first stop and image paints are skipped, and per-side
+    weights use the largest side.
+22. **Corner smoothing.** Figma's construction with `preserveSmoothing: false` (smoothing is
+    reduced when a corner lacks room, radii are distributed between neighbours). Smoothed
+    corners are circular; clip content follows the smoothed path.
+23. **Effects.** Blur radius = 2 sigma. Shadows follow the outline, not the painted pixels;
+    knocked out under the node unless `showBehindTransparentAreas` (skipped for opaque fills).
+    Non-box spread scales about the centre. Text shadows have no spread; text has no inner
+    shadow or background blur.
+24. **Blend and opacity.** Each paint's blend mode applies to its own draw (blends with the
+    stack below, inside the node). Node blend modes isolate the node in a `saveLayer`;
+    descendants that make their own compositing layers (repaint boundaries, blurs) paint
+    outside that group, so a blended group avoids them. Masks and video appearance are M3.

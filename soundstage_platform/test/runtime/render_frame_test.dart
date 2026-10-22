@@ -376,8 +376,7 @@ void main() {
     final row = frame(
       'row',
       common('row', w: 200, h: 100),
-      autoLayout: const ir.AutoLayout(
-      ),
+      autoLayout: const ir.AutoLayout(),
       children: [
         rect('a', common('a', w: 50, h: 50)),
         rect(

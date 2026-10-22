@@ -154,6 +154,15 @@ class StageMedia {
     return cache.obtain(uri, () => _decode(uri), onReady: onReady);
   }
 
+  /// The original size of [assetId] in pixels, when the asset declares it.
+  /// Used to place images and to pick variants before anything is decoded.
+  ui.Size? intrinsicSize(String assetId) {
+    final a = resolver.asset(assetId);
+    final w = a?.width, h = a?.height;
+    if (w == null || h == null || w <= 0 || h <= 0) return null;
+    return ui.Size(w.toDouble(), h.toDouble());
+  }
+
   /// The colour to paint while [assetId] loads, if the asset declares one.
   Color? placeholderColor(String assetId) {
     final c = resolver.asset(assetId)?.placeholder?.dominantColor;

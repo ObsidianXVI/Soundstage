@@ -1,9 +1,12 @@
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../paint/appearance_compositor.dart';
 import 'render_stage_box.dart';
+import 'render_stage_frame.dart' show stageDevicePixelRatio;
 import 'stage_environment.dart';
 import 'text/stage_text_layout.dart';
+import 'text/text_paint.dart';
 
 /// Rich text (architecture §7), laid out from the resolved paragraphs only
 /// (the resolver has merged every span's style; this never merges styles).
@@ -30,6 +33,7 @@ class RenderStageText extends RenderStageBox {
     if (identical(value, _paragraphs)) return;
     _paragraphs = value;
     _resetLayouts();
+    markNeedsCompositingBitsUpdate();
     markStageLayoutDirty();
   }
 
@@ -83,7 +87,7 @@ class RenderStageText extends RenderStageBox {
       );
     }
     if (old is ir.TextNode && !identical(old.appearance, next.appearance)) {
-      i = maxInvalidation(i, StageInvalidation.paint); // T0.5
+      i = maxInvalidation(i, StageInvalidation.paint);
     }
     return i;
   }
@@ -140,13 +144,39 @@ class RenderStageText extends RenderStageBox {
   /// The laid-out text (tests).
   StageTextLayout get textLayout => _paint;
 
+  final StageAppearanceLayers _layers = StageAppearanceLayers();
+
+  void _onImageReady() {
+    if (attached) markNeedsPaint();
+  }
+
+  @override
+  bool get opacityNeedsLayer => textPartCount(_paint, text.appearance) > 1;
+
+  @override
+  bool get hasEffectLayers => layerBlurOf(text.appearance.effects) != null;
+
   @override
   void paintStage(PaintingContext context, Offset offset) {
-    _paint.paint(context.canvas, offset, size.height);
+    final env = environment;
+    paintStageText(
+      context: context,
+      offset: offset,
+      size: size,
+      layout: _paint,
+      appearance: text.appearance,
+      painter: env.painter,
+      layers: _layers,
+      media: env.media,
+      onImageReady: _onImageReady,
+      devicePixelRatio: stageDevicePixelRatio(),
+      opacity: paintOpacity,
+    );
   }
 
   @override
   void dispose() {
+    _layers.dispose();
     _resetLayouts();
     super.dispose();
   }

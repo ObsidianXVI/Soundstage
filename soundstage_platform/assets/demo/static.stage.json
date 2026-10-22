@@ -217,13 +217,42 @@
             "appearance": {
               "fills": [
                 {
-                  "type": "solid",
+                  "type": "gradient",
                   "id": "fill",
-                  "color": {
-                    "r": 0.0,
-                    "g": 0.0,
-                    "b": 0.0,
-                    "a": 0.45
+                  "kind": "linear",
+                  "stops": [
+                    {
+                      "position": 0,
+                      "color": {
+                        "r": 0,
+                        "g": 0,
+                        "b": 0,
+                        "a": 0
+                      }
+                    },
+                    {
+                      "position": 1,
+                      "color": {
+                        "r": 0.04,
+                        "g": 0.02,
+                        "b": 0.08,
+                        "a": 0.82
+                      }
+                    }
+                  ],
+                  "handles": {
+                    "start": {
+                      "x": 0.5,
+                      "y": 0
+                    },
+                    "end": {
+                      "x": 0.5,
+                      "y": 1
+                    },
+                    "width": {
+                      "x": 0,
+                      "y": 0
+                    }
                   }
                 }
               ],

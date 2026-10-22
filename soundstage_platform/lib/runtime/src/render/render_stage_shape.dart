@@ -1,6 +1,7 @@
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../paint/appearance_compositor.dart';
 import 'render_stage_box.dart';
 import 'render_stage_frame.dart' show stageDevicePixelRatio;
 import 'shape_geometry.dart';
@@ -72,29 +73,54 @@ class RenderStageShape extends RenderStageBox {
   @override
   Size performStageLayout() => constraints.constrain(storedSize);
 
+  final StageAppearanceLayers _layers = StageAppearanceLayers();
+
   void _onImageReady() {
     if (attached) markNeedsPaint();
   }
 
   @override
+  bool get opacityNeedsLayer =>
+      paintedPartCount(
+        appearance.fills,
+        appearance.strokes,
+        appearance.effects,
+      ) >
+      1;
+
+  @override
+  bool get hasEffectLayers => hasLayerEffects(appearance.effects);
+
+  @override
   void paintStage(PaintingContext context, Offset offset) {
     final a = appearance;
-    if (a.fills.isEmpty && a.strokes.paints.isEmpty) return;
-    final outline = shapeOutline(geometry, size, cornerRadius: a.cornerRadius);
+    if (a.fills.isEmpty && a.strokes.paints.isEmpty && a.effects.isEmpty) {
+      return;
+    }
+    final outline = shapeOutline(
+      geometry,
+      size,
+      cornerRadius: a.cornerRadius,
+      cornerSmoothing: a.cornerSmoothing,
+    );
     final env = environment;
-    final canvas = context.canvas
-      ..save()
-      ..translate(offset.dx, offset.dy);
-    env.painter
-      ..paintFills(
-        canvas,
-        outline,
-        a.fills,
-        media: env.media,
-        onImageReady: _onImageReady,
-        devicePixelRatio: stageDevicePixelRatio(),
-      )
-      ..paintStroke(canvas, outline, a.strokes);
-    canvas.restore();
+    paintStageAppearance(
+      context: context,
+      offset: offset,
+      painter: env.painter,
+      layers: _layers,
+      outline: outline,
+      appearance: a,
+      media: env.media,
+      onImageReady: _onImageReady,
+      devicePixelRatio: stageDevicePixelRatio(),
+      opacity: paintOpacity,
+    );
+  }
+
+  @override
+  void dispose() {
+    _layers.dispose();
+    super.dispose();
   }
 }
