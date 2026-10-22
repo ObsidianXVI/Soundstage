@@ -114,6 +114,19 @@ class StageImageCache {
     }
   }
 
+  /// Drops [key] (decoded or loading) and disposes its image (T0.6: the
+  /// player releases images of scenes that leave the lazy window). Returns
+  /// whether there was an entry.
+  bool release(String key) {
+    final e = _entries.remove(key);
+    if (e == null) return false;
+    if (e.image != null) {
+      _bytes -= e.bytes;
+      e.image!.dispose();
+    }
+    return true;
+  }
+
   /// Disposes every cached image.
   void clear() {
     for (final e in _entries.values) {
@@ -152,6 +165,23 @@ class StageMedia {
     if (asset == null) return null;
     final uri = resolver.uriFor(asset, targetWidth: targetWidth);
     return cache.obtain(uri, () => _decode(uri), onReady: onReady);
+  }
+
+  /// Starts decoding [assetId] ahead of need (T0.6: scenes entering the
+  /// lazy window).
+  void prefetch(String assetId, {double? targetWidth}) {
+    image(assetId, targetWidth: targetWidth);
+  }
+
+  /// Releases every decoded rendition (original and variants) of [assetId]
+  /// (T0.6: scenes leaving the lazy window).
+  void releaseAsset(String assetId) {
+    final asset = resolver.asset(assetId);
+    if (asset == null) return;
+    cache.release(asset.uri);
+    for (final v in asset.variants) {
+      cache.release(v.uri);
+    }
   }
 
   /// The colour to paint while [assetId] loads, if the asset declares one.

@@ -6,6 +6,13 @@
 /// names collide with Flutter's.
 library;
 
+export 'src/animator/compiled_easing.dart';
+export 'src/animator/compiled_track.dart';
+export 'src/animator/node_registry.dart';
+export 'src/animator/stage_animator.dart';
+export 'src/clocks/clock_source.dart';
+export 'src/clocks/smoothing.dart';
+export 'src/clocks/timeline_clock.dart';
 export 'src/media/asset_resolver.dart';
 export 'src/media/fonts.dart';
 export 'src/media/image_cache.dart';
@@ -23,5 +30,7 @@ export 'src/render/shape_geometry.dart';
 export 'src/render/stage_environment.dart';
 export 'src/render/text/stage_text_layout.dart';
 export 'src/render/text/text_style_mapping.dart';
+export 'src/scenes/sliver_stage_scene.dart';
+export 'src/scenes/stage_player.dart';
 export 'src/widgets/stage_node_widget.dart';
 export 'src/widgets/stage_scene_view.dart';
