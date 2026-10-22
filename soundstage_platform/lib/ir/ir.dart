@@ -43,6 +43,8 @@ export 'src/resolve/resolved_tree.dart';
 export 'src/resolve/resolver.dart';
 export 'src/scene.dart';
 export 'src/tokens.dart';
+export 'src/validate/load.dart';
+export 'src/validate/validate.dart';
 export 'src/values/geometry.dart';
 export 'src/values/ids.dart';
 export 'src/values/ir_value.dart';
