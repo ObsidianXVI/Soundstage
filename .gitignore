@@ -15,5 +15,12 @@
 .gemini/
 /_dev
 
+# Project context and tracking records (kept local)
+AGENTS.md
+CURRENT_TASK.md
+CURRENT_RELEASE.md
+DECISIONS.md
+DECISIONS_NEEDED.md
+
 # Firebase
 .firebase/
