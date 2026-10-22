@@ -98,10 +98,17 @@ class _StageEnterGateState extends State<StageEnterGate> {
       widget.environment,
       audio: widget.audio,
     );
+    widget.environment.fonts.addListener(_fontLoaded);
+  }
+
+  /// Restyles the gate's own text once the document font arrives.
+  void _fontLoaded(String familyId) {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    widget.environment.fonts.removeListener(_fontLoaded);
     _focus.dispose();
     super.dispose();
   }

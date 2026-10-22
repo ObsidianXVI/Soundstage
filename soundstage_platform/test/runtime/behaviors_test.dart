@@ -273,6 +273,17 @@ void main() {
       }
     });
 
+    testWidgets('paints at its laid-out width after a dry layout elsewhere', (
+      tester,
+    ) async {
+      await _pump(tester, doc(ir.LyricsScrollMode.top), {'__lyrics/lyrics': 0});
+      final box = stageBox(tester, 'template') as RenderStageLyrics;
+      final top1 = box.lineTop(1);
+      // Measuring at another width must not leak into painting.
+      box.getDryLayout(const BoxConstraints(maxWidth: 60));
+      expect(box.lineTop(1), top1);
+    });
+
     testWidgets('a missing lyrics doc renders nothing', (tester) async {
       final d = _doc(frame(ir.LyricsScrollMode.center), clocks: const []);
       await _pump(tester, d, {});

@@ -307,8 +307,9 @@ class RenderStageLyrics extends RenderStageBox {
 
   /// The scroll targets of each line for the current scroll mode.
   List<double> scrollTargets() {
-    final lines = _lines;
-    if (lines == null || !hasSize) return const [];
+    if (!hasSize) return const [];
+    // Dry layout may have laid the painters out at another width.
+    final lines = _layoutLines(size.width);
     switch (_behavior.scrollMode) {
       case ir.LyricsScrollMode.none:
         return List.filled(lines.length, 0);
@@ -333,15 +334,16 @@ class RenderStageLyrics extends RenderStageBox {
   }
 
   /// The top of line [i] relative to the stack box (tests).
-  double lineTop(int i) => _lines![i].top;
+  double lineTop(int i) => _layoutLines(size.width)[i].top;
 
   // ---- Paint ------------------------------------------------------------------
 
   @override
   void paintStage(PaintingContext context, Offset offset) {
     final doc = _lyrics;
-    final lines = _lines;
-    if (doc == null || lines == null || lines.isEmpty) return;
+    // Dry layout may have laid the painters out at another width.
+    final lines = _layoutLines(size.width);
+    if (doc == null || lines.isEmpty) return;
     final canvas = context.canvas;
     final scroll = scrollOffset;
     final p = parent;

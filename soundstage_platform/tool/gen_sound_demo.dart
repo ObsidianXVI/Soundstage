@@ -159,7 +159,7 @@ Scene _title() {
     size: 56,
     weight: 200,
     color: '#f2b880',
-    overrides: _mobile4(16, 290, 358, 60)
+    overrides: _mobile4(16, 330, 358, 60)
       ..['mobile']!['style.fontSize'] = _n(30),
   );
   final reveal = FrameNode(
@@ -171,7 +171,7 @@ Scene _title() {
       width: 900,
       height: 260,
       layoutChild: _centre,
-      breakpointOverrides: _mobile4(16, 400, 358, 380),
+      breakpointOverrides: _mobile4(16, 470, 358, 330),
     ),
     behavior: const Behavior.textReveal(
       clockId: clock,
@@ -194,7 +194,7 @@ Scene _title() {
         color: '#d9d2c5',
         lc: _stretchX,
         overrides: {
-          'mobile': {'style.fontSize': _n(22)},
+          'mobile': {'width': _n(358), 'style.fontSize': _n(22)},
         },
       ),
     ],
@@ -270,7 +270,7 @@ Scene _lyric(LyricsDoc lyrics) {
         lineHeight: 120,
         lc: _stretchX,
         overrides: {
-          'mobile': {'style.fontSize': _n(28)},
+          'mobile': {'width': _n(366), 'style.fontSize': _n(28)},
         },
       ).copyWith(
         style: const TextStyleOverride(

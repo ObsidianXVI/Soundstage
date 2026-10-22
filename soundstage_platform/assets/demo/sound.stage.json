@@ -456,7 +456,7 @@
                     "type": "number"
                   },
                   "y": {
-                    "value": 290.0,
+                    "value": 330.0,
                     "type": "number"
                   },
                   "width": {
@@ -585,7 +585,7 @@
                     "type": "number"
                   },
                   "y": {
-                    "value": 400.0,
+                    "value": 470.0,
                     "type": "number"
                   },
                   "width": {
@@ -593,7 +593,7 @@
                     "type": "number"
                   },
                   "height": {
-                    "value": 380.0,
+                    "value": 330.0,
                     "type": "number"
                   }
                 }
@@ -667,6 +667,10 @@
                   "mask": "none",
                   "breakpointOverrides": {
                     "mobile": {
+                      "width": {
+                        "value": 358.0,
+                        "type": "number"
+                      },
                       "style.fontSize": {
                         "value": 22.0,
                         "type": "number"
@@ -1260,6 +1264,10 @@
                   "mask": "none",
                   "breakpointOverrides": {
                     "mobile": {
+                      "width": {
+                        "value": 366.0,
+                        "type": "number"
+                      },
                       "style.fontSize": {
                         "value": 28.0,
                         "type": "number"
