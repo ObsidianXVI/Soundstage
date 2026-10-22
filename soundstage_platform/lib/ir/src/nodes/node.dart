@@ -90,14 +90,15 @@ sealed class Node with _$Node {
   }) = FrameNode;
 
   /// Rich text (architecture §7). `appearance` holds the text's stroke and
-  /// effects; its fills are in `style.fills`.
+  /// effects. `style` is an override layer over the named style / document default
+  /// (architecture §7); resolved fills are in `ResolvedNode.paragraphs`.
   @FreezedUnionValue('text')
   const factory Node.text({
     required NodeCommon common,
     @Default(TextAppearance()) TextAppearance appearance,
     @Default(<Paragraph>[]) List<Paragraph> content,
     String? textStyleId,
-    @Default(TextStyle()) TextStyle style,
+    @Default(TextStyleOverride()) TextStyleOverride style,
     @Default(TextAutoResize.widthAndHeight) TextAutoResize autoResize,
     int? maxLines,
     @Default(TextTruncation.none) TextTruncation truncation,

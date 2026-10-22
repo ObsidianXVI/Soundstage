@@ -40,7 +40,7 @@ in `DECISIONS_NEEDED.md`.
 - **Appearance per kind.** Frames, shapes and videos hold an `Appearance` (fills, stroke,
   effects, corners, style ids). On a video, fills paint behind the video (visible in `fit`
   letterboxing and before the first frame). Text holds a `TextAppearance` (stroke, effects,
-  `strokeStyleId`, `effectStyleId`): its fills are `TextStyle.fills`, and it has no corners.
+  `strokeStyleId`, `effectStyleId`): its fills come from the text style cascade, and it has no corners.
   Property paths are the same on every kind (`strokes.weight`, `effects.<effectId>.blur`), so
   the registry hides the difference.
 - **`clipContent`** is on `FrameNode`, not `Appearance`, because shapes don't clip.
@@ -57,6 +57,14 @@ in `DECISIONS_NEEDED.md`.
 - **Interactions** (`NodeCommon.interactions`) and **component bindings**
   (`NodeCommon.componentBindings`) are on every node. `behavior` and `modeOverrides` are
   frame-only.
+- **Text styles are layered.** `StageDocument.defaultTextStyle` (a complete `TextStyle`) is the
+  base. A text node's `textStyleId` names a `TextStyleDef`, whose `style` is a partial
+  `TextStyleOverride` layered over the default (unset fields inherit; token bindings resolved in
+  the node's modes). `TextNode.style` is a `TextStyleOverride` (all
+  fields nullable, null = inherit) layered over that; then the paragraph style
+  (spacing/indent/list) and the span override. `style.*` paths read/write the override fields
+  and `IrValue.none()` clears one. The resolved node's own `style` is emptied and `textStyleId`
+  cleared: the runtime reads only `ResolvedNode.paragraphs`.
 - **Text** has `ParagraphStyle` (align, spacing, indent and list style, all nullable) and a
   default fill of opaque black (`kDefaultTextFills`). `TextDecorationStyle.doubleLine`
   serialises as `"double"`.
@@ -108,8 +116,35 @@ in `DECISIONS_NEEDED.md`.
 - **Resolver** (`src/resolve/`). `Resolver.resolve` / `resolveDocument` run §11.3 steps 2–5 as
   per-node steps over an immutable scope (namespace, active modes, enclosing instance's props and
   overrides). The only shared state is the diagnostic list and token caches keyed by the
-  identity of the modes map, so per-node memoisation can be added later (§17.1). Output is a
+  identity of the modes map. A long-lived `Resolver` memoises scene-level subtrees between passes (see
+below). Output is a
   `ResolvedDocument` of `ResolvedNode`s with namespaced ids, concrete nodes (no instances,
   bindings, overrides, token or style refs; `FrameNode.children` is empty, and children live on
   `ResolvedNode.children`), per-span merged `TextStyle`s, active modes and placeholders for
   failed instances. Ordering and precedence choices are in `DECISIONS_NEEDED.md` #6–#10.
+
+## Validation, loading and incremental resolution (T0.3b)
+
+- **`validateDocument(doc)`** (`src/validate/`) returns `IrDiagnostic`s with a `severity`
+  (`error`/`warning`), a stable `code` (the `IrDiagnosticKind` name) and a `location` path such
+  as `scenes[0].root.children[2].common.interactions[0].actions[0]`. It checks unique ids (nodes
+  document-wide and per component, scenes, clocks, tracks, keyframes, variables, modes, audio
+  tracks, interactions, paints, effects), map keys against value ids, and every reference:
+  breakpoints, components and variant sets (instances, variants, `instanceSwap`), assets (paints,
+  video, embed, font faces, audio tracks, cover), fonts, variables (bindings, aliases, patch
+  values), styles, clocks, audio tracks, scenes, nodes (lightbox, pointer/behaviour clocks) and
+  track targets (a scene node id, or `<instanceId>/<innerId>[/…]` through the instance's
+  component). It also reports component containment cycles and token alias cycles. Unknown
+  property paths and assets of an unexpected kind are warnings.
+- **`loadDocument(json)`** migrates, parses and validates. It never throws: an unreadable input
+  gives a `LoadResult` with no document and one `invalidDocument` error; otherwise the document
+  plus its diagnostics (`LoadResult.clean` = loaded with no errors).
+- **`IdGenerator.forDocument(doc)`** reserves every generated-shape id and key in the document
+  and retries on collision; any generator also never repeats an id it issued.
+- **Incremental resolution.** `Resolver` keeps the previous pass. A scene-level node that is the
+  same object (`identical`) as last pass, under equal modes, reuses its `ResolvedNode` and
+  replays its diagnostics, so a path-copied edit re-resolves only the path to the edit. Instance
+  expansions are memoised as a whole at the instance. A change to tokens, assets, components,
+  variant sets, the default text style, breakpoints or the `ResolveContext` drops the memo (the
+  per-dependency invalidation of §17.1 is not built yet). Only the previous pass is retained.
+  Note that freezed collection getters return fresh views, so shared inputs are compared with `==`.

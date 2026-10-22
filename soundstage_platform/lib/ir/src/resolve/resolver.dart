@@ -39,18 +39,89 @@ ResolvedDocument resolveDocument(
 /// Never throws on a broken document: problems become
 /// `ResolvedDocument.diagnostics`, and output is deterministic for the same
 /// inputs.
+///
+/// **Incremental resolution.** A long-lived `Resolver` remembers the previous
+/// pass. A scene-level subtree whose root node is the *same object*
+/// (`identical`) as in the previous pass, resolved under equal modes, is not
+/// resolved again: its `ResolvedNode` (and diagnostics) are reused, so
+/// unchanged subtrees keep their output identity. Edits that copy only the
+/// path from the root to the changed node (structural sharing) therefore
+/// re-resolve only that path. Memoised results are valid while the shared
+/// inputs are unchanged (the document's tokens, assets, components, variant
+/// sets, default text style, breakpoints, and the `ResolveContext`); when any
+/// of those changes the memo is dropped and the next pass is a full one.
+/// Only the previous pass is kept, so memory stays proportional to the
+/// document. Not thread-safe; use one `Resolver` per owner.
 class Resolver {
   Resolver({PropertyRegistry? registry})
     : registry = registry ?? PropertyRegistry.standard;
 
   final PropertyRegistry registry;
 
+  final _Memo _memo = _Memo();
+
   ResolvedDocument resolve(
     StageDocument doc, [
     ResolveContext context = const ResolveContext(),
   ]) {
-    final pass = _Pass(doc, context, registry);
-    return pass.run();
+    _memo.prepare(doc, context);
+    final pass = _Pass(doc, context, registry, _memo);
+    final out = pass.run();
+    _memo.commit(pass.memoNext);
+    return out;
+  }
+}
+
+/// One memoised scene-level subtree.
+class _MemoEntry {
+  const _MemoEntry(this.modes, this.result, this.diagnostics);
+
+  /// The (input) modes the subtree was resolved under.
+  final Map<String, String> modes;
+  final ResolvedNode result;
+
+  /// Diagnostics the subtree produced, replayed on reuse.
+  final List<IrDiagnostic> diagnostics;
+}
+
+typedef _MemoMap = Map<Node, List<_MemoEntry>>;
+
+/// The previous pass of a [Resolver] and the inputs it is valid for.
+class _Memo {
+  StageDocument? _doc;
+  ResolveContext? _ctx;
+  _MemoMap previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+
+  /// Drops the memo unless the shared inputs are unchanged.
+  void prepare(StageDocument doc, ResolveContext ctx) {
+    final d = _doc;
+    // freezed collection getters return fresh read-only views, so `identical`
+    // never holds for them; `==` is cheap here because freezed values
+    // short-circuit on identity and these inputs are small or unchanged.
+    final same =
+        d != null &&
+        identical(d.tokens, doc.tokens) &&
+        identical(d.defaultTextStyle, doc.defaultTextStyle) &&
+        d.baseBreakpointId == doc.baseBreakpointId &&
+        d.breakpoints == doc.breakpoints &&
+        d.assets == doc.assets &&
+        d.variantSets == doc.variantSets &&
+        d.components == doc.components &&
+        _ctx == ctx;
+    if (!same) previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+    _doc = doc;
+    _ctx = ctx;
+  }
+
+  void commit(_MemoMap next) => previous = next;
+
+  static bool sameModes(Map<String, String> a, Map<String, String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      if (b[e.key] != e.value) return false;
+    }
+    return true;
   }
 }
 
@@ -115,12 +186,17 @@ class _TokenResult {
 
 /// One resolution of one document for one context.
 class _Pass {
-  _Pass(this.doc, this.ctx, this.registry);
+  _Pass(this.doc, this.ctx, this.registry, this.memo);
 
   final StageDocument doc;
   final ResolveContext ctx;
   final PropertyRegistry registry;
   final List<IrDiagnostic> diagnostics = [];
+
+  final _Memo memo;
+
+  /// The memo this pass is building (becomes the next pass's `previous`).
+  final _MemoMap memoNext = LinkedHashMap<Node, List<_MemoEntry>>.identity();
 
   late final Breakpoint? breakpoint = _pickBreakpoint();
   late final List<Breakpoint> cascade = breakpoint == null
@@ -451,26 +527,59 @@ class _Pass {
 
   // ---- Nodes -------------------------------------------------------------------
 
-  /// Applies [patch] to [n], reporting against [id] and recording written
-  /// `style.*` paths in [touched].
-  Node _patch(Node n, Patch patch, String id, Set<String> touched) {
+  /// Applies [patch] to [n], reporting against [id].
+  Node _patch(Node n, Patch patch, String id) {
     final local = <IrDiagnostic>[];
-    final out = applyPatch(
-      n,
-      patch,
-      diagnostics: local,
-      registry: registry,
-      onApplied: touched.add,
-    );
+    final out = applyPatch(n, patch, diagnostics: local, registry: registry);
     for (final d in local) {
       diagnostics.add(d.copyWith(nodeId: id));
     }
     return out;
   }
 
-  /// Resolves one node and its subtree. [forcedId] and [placement] are set
-  /// for a component root being instantiated by [placement].
+  /// Resolves one node and its subtree, reusing the previous pass's result
+  /// for an unchanged scene-level subtree (see [Resolver]).
   ResolvedNode _resolveNode(
+    Node node,
+    _Scope scope, {
+    String? forcedId,
+    InstanceNode? placement,
+  }) {
+    // Only scene-level nodes are memoised; an instance's expansion is
+    // memoised as a whole at the instance node.
+    if (scope.instance != null || forcedId != null || placement != null) {
+      return _resolveNodeUncached(
+        node,
+        scope,
+        forcedId: forcedId,
+        placement: placement,
+      );
+    }
+    final hits = memo.previous[node];
+    if (hits != null) {
+      for (final e in hits) {
+        if (_Memo.sameModes(e.modes, scope.modes)) {
+          diagnostics.addAll(e.diagnostics);
+          (memoNext[node] ??= []).add(e);
+          return e.result;
+        }
+      }
+    }
+    final start = diagnostics.length;
+    final result = _resolveNodeUncached(node, scope);
+    (memoNext[node] ??= []).add(
+      _MemoEntry(
+        scope.modes,
+        result,
+        diagnostics.length == start
+            ? const []
+            : List.unmodifiable(diagnostics.sublist(start)),
+      ),
+    );
+    return result;
+  }
+
+  ResolvedNode _resolveNodeUncached(
     Node node,
     _Scope scope, {
     String? forcedId,
@@ -481,13 +590,12 @@ class _Pass {
     // Override key relative to the enclosing instance: the root is addressed
     // by its own (component) id.
     final key = placement != null ? node.id : id.substring(scope.prefix.length);
-    final touched = <String>{};
     var n = node;
 
     // 1. Breakpoint patches (§3.1).
     for (final bp in cascade) {
       final patch = n.common.breakpointOverrides[bp.id];
-      if (patch != null) n = _patch(n, patch, id, touched);
+      if (patch != null) n = _patch(n, patch, id);
     }
 
     // 2. Component prop bindings (§9).
@@ -506,14 +614,14 @@ class _Pass {
           patch[path] = v;
         }
       });
-      n = _patch(n, patch, id, touched);
+      n = _patch(n, patch, id);
     }
 
     // 3. Instance placement (component root only), then overrides.
     if (placement != null && n is FrameNode) n = _place(n, placement);
     if (inst != null) {
       for (final patch in inst.overrides[key] ?? const <Patch>[]) {
-        n = _patch(n, patch, id, touched);
+        n = _patch(n, patch, id);
       }
     }
 
@@ -527,21 +635,21 @@ class _Pass {
     }
 
     // 6. Token bindings.
-    for (final p in n.common.bindings.keys) {
-      if (p.startsWith('style.')) touched.add(p);
-    }
     n = _bindTokens(n, modes, id);
 
     // 7. Styles.
     List<ResolvedParagraph>? paragraphs;
+    List<Paint>? textFills;
     n = _applyPaintAndEffectStyles(n, id);
     if (n is TextNode) {
-      final base = _textBaseStyle(n, modes, id, touched);
-      n = n.copyWith(style: base, textStyleId: null);
-      paragraphs = _paragraphs(n);
+      final merged = mergeTextStyle(_namedTextStyle(n, modes, id), n.style);
+      paragraphs = _paragraphs(n, merged);
+      textFills = merged.fills;
+      // Consumers read the merged result from `paragraphs`.
+      n = n.copyWith(style: const TextStyleOverride(), textStyleId: null);
     }
 
-    _checkAssets(n, id);
+    _checkAssets(n, id, textFills);
 
     // 8. Children.
     final childScope = scope.withModes(modes);
@@ -782,32 +890,37 @@ class _Pass {
     return s?.effects;
   }
 
-  /// The node's base text style. Without a `textStyleId` it is the node's
-  /// own `style`. With one, it is the named style (its token bindings
-  /// resolved in this node's modes) with the node's *local* style values on
-  /// top: the `style.*` paths written by breakpoint patches, prop bindings,
-  /// instance overrides and token bindings at this node.
-  TextStyle _textBaseStyle(
-    TextNode n,
-    Map<String, String> modes,
-    String id,
-    Set<String> touched,
-  ) {
+  /// The base of a text node's cascade: the document's default text style
+  /// with the named style (`textStyleId`) layered over it. A named style is
+  /// partial: unset fields inherit the default. Its token bindings are
+  /// resolved in this node's [modes]. The node's `style` override and the
+  /// spans are layered on top.
+  TextStyle _namedTextStyle(TextNode n, Map<String, String> modes, String id) {
     final styleId = n.textStyleId;
-    if (styleId == null) return n.style;
+    if (styleId == null) return doc.defaultTextStyle;
     final def = doc.tokens.textStyles[styleId];
     if (def == null) {
       _diag(
         IrDiagnosticKind.missingStyle,
-        'Text style "$styleId" does not exist; using the node style.',
+        'Text style "$styleId" does not exist; using the document default.',
         nodeId: id,
         path: 'textStyleId',
       );
-      return n.style;
+      return doc.defaultTextStyle;
     }
-    var carrier = TextNode(
+    if (def.bindings.isEmpty) {
+      return mergeTextStyle(doc.defaultTextStyle, def.style);
+    }
+    // Bound fields are written (through the registry) into a carrier that
+    // holds the style's own overrides.
+    final needsFills =
+        def.style.fills == null &&
+        def.bindings.keys.any((k) => k.startsWith('fills.'));
+    Node carrier = TextNode(
       common: NodeCommon(id: id),
-      style: def.style,
+      style: needsFills
+          ? def.style.copyWith(fills: doc.defaultTextStyle.fills)
+          : def.style,
     );
     def.bindings.forEach((rel, ref) {
       final value = _tokenValue(ref, modes, id, 'textStyles.$styleId.$rel');
@@ -821,33 +934,20 @@ class _Pass {
           path: 'textStyles.$styleId.$rel',
         );
       } else {
-        carrier = next as TextNode;
+        carrier = next;
       }
     });
-    for (final path in touched) {
-      if (!path.startsWith('style.')) continue;
-      final value = registry.get(n, path);
-      Node? next = value == null ? null : registry.trySet(carrier, path, value);
-      if (next == null) {
-        // E.g. `style.fills.<id>.color` where the named style has no such
-        // paint: take the whole top-level field from the node.
-        final top = path.split('.').take(2).join('.');
-        final whole = registry.get(n, top);
-        next = whole == null ? null : registry.trySet(carrier, top, whole);
-      }
-      if (next != null) carrier = next as TextNode;
-    }
-    return carrier.style;
+    return mergeTextStyle(doc.defaultTextStyle, (carrier as TextNode).style);
   }
 
-  List<ResolvedParagraph> _paragraphs(TextNode n) => [
+  List<ResolvedParagraph> _paragraphs(TextNode n, TextStyle merged) => [
     for (final p in n.content)
       () {
         final ps = p.style;
-        final base = n.style.copyWith(
-          paragraphSpacing: ps?.paragraphSpacing ?? n.style.paragraphSpacing,
-          paragraphIndent: ps?.paragraphIndent ?? n.style.paragraphIndent,
-          listStyle: ps?.listStyle ?? n.style.listStyle,
+        final base = merged.copyWith(
+          paragraphSpacing: ps?.paragraphSpacing ?? merged.paragraphSpacing,
+          paragraphIndent: ps?.paragraphIndent ?? merged.paragraphIndent,
+          listStyle: ps?.listStyle ?? merged.listStyle,
         );
         return ResolvedParagraph(
           alignHorizontal: ps?.alignHorizontal ?? n.alignHorizontal,
@@ -868,7 +968,7 @@ class _Pass {
 
   // ---- Output ------------------------------------------------------------------
 
-  void _checkAssets(Node n, String id) {
+  void _checkAssets(Node n, String id, List<Paint>? textFills) {
     void check(String? assetId, String path) {
       if (assetId == null || doc.assets.containsKey(assetId)) return;
       _diag(
@@ -895,7 +995,7 @@ class _Pass {
         paints(appearance.fills, 'fills');
         paints(appearance.strokes.paints, 'strokes.paints');
       case TextNode():
-        paints(n.style.fills, 'style.fills');
+        paints(textFills, 'style.fills');
         paints(n.appearance.strokes.paints, 'strokes.paints');
         for (final (pi, p) in n.content.indexed) {
           for (final (si, s) in p.spans.indexed) {

@@ -148,10 +148,12 @@ void main() {
 
       final text = root.children[0] as TextNode;
       expect(text.effectiveBlendMode, BlendMode.normal);
-      expect(text.style.fontSize, 16);
-      expect(text.style.fontWeight, 400);
-      expect(text.style.lineHeight, const LineHeight.auto());
-      expect(text.style.fills, kDefaultTextFills);
+      expect(text.style, const TextStyleOverride());
+      final d = doc.defaultTextStyle;
+      expect(d.fontSize, 16);
+      expect(d.fontWeight, 400);
+      expect(d.lineHeight, const LineHeight.auto());
+      expect(d.fills, kDefaultTextFills);
       expect(text.autoResize, TextAutoResize.widthAndHeight);
       expect(text.content.single.spans.single.style, const TextStyleOverride());
 

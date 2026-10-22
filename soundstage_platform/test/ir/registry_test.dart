@@ -39,7 +39,7 @@ const Map<NodeKind, List<Node>> _nodes = {
         strokes: Stroke(paints: _paints),
         effects: _effects,
       ),
-      style: TextStyle(fills: _paints),
+      style: TextStyleOverride(fills: _paints),
       content: [
         Paragraph(
           spans: [

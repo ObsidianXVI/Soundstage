@@ -1281,132 +1281,6 @@ final Codec<TextDecorationStyle> _decorationStyleC = enumC(
   {TextDecorationStyle.doubleLine: 'double'},
 );
 
-/// `style.*` on a complete [TextStyle] (the node's base style).
-void _textStyleProps(_Builder b, String prefix, Lens<Node, TextStyle> style) {
-  void f<A extends Object>(
-    String name,
-    Codec<A> codec,
-    A Function(TextStyle s) get,
-    TextStyle Function(TextStyle s, A v) set, {
-    Invalidation inv = _layout,
-  }) => b.add(
-    '$prefix.$name',
-    _text,
-    style.leaf(field(codec, get, set)),
-    inv: inv,
-  );
-
-  b.add(
-    '$prefix.fontFamilyId',
-    _text,
-    style.leaf(
-      optField(
-        strC,
-        (s) => s.fontFamilyId,
-        (s, v) => s.copyWith(fontFamilyId: v),
-      ),
-    ),
-    inv: _layout,
-  );
-  f(
-    'fontWeight',
-    intC(continuous: true, min: 1, max: 1000),
-    (s) => s.fontWeight,
-    (s, v) => s.copyWith(fontWeight: v),
-  );
-  f('italic', boolC, (s) => s.italic, (s, v) => s.copyWith(italic: v));
-  b.add(
-    '$prefix.fontVariations.<axisTag>',
-    _text,
-    style.leaf(
-      mapEntry(
-        numC,
-        'axisTag',
-        (s) => s.fontVariations,
-        (s, m) => s.copyWith(fontVariations: m),
-      ),
-    ),
-    inv: _layout,
-  );
-  f('fontSize', numC, (s) => s.fontSize, (s, v) => s.copyWith(fontSize: v));
-  f(
-    'lineHeight',
-    lineHeightC,
-    (s) => s.lineHeight,
-    (s, v) => s.copyWith(lineHeight: v),
-  );
-  f(
-    'letterSpacing',
-    letterSpacingC,
-    (s) => s.letterSpacing,
-    (s, v) => s.copyWith(letterSpacing: v),
-  );
-  f(
-    'paragraphSpacing',
-    numC,
-    (s) => s.paragraphSpacing,
-    (s, v) => s.copyWith(paragraphSpacing: v),
-  );
-  f(
-    'paragraphIndent',
-    numC,
-    (s) => s.paragraphIndent,
-    (s, v) => s.copyWith(paragraphIndent: v),
-  );
-  f(
-    'textCase',
-    enumC(TextCase.values),
-    (s) => s.textCase,
-    (s, v) => s.copyWith(textCase: v),
-  );
-  _decorationProps(
-    b,
-    '$prefix.decoration',
-    style.then(
-      sub<TextStyle, TextDecoration>(
-        (s) => s.decoration,
-        (s, d) => s.copyWith(decoration: d),
-      ),
-    ),
-  );
-  _paintProps(
-    b,
-    '$prefix.fills',
-    _text,
-    style.then(
-      sub<TextStyle, List<Paint>>(
-        (s) => s.fills,
-        (s, f) => s.copyWith(fills: f),
-      ),
-    ),
-  );
-  b.add(
-    '$prefix.openType.<featureTag>',
-    _text,
-    style.leaf(
-      mapEntry(
-        intC(),
-        'featureTag',
-        (s) => s.openType,
-        (s, m) => s.copyWith(openType: m),
-      ),
-    ),
-    inv: _layout,
-  );
-  f(
-    'baselineShift',
-    enumC(BaselineShift.values),
-    (s) => s.baselineShift,
-    (s, v) => s.copyWith(baselineShift: v),
-  );
-  f(
-    'listStyle',
-    enumC(ListStyle.values),
-    (s) => s.listStyle,
-    (s, v) => s.copyWith(listStyle: v),
-  );
-}
-
 void _decorationProps(
   _Builder b,
   String prefix,
@@ -1449,7 +1323,7 @@ void _decorationProps(
   );
 }
 
-/// `…style.*` on a partial [TextStyleOverride] (spans). Every field is
+/// `…style.*` on a partial [TextStyleOverride] (node and spans). Every field is
 /// nullable: `none` clears it back to "inherit".
 void _textOverrideProps(
   _Builder b,
@@ -1678,11 +1552,14 @@ void _textProps(_Builder b) {
     (n, v) => n.copyWith(leadingTrim: v),
   );
 
-  _textStyleProps(
+  _textOverrideProps(
     b,
     'style',
     _asText.then(
-      sub<TextNode, TextStyle>((n) => n.style, (n, s) => n.copyWith(style: s)),
+      sub<TextNode, TextStyleOverride>(
+        (n) => n.style,
+        (n, s) => n.copyWith(style: s),
+      ),
     ),
   );
 

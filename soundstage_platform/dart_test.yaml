@@ -1,0 +1,7 @@
+tags:
+  # Timing-sensitive performance budgets (architecture §18). Files are named
+  # `*_bench.dart`, so a plain `flutter test` does not pick them up. Run:
+  #   flutter test --tags bench test/bench/resolver_bench.dart
+  #   flutter test --platform chrome --tags bench test/bench/resolver_bench.dart
+  bench:
+    timeout: 3x

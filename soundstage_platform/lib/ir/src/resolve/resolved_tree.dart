@@ -35,7 +35,8 @@ abstract class ResolvedSpan with _$ResolvedSpan {
   const factory ResolvedSpan({
     required String text,
 
-    /// Node style ⊕ named text style ⊕ paragraph style ⊕ span override,
+    /// Document default ⊕ named text style ⊕ node override ⊕ paragraph style ⊕
+    /// span override,
     /// with tokens resolved. Complete: the runtime never merges styles.
     required TextStyle style,
     SpanLink? link,

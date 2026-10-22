@@ -131,7 +131,7 @@ final tokens = TokenSystem(
   textStyles: {
     'tsBody': TextStyleDef(
       name: 'Body',
-      style: const TextStyle(fontSize: 18, fontWeight: 500),
+      style: const TextStyleOverride(fontSize: 18, fontWeight: 500),
       bindings: {'fills.text.color': ref('vBrand')},
     ),
   },
@@ -328,7 +328,7 @@ StageDocument buildDoc() => StageDocument(
             },
           ),
           textStyleId: 'tsBody',
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyleOverride(fontSize: 12),
           content: const [
             Paragraph(
               style: ParagraphStyle(
@@ -435,7 +435,6 @@ void main() {
       final label = desktop.nodeIndex['i1/bLabel']!;
       expect(label.paragraphs!.single.spans.single.text, 'Go');
       expect(label.paragraphs!.single.spans.single.style.fontSize, 30);
-      expect(nodeOf<TextNode>(desktop, 'i1/bLabel').style.fontSize, 30);
       final icon = nodeOf<FrameNode>(desktop, 'i1/bIcon');
       expect(icon.common.visible, isFalse);
       expect((icon.appearance.fills.single as ImagePaint).assetId, 'aHero');
@@ -456,7 +455,6 @@ void main() {
       expect(desktop.nodeIndex['i2/cTitle']!.instanceId, 'i2');
       final label = desktop.nodeIndex['i2/cBtn/bLabel']!;
       expect(label.paragraphs!.single.spans.single.text, 'Outer');
-      expect(nodeOf<TextNode>(desktop, 'i2/cBtn/bLabel').style.fontSize, 40);
       expect(label.instanceId, 'i2/cBtn');
     });
 
@@ -631,29 +629,30 @@ void main() {
   });
 
   group('styles', () {
-    test('text style merges under local values; spans are fully merged', () {
+    test('node override beats the named style; spans are fully merged', () {
       final t = desktop.nodeIndex['txt']!;
-      final base = (t.node as TextNode).style;
-      expect(base.fontSize, 18); // named style beats the detached node style
-      expect(base.fontWeight, 500);
+      final p = t.paragraphs!.single;
+      final base = p.spans[0].style;
+      expect(base.fontSize, 12); // node override beats the named style (18)
+      expect(base.fontWeight, 500); // from the named style
       expect(
         (base.fills.single as SolidPaint).color,
         red,
       ); // token-bound style field
-      final p = t.paragraphs!.single;
       expect(p.alignHorizontal, TextAlignHorizontal.right);
       expect(p.paragraphSpacing, 8);
       expect(p.spans[0].style.fontWeight, 500);
       expect(p.spans[1].style.fontWeight, 700);
       expect(p.spans[1].style.paragraphSpacing, 8);
+      // The resolved node carries no style references; paragraphs are the result.
       expect((t.node as TextNode).textStyleId, isNull);
-      // At mobile a local (patched) value wins over the named style.
+      expect((t.node as TextNode).style, const TextStyleOverride());
+      // At mobile a patched value is written into the node override.
       final m = mobile.nodeIndex['txt']!;
       expect(
-        (m.node as TextNode).style.letterSpacing,
+        m.paragraphs!.single.spans[0].style.letterSpacing,
         const LetterSpacing.px(2),
       );
-      expect((m.node as TextNode).style.fontSize, 18);
       expect(
         m.paragraphs!.single.spans[1].style.letterSpacing,
         const LetterSpacing.px(2),

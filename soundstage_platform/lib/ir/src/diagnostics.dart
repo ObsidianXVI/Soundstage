@@ -21,7 +21,34 @@ enum IrDiagnosticKind {
   missingStyle,
   missingAsset,
   missingTrackTarget,
+
+  // Validator (`validateDocument`) kinds.
+  /// A node id is used twice (document-wide, or within one component).
+  duplicateNodeId,
+
+  /// Another id (breakpoint, scene, clock, track, keyframe, variable, mode,
+  /// audio track, interaction, paint or effect) is used twice in its scope.
+  duplicateId,
+
+  /// A map entry's key differs from the `id` of its value.
+  idMismatch,
+  missingVariantSet,
+  missingFont,
+  missingClock,
+  missingAudioTrack,
+  missingScene,
+  missingNode,
+
+  /// A referenced asset exists but has the wrong kind.
+  wrongAssetKind,
+
+  /// The document could not be parsed at all (`loadDocument`).
+  invalidDocument,
 }
+
+/// How serious a diagnostic is. Errors make a document unsafe to publish;
+/// warnings are tolerated by the resolver and runtime.
+enum IrSeverity { error, warning }
 
 /// A non-fatal problem found while patching or resolving a document. The
 /// editor often holds temporarily broken documents, so operations report
@@ -36,5 +63,16 @@ abstract class IrDiagnostic with _$IrDiagnostic {
     String message, {
     String? nodeId,
     String? path,
+    @Default(IrSeverity.error) IrSeverity severity,
+
+    /// Where in the document the problem is, e.g.
+    /// `scenes[0].root.children[2].common.interactions[0]`. Set by the
+    /// validator.
+    String? location,
   }) = _IrDiagnostic;
+
+  const IrDiagnostic._();
+
+  /// A stable machine-readable code (the kind's name).
+  String get code => kind.name;
 }

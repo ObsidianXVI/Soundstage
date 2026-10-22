@@ -283,7 +283,7 @@ TextNode fullText(String id) => TextNode(
     Paragraph(spans: [Span(text: 'Second')]),
   ],
   textStyleId: 'tsBody',
-  style: textStyle,
+  style: styleOverride,
   autoResize: TextAutoResize.truncate,
   maxLines: 3,
   truncation: TextTruncation.ending,
@@ -580,7 +580,7 @@ const tokenSystem = TokenSystem(
   textStyles: {
     'tsBody': TextStyleDef(
       name: 'Body',
-      style: textStyle,
+      style: styleOverride,
       bindings: {'fontFamilyId': TokenRef(variableId: 'vFont')},
     ),
   },
@@ -800,6 +800,7 @@ StageDocument compositeDocument() {
     breakpoints: breakpoints,
     baseBreakpointId: 'bpDesktop',
     tokens: tokenSystem,
+    defaultTextStyle: textStyle,
     assets: {
       'aHero': asset,
       'aSong': const Asset(
