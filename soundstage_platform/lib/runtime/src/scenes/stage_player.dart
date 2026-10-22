@@ -131,10 +131,10 @@ class _StagePlayerState extends State<StagePlayer>
     _env = _environmentFor(widget);
     _animator = _newAnimator();
     _attachController(widget.controller);
-    widget.audio?.addSeekListener(_audioSeeked);
+    widget.audio?.addClockListener(_audioChanged);
   }
 
-  void _audioSeeked() => _animator.notifyClockChanged();
+  void _audioChanged() => _animator.notifyClockChanged();
 
   StageClockFactories get _factories {
     final f = widget.clockFactories;
@@ -181,8 +181,8 @@ class _StagePlayerState extends State<StagePlayer>
             !identical(old.document, widget.document));
     if (envChanged) _env = _environmentFor(widget);
     if (!identical(old.audio, widget.audio)) {
-      old.audio?.removeSeekListener(_audioSeeked);
-      widget.audio?.addSeekListener(_audioSeeked);
+      old.audio?.removeClockListener(_audioChanged);
+      widget.audio?.addClockListener(_audioChanged);
     }
     if (old.mode != widget.mode ||
         !identical(old.audio, widget.audio) ||
@@ -206,7 +206,7 @@ class _StagePlayerState extends State<StagePlayer>
 
   @override
   void dispose() {
-    widget.audio?.removeSeekListener(_audioSeeked);
+    widget.audio?.removeClockListener(_audioChanged);
     _detachController(widget.controller);
     _animator.dispose();
     _scroll.dispose();

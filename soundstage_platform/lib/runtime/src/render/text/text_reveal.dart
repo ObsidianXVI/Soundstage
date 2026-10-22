@@ -60,7 +60,8 @@ class RevealTiming {
   double unit(int i, double p) {
     if (duration <= 0) return p >= 1 ? 1 : 0;
     final v = (p * total - i * stagger) / duration;
-    return v < 0 ? 0 : (v > 1 ? 1 : v);
+    // Snap rounding noise at the end so finished units paint whole.
+    return v < 0 ? 0 : (v > 1 - 1e-9 ? 1 : v);
   }
 }
 
@@ -106,6 +107,9 @@ List<TextRange> revealTextUnits(String text, ir.TextRevealUnit unit) {
 /// Set on a `StageTextLayout` while painting.
 abstract class StageTextRevealPaint {
   ir.TextRevealUnit get unit;
+
+  /// Called before the node paints (its layout is current).
+  void beginPaint() {}
 
   /// The linear progress (0–1) of the node's unit [i] (node-local index).
   double unitProgress(int i);

@@ -136,8 +136,9 @@ class StageAudioTrackState {
 ///   for tracks that do not loop, before the natural end. Fades run on a
 ///   timer while needed ([advance] steps them; tests call it directly).
 /// - **Clocks.** [clockSource] creates the `audio` clock sources for
-///   `StageClockFactories.audio`; seeks notify [addSeekListener] listeners
-///   (the player's animator) so clocks re-read at once.
+///   `StageClockFactories.audio`; seeks and starts notify
+///   [addClockListener] listeners (the player's animator) so clocks re-read
+///   at once and the player ticks while audio plays.
 class StageAudioService {
   StageAudioService({
     required List<ir.AudioTrack> tracks,
@@ -169,7 +170,7 @@ class StageAudioService {
 
   final Map<String, StageAudioTrackState> _tracks = {};
   final Map<String, bool> _sceneVisible = {};
-  final List<VoidCallback> _seekListeners = [];
+  final List<VoidCallback> _clockListeners = [];
   Future<void>? _preload;
   Timer? _timer;
   final Stopwatch _watch = Stopwatch();
@@ -184,8 +185,8 @@ class StageAudioService {
 
   Iterable<StageAudioTrackState> get tracks => _tracks.values;
 
-  void addSeekListener(VoidCallback l) => _seekListeners.add(l);
-  void removeSeekListener(VoidCallback l) => _seekListeners.remove(l);
+  void addClockListener(VoidCallback l) => _clockListeners.add(l);
+  void removeClockListener(VoidCallback l) => _clockListeners.remove(l);
 
   /// Loads every track's source once (idempotent). Never throws: a track
   /// that fails keeps [StageAudioTrackState.loadError] and stays silent.
@@ -265,7 +266,13 @@ class StageAudioService {
     s.seekGeneration++;
     s._endFading = false;
     await s.backend.seek(math.max(0, seconds));
-    for (final l in List.of(_seekListeners)) {
+    _notify();
+  }
+
+  /// Tells clock listeners that a position jumped or playback started, so
+  /// the player re-reads (and keeps ticking) its audio clocks.
+  void _notify() {
+    for (final l in List.of(_clockListeners)) {
       l();
     }
   }
@@ -287,6 +294,7 @@ class StageAudioService {
     }
     if (!s.isPlaying) s.backend.play();
     _ensureTicking();
+    _notify();
   }
 
   void _stop(StageAudioTrackState s) {
@@ -397,7 +405,7 @@ class StageAudioService {
     _disposed = true;
     _timer?.cancel();
     _timer = null;
-    _seekListeners.clear();
+    _clockListeners.clear();
     await Future.wait([for (final s in _tracks.values) s.backend.dispose()]);
   }
 }

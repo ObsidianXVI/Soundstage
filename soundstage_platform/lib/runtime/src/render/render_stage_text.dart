@@ -284,6 +284,7 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
     _paint
       ..relayout()
       ..reveal = _reveal;
+    _reveal?.beginPaint();
     paintStageText(
       context: context,
       offset: offset,

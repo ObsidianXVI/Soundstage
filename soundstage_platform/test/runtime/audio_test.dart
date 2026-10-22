@@ -132,7 +132,7 @@ void main() {
         sceneId: 's',
       )!;
       var notified = 0;
-      service.addSeekListener(() => notified++);
+      service.addClockListener(() => notified++);
       clock.advance(1 / 60);
       await service.seek('song', 12.5);
       expect(notified, 1);

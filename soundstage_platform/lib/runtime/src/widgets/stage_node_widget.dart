@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../render/render_stage_frame.dart';
+import '../render/render_stage_lyrics.dart';
 import '../render/render_stage_shape.dart';
 import '../render/render_stage_text.dart';
 import '../render/stage_environment.dart';
@@ -61,11 +62,23 @@ class StageNodeWidget extends StatelessWidget {
         placeholder: node.isPlaceholder,
         children: [
           for (final child in node.children)
-            StageNodeWidget(
-              key: ValueKey<String>(child.id),
-              node: child,
-              repaintBoundaryIds: repaintBoundaryIds,
-            ),
+            if (frame.behavior case final ir.LyricsBehavior lyrics
+                when identical(child, lyricsTemplateOf(node)))
+              StageLyricsWidget(
+                key: ValueKey<String>(child.id),
+                node: child.node as ir.TextNode,
+                paragraphs: child.paragraphs ?? const [],
+                behavior: lyrics,
+                lyrics: env.audioTracks[lyrics.audioTrackId]?.lyrics,
+                environment: env,
+                repaintBoundary: true,
+              )
+            else
+              StageNodeWidget(
+                key: ValueKey<String>(child.id),
+                node: child,
+                repaintBoundaryIds: repaintBoundaryIds,
+              ),
         ],
       ),
       final ir.TextNode text => StageTextWidget(
@@ -80,6 +93,61 @@ class StageNodeWidget extends StatelessWidget {
         repaintBoundary: boundary,
       ),
     };
+  }
+}
+
+/// The line template of a `Lyrics` frame: its first text child (null when
+/// it has none, and the behaviour renders nothing).
+ir.ResolvedNode? lyricsTemplateOf(ir.ResolvedNode frame) {
+  for (final c in frame.children) {
+    if (c.node is ir.TextNode) return c;
+  }
+  return null;
+}
+
+/// The render-object widget of a `Lyrics` line stack (see
+/// [RenderStageLyrics]).
+class StageLyricsWidget extends LeafRenderObjectWidget {
+  const StageLyricsWidget({
+    super.key,
+    required this.node,
+    required this.paragraphs,
+    required this.behavior,
+    required this.lyrics,
+    required this.environment,
+    this.repaintBoundary = false,
+  });
+
+  final ir.TextNode node;
+  final List<ir.ResolvedParagraph> paragraphs;
+  final ir.LyricsBehavior behavior;
+  final ir.LyricsDoc? lyrics;
+  final StageEnvironment environment;
+  final bool repaintBoundary;
+
+  @override
+  RenderStageLyrics createRenderObject(BuildContext context) =>
+      RenderStageLyrics(
+        node: node,
+        paragraphs: paragraphs,
+        behavior: behavior,
+        lyrics: lyrics,
+        environment: environment,
+        repaintBoundary: repaintBoundary,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    RenderStageLyrics renderObject,
+  ) {
+    renderObject
+      ..node = node
+      ..paragraphs = paragraphs
+      ..behavior = behavior
+      ..lyrics = lyrics
+      ..environment = environment
+      ..repaintBoundary = repaintBoundary;
   }
 }
 

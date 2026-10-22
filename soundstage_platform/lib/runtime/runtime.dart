@@ -6,6 +6,7 @@
 /// names collide with Flutter's.
 library;
 
+export 'src/animator/behavior_drivers.dart';
 export 'src/animator/compiled_easing.dart';
 export 'src/animator/compiled_track.dart';
 export 'src/animator/node_registry.dart';
@@ -26,6 +27,7 @@ export 'src/render/layout/auto_layout.dart';
 export 'src/render/layout/constraints.dart';
 export 'src/render/render_stage_box.dart';
 export 'src/render/render_stage_frame.dart';
+export 'src/render/render_stage_lyrics.dart';
 export 'src/render/render_stage_scene.dart';
 export 'src/render/render_stage_shape.dart';
 export 'src/render/render_stage_text.dart';

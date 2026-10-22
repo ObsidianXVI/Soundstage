@@ -7,6 +7,7 @@ import '../clocks/smoothing.dart';
 import '../clocks/timeline_clock.dart';
 import '../render/render_stage_box.dart';
 import '../render/stage_environment.dart';
+import 'behavior_drivers.dart';
 import 'compiled_track.dart';
 import 'node_registry.dart';
 import 'text_style_tracks.dart';
@@ -65,6 +66,7 @@ class StageAnimator implements StageNodeListener {
   final Map<String, _Clock> _byKey = {};
   final Map<String, List<_Binding>> _byTarget = {};
   final Map<String, _NodeTarget> _nodeTargets = {};
+  final Map<String, List<StageBehaviorDriver>> _drivers = {};
   final Map<String, List<_Clock>> _scrollClocks = {};
   final Map<String, List<_Clock>> _sceneClocks = {};
   final Map<String, bool> _sceneVisible = {};
@@ -119,6 +121,14 @@ class StageAnimator implements StageNodeListener {
     for (final t in _nodeTargets.values) {
       t.box?.nodeAnimator = null;
     }
+    _drivers.forEach((id, list) {
+      final box = registry[id];
+      if (box == null) return;
+      for (final d in list) {
+        d.detach(box);
+      }
+    });
+    _drivers.clear();
     _byTarget.clear();
     _nodeTargets.clear();
     _scrollClocks.clear();
@@ -133,7 +143,9 @@ class StageAnimator implements StageNodeListener {
         final key = '${scene.id}\u0000${clock.id}';
         final old = previous.remove(key);
         final c = old != null && old.clock == clock
-            ? (old..bindings.clear())
+            ? (old
+                ..bindings.clear()
+                ..drivers.clear())
             : _newClock(scene.id, clock);
         if (old != null && !identical(old, c)) old.source.dispose();
         _clocks.add(c);
@@ -145,6 +157,36 @@ class StageAnimator implements StageNodeListener {
         final visible = _sceneVisible[scene.id];
         if (visible != null) {
           c.source.sceneVisibilityChanged(visible: visible);
+        }
+      }
+      // Behaviours (TextReveal, Lyrics) follow a clock like tracks do.
+      for (final d in behaviorDriversFor(scene)) {
+        final own = d.ownClock;
+        _Clock? c;
+        if (own != null) {
+          final key = '${scene.id}\u0000${own.id}';
+          final old = previous.remove(key);
+          c = old != null && old.clock == own
+              ? (old
+                  ..bindings.clear()
+                  ..drivers.clear())
+              : _newClock(scene.id, own);
+          if (old != null && !identical(old, c)) old.source.dispose();
+          _clocks.add(c);
+          _byKey[key] = c;
+          (_sceneClocks[scene.id] ??= []).add(c);
+          final visible = _sceneVisible[scene.id];
+          if (visible != null) {
+            c.source.sceneVisibilityChanged(visible: visible);
+          }
+        } else {
+          c = _byKey['${scene.id}\u0000${d.clockId}'];
+        }
+        if (c == null) continue;
+        c.drivers.add(d);
+        d.update(c.value);
+        for (final id in d.targetIds) {
+          (_drivers[id] ??= []).add(d);
         }
       }
       for (final track in scene.tracks) {
@@ -168,7 +210,7 @@ class StageAnimator implements StageNodeListener {
     for (final old in previous.values) {
       old.source.dispose();
     }
-    for (final id in _byTarget.keys) {
+    for (final id in {..._byTarget.keys, ..._drivers.keys}) {
       final box = registry[id];
       if (box != null) nodeAttached(box);
     }
@@ -197,6 +239,9 @@ class StageAnimator implements StageNodeListener {
 
   @override
   void nodeAttached(RenderStageBox box) {
+    for (final d in _drivers[box.nodeId] ?? const <StageBehaviorDriver>[]) {
+      d.attach(box);
+    }
     final list = _byTarget[box.nodeId];
     if (list == null) return;
     for (final b in list) {
@@ -226,6 +271,9 @@ class StageAnimator implements StageNodeListener {
 
   @override
   void nodeDetached(RenderStageBox box) {
+    for (final d in _drivers[box.nodeId] ?? const <StageBehaviorDriver>[]) {
+      d.detach(box);
+    }
     final list = _byTarget[box.nodeId];
     if (list == null) return;
     for (final b in list) {
@@ -426,6 +474,10 @@ class StageAnimator implements StageNodeListener {
         }
       }
     }
+    final drivers = c.drivers;
+    for (var i = 0; i < drivers.length; i++) {
+      drivers[i].update(v);
+    }
   }
 
   void _flush() {
@@ -458,6 +510,7 @@ class _Clock {
   final StageClockSource source;
   final StageSmoother smoother;
   final List<_Binding> bindings = [];
+  final List<StageBehaviorDriver> drivers = [];
 
   /// The current (smoothed) value.
   double value = 0;
