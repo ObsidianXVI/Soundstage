@@ -1,3 +1,8 @@
+// Reads the demo with dart:io (the web test runner never completes a
+// rootBundle load, see test/runtime/demo_document_test.dart).
+@TestOn('vm')
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
