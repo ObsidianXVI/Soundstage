@@ -32,8 +32,12 @@ class RenderStageShape extends RenderStageBox {
   };
 
   @override
+  bool get supportsAppearanceOverrides => true;
+
+  @override
   EdgeInsets get strokeOutsets {
-    final s = appearance.strokes;
+    final o = appearanceOverrides;
+    final s = o == null ? appearance.strokes : o.stroke(appearance.strokes);
     // Lines have no inside: their stroke is always centred.
     return geometry is ir.LineGeometry
         ? strokeOutsetsOf(s.copyWith(align: ir.StrokeAlign.center))
@@ -85,11 +89,14 @@ class RenderStageShape extends RenderStageBox {
         appearance.fills,
         appearance.strokes,
         appearance.effects,
+        appearanceOverrides,
       ) >
       1;
 
   @override
-  bool get hasEffectLayers => hasLayerEffects(appearance.effects);
+  bool get hasEffectLayers => inBlendGroup
+      ? hasBackgroundBlur(appearance.effects, appearanceOverrides)
+      : hasLayerEffects(appearance.effects, appearanceOverrides);
 
   @override
   void paintStage(PaintingContext context, Offset offset) {
@@ -97,11 +104,14 @@ class RenderStageShape extends RenderStageBox {
     if (a.fills.isEmpty && a.strokes.paints.isEmpty && a.effects.isEmpty) {
       return;
     }
+    final o = appearanceOverrides;
     final outline = shapeOutline(
       geometry,
       size,
-      cornerRadius: a.cornerRadius,
-      cornerSmoothing: a.cornerSmoothing,
+      cornerRadius: o == null ? a.cornerRadius : o.cornerRadius(a.cornerRadius),
+      cornerSmoothing: o == null
+          ? a.cornerSmoothing
+          : o.cornerSmoothing(a.cornerSmoothing),
     );
     final env = environment;
     paintStageAppearance(
@@ -115,6 +125,8 @@ class RenderStageShape extends RenderStageBox {
       onImageReady: _onImageReady,
       devicePixelRatio: stageDevicePixelRatio(),
       opacity: paintOpacity,
+      overrides: o,
+      composited: !inBlendGroup,
     );
   }
 

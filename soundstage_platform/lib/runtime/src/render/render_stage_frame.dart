@@ -84,7 +84,36 @@ class RenderStageFrame extends RenderStageBox
       _autoLayout != null && layoutChild.verticalSizing == ir.Sizing.hug;
 
   @override
-  EdgeInsets get strokeOutsets => strokeOutsetsOf(frame.appearance.strokes);
+  bool get supportsAppearanceOverrides => true;
+
+  @override
+  EdgeInsets get strokeOutsets {
+    final s = frame.appearance.strokes;
+    final o = appearanceOverrides;
+    return strokeOutsetsOf(o == null ? s : o.stroke(s));
+  }
+
+  @override
+  bool get includesChildStrokesInLayout =>
+      _autoLayout?.strokesIncludedInLayout ?? false;
+
+  @override
+  void adoptChild(RenderObject child) {
+    super.adoptChild(child);
+    if (child is RenderStageBox &&
+        blendNeedsIsolation(child.node.effectiveBlendMode)) {
+      childBlendChanged();
+    }
+  }
+
+  @override
+  void dropChild(RenderObject child) {
+    super.dropChild(child);
+    if (child is RenderStageBox &&
+        blendNeedsIsolation(child.node.effectiveBlendMode)) {
+      childBlendChanged();
+    }
+  }
 
   @override
   bool get clipsHitTesting => frame.clipContent;
@@ -319,11 +348,14 @@ class RenderStageFrame extends RenderStageBox
             _appearance.fills,
             _appearance.strokes,
             _appearance.effects,
+            appearanceOverrides,
           ) >
           1;
 
   @override
-  bool get hasEffectLayers => hasLayerEffects(_appearance.effects);
+  bool get hasEffectLayers => inBlendGroup
+      ? hasBackgroundBlur(_appearance.effects, appearanceOverrides)
+      : hasLayerEffects(_appearance.effects, appearanceOverrides);
 
   @override
   bool get isolatesBlend {
@@ -344,10 +376,15 @@ class RenderStageFrame extends RenderStageBox
   void paintStage(PaintingContext context, Offset offset) {
     final env = environment;
     final appearance = _appearance;
+    final o = appearanceOverrides;
     final outline = StageOutline.box(
       size,
-      appearance.cornerRadius,
-      smoothing: appearance.cornerSmoothing,
+      o == null
+          ? appearance.cornerRadius
+          : o.cornerRadius(appearance.cornerRadius),
+      smoothing: o == null
+          ? appearance.cornerSmoothing
+          : o.cornerSmoothing(appearance.cornerSmoothing),
     );
     paintStageAppearance(
       context: context,
@@ -360,6 +397,8 @@ class RenderStageFrame extends RenderStageBox
       onImageReady: _onImageReady,
       devicePixelRatio: stageDevicePixelRatio(),
       opacity: paintOpacity,
+      overrides: o,
+      composited: !inBlendGroup,
       paintChildren: (ctx, off) {
         if (frame.clipContent) {
           _layers.pushOutlineClip(

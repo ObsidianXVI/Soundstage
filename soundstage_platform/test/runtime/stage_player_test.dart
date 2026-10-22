@@ -276,7 +276,11 @@ void main() {
         0,
         reason: 'paint-class tracks never relayout',
       );
-      expect(RenderStageBox.debugPaintCount - paints, greaterThan(0));
+      expect(
+        RenderStageBox.debugPaintCount - paints,
+        0,
+        reason: 'opacity and motion update composited layers, no re-record',
+      );
 
       // Crossing the window boundary builds exactly the entering scene.
       debugOnRebuildDirtyWidget = (e, _) =>

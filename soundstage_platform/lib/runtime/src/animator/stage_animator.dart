@@ -5,6 +5,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../clocks/clock_source.dart';
 import '../clocks/smoothing.dart';
 import '../clocks/timeline_clock.dart';
+import '../paint/appearance_overrides.dart';
 import '../render/render_stage_box.dart';
 import '../render/stage_environment.dart';
 import 'compiled_track.dart';
@@ -18,11 +19,17 @@ import 'node_registry.dart';
 ///   (through the [StageNodeRegistry]); tracks of scenes outside the lazy
 ///   window have no target and cost nothing.
 /// - `opacity` and `motion.*` tracks write typed slots on the render object
-///   ([RenderStageBox.setAnimatedSlot], allocation-free, paint only). Every
-///   other property goes through the node's [RenderStageBox.nodeAnimator],
-///   which re-applies the node's animated values through the property
-///   registry (allocates a node copy per changed node per frame; paint or
-///   layout invalidation by what changed).
+///   ([RenderStageBox.setAnimatedSlot], allocation-free; a repaint boundary
+///   only updates its composited layers).
+/// - Numeric and colour appearance tracks on frames and shapes (fills and
+///   stroke paints: colour, opacity, gradient stops; stroke weight; effect
+///   colour, offset, blur, spread, radius; corner radii and smoothing)
+///   write typed paint overrides ([RenderStageBox.addAppearanceOverride],
+///   allocation-free, read by the paint seam at paint time).
+/// - Every other property goes through the node's
+///   [RenderStageBox.nodeAnimator], which re-applies the node's animated
+///   values through the property registry (allocates a node copy per
+///   changed node per frame; paint or layout invalidation by what changed).
 /// - **One ticker.** It runs only while something moves by itself: a
 ///   playing timeline, an active audio source, or a smoothed clock that has
 ///   not settled. Each tick advances sources, applies smoothing, and
@@ -112,6 +119,7 @@ class StageAnimator implements StageNodeListener {
       for (final b in list) {
         final box = b.box;
         if (box != null && b.slot >= 0) box.setAnimatedSlot(b.slot, double.nan);
+        if (box != null && b.channel != null) box.clearAppearanceOverrides();
       }
     }
     for (final t in _nodeTargets.values) {
@@ -151,7 +159,12 @@ class StageAnimator implements StageNodeListener {
         final compiled = CompiledTrack.compile(track, registry: properties);
         if (compiled.match == null || compiled.keyframes.isEmpty) continue;
         final slot = RenderStageBox.slotForPath(track.property);
-        final binding = _Binding(compiled, track.target, slot, clock);
+        StageAppearancePath? typed;
+        if (slot < 0 && compiled.isTyped) {
+          typed = StageAppearancePath.parse(track.property);
+          if (typed != null && typed.stride != compiled.stride) typed = null;
+        }
+        final binding = _Binding(compiled, track.target, slot, clock, typed);
         clock.bindings.add(binding);
         (_byTarget[track.target] ??= []).add(binding);
         if (slot < 0) {
@@ -197,15 +210,23 @@ class StageAnimator implements StageNodeListener {
   void nodeAttached(RenderStageBox box) {
     final list = _byTarget[box.nodeId];
     if (list == null) return;
+    // Typed paint overrides are re-added on every attach.
+    box.clearAppearanceOverrides();
     for (final b in list) {
       b.box = box;
+      b.channel = null;
       b.track.evaluate(b.clock.value);
-      if (b.slot >= 0) box.setAnimatedSlot(b.slot, b.track.scalar);
+      if (b.slot >= 0) {
+        box.setAnimatedSlot(b.slot, b.track.scalar);
+      } else if (b.typed != null && box.supportsAppearanceOverrides) {
+        final channel = b.channel = box.addAppearanceOverride(b.typed!);
+        channel.write(b.track.out, uniform: b.track.outputUniform);
+      }
     }
     final target = _nodeTargets[box.nodeId];
     if (target != null) {
       target.box = box;
-      box.nodeAnimator = target.animate;
+      box.nodeAnimator = target.usesRegistry ? target.animate : null;
     }
   }
 
@@ -214,7 +235,10 @@ class StageAnimator implements StageNodeListener {
     final list = _byTarget[box.nodeId];
     if (list == null) return;
     for (final b in list) {
-      if (identical(b.box, box)) b.box = null;
+      if (identical(b.box, box)) {
+        b.box = null;
+        b.channel = null;
+      }
     }
     final target = _nodeTargets[box.nodeId];
     if (target != null && identical(target.box, box)) target.box = null;
@@ -291,11 +315,13 @@ class StageAnimator implements StageNodeListener {
 
   /// A source changed from outside the ticker. Unsmoothed clocks evaluate
   /// now when [immediate]; others are picked up by the next tick.
+  @pragma('vm:prefer-inline')
   void _external(_Clock c, {required bool immediate}) {
     if (mode == StageRenderMode.edit) return;
     if (c.smoother.smoothing <= 0 && immediate) {
-      c.smoother.reset(c.source.value);
-      _setValue(c, c.source.value);
+      final v = c.source.value;
+      c.smoother.reset(v);
+      _setValue(c, v);
     } else {
       c.pending = true;
     }
@@ -386,6 +412,7 @@ class StageAnimator implements StageNodeListener {
     _flush();
   }
 
+  @pragma('vm:prefer-inline')
   void _setValue(_Clock c, double v) {
     c.value = v;
     if (c.evaluatedAt == v) return;
@@ -396,8 +423,12 @@ class StageAnimator implements StageNodeListener {
       final box = b.box;
       if (box == null) continue;
       if (!b.track.evaluate(v)) continue;
+      final channel = b.channel;
       if (b.slot >= 0) {
-        box.setAnimatedSlot(b.slot, b.track.scalar);
+        box.setAnimatedSlotFrom(b.slot, b.track.out, 0);
+      } else if (channel != null) {
+        channel.write(b.track.out, uniform: b.track.outputUniform);
+        box.appearanceOverrideChanged(channel);
       } else {
         final target = b.node!;
         if (!target.dirty) {
@@ -458,7 +489,7 @@ class _Clock {
 }
 
 class _Binding {
-  _Binding(this.track, this.targetId, this.slot, this.clock);
+  _Binding(this.track, this.targetId, this.slot, this.clock, this.typed);
 
   final CompiledTrack track;
   final String targetId;
@@ -466,8 +497,15 @@ class _Binding {
   /// The typed slot (`opacity`, `motion.*`), or −1 for node-level.
   final int slot;
   final _Clock clock;
+
+  /// The typed paint override path, when the property has one and the
+  /// track is fully typed. Used when the bound box supports it.
+  final StageAppearancePath? typed;
   RenderStageBox? box;
   _NodeTarget? node;
+
+  /// The bound typed paint override (null: slot or registry path).
+  StageAppearanceChannel? channel;
 }
 
 /// A node with node-level (non-slot) animated properties.
@@ -481,9 +519,18 @@ class _NodeTarget {
 
   late final ir.Node Function(ir.Node) animate = _apply;
 
+  /// Whether any binding goes through the registry (has no typed channel).
+  bool get usesRegistry {
+    for (final b in bindings) {
+      if (b.channel == null) return true;
+    }
+    return false;
+  }
+
   ir.Node _apply(ir.Node resolved) {
     var n = resolved;
     for (final b in bindings) {
+      if (b.channel != null) continue;
       final v = b.track.value;
       final match = b.track.match;
       if (v == null || match == null) continue;

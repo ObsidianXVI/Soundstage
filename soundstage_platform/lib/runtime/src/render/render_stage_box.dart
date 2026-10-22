@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../paint/appearance_overrides.dart';
 import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
 import 'stage_environment.dart';
@@ -115,8 +116,16 @@ abstract class RenderStageBox extends RenderBox {
     if (identical(value, _node)) return;
     final old = _node;
     final couldNeedCompositing = alwaysNeedsCompositing;
+    final wasBoundary = isRepaintBoundary;
+    final wasIsolating = isolatesBlend;
     _node = value;
-    if (couldNeedCompositing != alwaysNeedsCompositing) {
+    if (old.effectiveBlendMode != value.effectiveBlendMode) {
+      final p = parent;
+      if (p is RenderStageBox) p.childBlendChanged();
+    }
+    if (wasIsolating != isolatesBlend) _updateChildBlendGroups();
+    if (couldNeedCompositing != alwaysNeedsCompositing ||
+        wasBoundary != isRepaintBoundary) {
       markNeedsCompositingBitsUpdate();
     }
     applyInvalidation(invalidationFor(old, value));
@@ -124,11 +133,15 @@ abstract class RenderStageBox extends RenderBox {
 
   // ---- Animated overrides (T0.6, architecture §14) -------------------------------
   //
-  // Two layers sit over the resolved node while tracks play:
+  // Three layers sit over the resolved node while tracks play:
   //
   // - Typed slots for the compositing-class properties (`opacity` and
   //   `motion.*`), written by the animator with [setAnimatedSlot] without
-  //   allocating, and read directly at paint and hit test.
+  //   allocating, and read directly at compositing, paint and hit test.
+  // - Typed paint overrides (T0.6b) for the numeric and colour properties
+  //   of a frame's or shape's appearance (fills, stroke paints and weight,
+  //   effects, corners): channels written in place by the animator and
+  //   read by the paint seam at paint time ([appearanceOverrides]).
   // - A node animator for every other property: a function from the
   //   resolved node to the rendered node (the animator applies its tracks'
   //   current values through the property registry), re-run by
@@ -188,25 +201,159 @@ abstract class RenderStageBox extends RenderBox {
   /// NaN = not overridden. Allocated on first use.
   Float64List? _slots;
 
+  // ---- Typed paint overrides (T0.6b) ---------------------------------------------
+
+  /// Whether this render object reads typed paint overrides (frames and
+  /// shapes). Others animate their appearance through the registry.
+  bool get supportsAppearanceOverrides => false;
+
+  StageAppearanceOverrides? _appearanceOverrides;
+
+  /// The typed paint overrides, or null when there are none.
+  StageAppearanceOverrides? get appearanceOverrides {
+    final o = _appearanceOverrides;
+    return o == null || o.isEmpty ? null : o;
+  }
+
+  /// Adds a typed paint override for [path] (when a track binds). Which
+  /// overrides exist can change the node's compositing (a blur with an
+  /// animated radius needs its layer), so this updates compositing bits.
+  StageAppearanceChannel addAppearanceOverride(StageAppearancePath path) {
+    assert(supportsAppearanceOverrides);
+    final channel = (_appearanceOverrides ??= StageAppearanceOverrides()).add(
+      path,
+    );
+    _appearanceOverridesChanged(layout: path.affectsLayout);
+    return channel;
+  }
+
+  /// Removes every typed paint override.
+  void clearAppearanceOverrides() {
+    final o = _appearanceOverrides;
+    if (o == null || o.isEmpty) return;
+    final layout = o.overridesStrokeWeight;
+    o.clear();
+    _appearanceOverridesChanged(layout: layout);
+  }
+
+  void _appearanceOverridesChanged({required bool layout}) {
+    markNeedsCompositingBitsUpdate();
+    if (layout) {
+      markStageLayoutDirty();
+    } else {
+      markNeedsPaint();
+    }
+  }
+
+  /// The animator wrote [channel]: repaints this node, and relayouts it
+  /// (with its parent) when a stroke weight change moves the parent's auto
+  /// layout (`strokesIncludedInLayout`). Allocation-free.
+  void appearanceOverrideChanged(StageAppearanceChannel channel) {
+    if (channel.path.affectsLayout) {
+      final p = parent;
+      if (p is RenderStageBox && p.includesChildStrokesInLayout) {
+        markStageLayoutDirty();
+        return;
+      }
+    }
+    markNeedsPaint();
+  }
+
+  /// Whether this node's layout reads its children's stroke outsets
+  /// (auto layout with `strokesIncludedInLayout`).
+  @protected
+  bool get includesChildStrokesInLayout => false;
+
+  // ---- Blend groups (T0.6b) -----------------------------------------------------
+
+  bool _inBlendGroup = false;
+
+  /// False until the first attach decides [inBlendGroup]. Until then the
+  /// node is not a repaint boundary: the framework assumes a node that was
+  /// a boundary at construction has a layer, so it must not stop being one
+  /// before its first paint.
+  bool _blendGroupResolved = false;
+
+  /// Whether an ancestor isolates a blended group (a non-normal blend mode,
+  /// or a `normal` frame with a blending child: one canvas `saveLayer`).
+  ///
+  /// Such a group must stay one canvas layer: a descendant that started a
+  /// compositing layer of its own would paint outside the `saveLayer`. So a
+  /// node in a group is never a repaint boundary, applies its opacity and
+  /// layer blur with canvas `saveLayer`s, and repaints with the group when
+  /// its animated values change. Decided at attach, and again whenever an
+  /// ancestor's blend (or a frame's blending children) changes.
+  bool get inBlendGroup => _inBlendGroup;
+
+  void _updateBlendGroup() {
+    final p = parent;
+    final inGroup = p is RenderStageBox && (p._inBlendGroup || p.isolatesBlend);
+    if (inGroup == _inBlendGroup) return;
+    _inBlendGroup = inGroup;
+    markNeedsCompositingBitsUpdate();
+    markNeedsPaint();
+    _updateChildBlendGroups();
+  }
+
+  void _updateChildBlendGroups() {
+    visitChildren((child) {
+      if (child is RenderStageBox) child._updateBlendGroup();
+    });
+  }
+
+  /// A child's blend mode changed, or a blending child was added or
+  /// removed: this node's isolation (and its children's groups) may change.
+  @protected
+  void childBlendChanged() {
+    markNeedsCompositingBitsUpdate();
+    markNeedsPaint();
+    _updateChildBlendGroups();
+  }
+
   /// The animated value in [slot], or NaN when it is not overridden.
   double animatedSlot(int slot) => _slots?[slot] ?? double.nan;
 
-  /// Overrides [slot] with [value] (NaN clears it). Repaints this node's
-  /// repaint boundary; never relayouts. Allocation-free after the first
-  /// call.
+  /// Overrides [slot] with [value] (NaN clears it). Never relayouts.
+  /// Allocation-free after the first call.
+  ///
+  /// On a repaint boundary this only updates the node's composited layers
+  /// (its `TransformLayer` and `OpacityLayer`, through
+  /// [updateCompositedLayer]): the picture is not re-recorded. Otherwise it
+  /// repaints the nearest repaint boundary.
+  @pragma('vm:prefer-inline')
   void setAnimatedSlot(int slot, double value) {
-    final slots = _slots ??= Float64List(slotCount)
-      ..fillRange(0, slotCount, double.nan);
+    final slots = _slots ?? _createSlots();
     final old = slots[slot];
     if (old == value || (old.isNaN && value.isNaN)) return;
-    if (slot == slotOpacity) {
-      final before = alwaysNeedsCompositing;
+    if (isRepaintBoundary) {
       slots[slot] = value;
-      if (before != alwaysNeedsCompositing) {
-        markNeedsCompositingBitsUpdate();
-      }
-    } else {
-      slots[slot] = value;
+      markNeedsCompositedLayerUpdate();
+      return;
+    }
+    final layerBefore =
+        slot == slotOpacity && _compositingOpacity(effectiveOpacity);
+    slots[slot] = value;
+    _slotChanged(slot, layerBefore);
+  }
+
+  /// [setAnimatedSlot] with the value read from `values[index]` (the
+  /// animator passes a compiled track's output). No double crosses the call,
+  /// which keeps the push allocation-free in the VM's JIT even when the
+  /// receiver is polymorphic (frames and shapes).
+  void setAnimatedSlotFrom(int slot, Float64List values, int index) =>
+      setAnimatedSlot(slot, values[index]);
+
+  Float64List _createSlots() =>
+      _slots = Float64List(slotCount)..fillRange(0, slotCount, double.nan);
+
+  // Kept free of double parameters, so the push stays allocation-free in
+  // the VM's JIT (doubles crossing a call that is not inlined are boxed).
+  void _slotChanged(int slot, bool layerBefore) {
+    // Only an opacity crossing into or out of (0, 1) can change whether
+    // the node needs an opacity layer.
+    if (slot == slotOpacity &&
+        layerBefore != _compositingOpacity(effectiveOpacity)) {
+      markNeedsCompositingBitsUpdate();
     }
     markNeedsPaint();
   }
@@ -220,6 +367,7 @@ abstract class RenderStageBox extends RenderBox {
     }
   }
 
+  @pragma('vm:prefer-inline')
   double _slotOr(int slot, double base) {
     final slots = _slots;
     if (slots == null) return base;
@@ -227,10 +375,12 @@ abstract class RenderStageBox extends RenderBox {
     return v.isNaN ? base : v;
   }
 
+  @pragma('vm:prefer-inline')
   double _effectiveOpacityOf(ir.Node n) =>
       _slotOr(slotOpacity, n.common.opacity);
 
   /// The opacity as rendered (animated or resolved).
+  @pragma('vm:prefer-inline')
   double get effectiveOpacity => _effectiveOpacityOf(_node);
 
   // ---- Registry (T0.6) ----------------------------------------------------------
@@ -238,6 +388,13 @@ abstract class RenderStageBox extends RenderBox {
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
+    final wasBoundary = isRepaintBoundary;
+    _blendGroupResolved = true;
+    _updateBlendGroup();
+    if (wasBoundary != isRepaintBoundary) {
+      markNeedsCompositingBitsUpdate();
+      markNeedsPaint();
+    }
     _environment.nodes?.attachNode(this);
   }
 
@@ -254,6 +411,12 @@ abstract class RenderStageBox extends RenderBox {
   /// See [debugLayoutCount].
   @visibleForTesting
   static int debugPaintCount = 0;
+
+  /// Test counter: how many times this node recorded its content (paints
+  /// skipped for invisible or faulted nodes do not count). Composited
+  /// updates ([updateCompositedLayer]) do not count.
+  @visibleForTesting
+  int debugNodePaintCount = 0;
 
   StageEnvironment _environment;
   StageEnvironment get environment => _environment;
@@ -276,8 +439,15 @@ abstract class RenderStageBox extends RenderBox {
     markNeedsPaint();
   }
 
+  /// A node is a repaint boundary when asked to be ([repaintBoundary]),
+  /// except inside a blended group ([inBlendGroup]) or when it blends
+  /// itself: its blend must apply to the backdrop, inside one picture.
   @override
-  bool get isRepaintBoundary => _repaintBoundary;
+  bool get isRepaintBoundary =>
+      _repaintBoundary &&
+      _blendGroupResolved &&
+      !_inBlendGroup &&
+      !blendNeedsIsolation(_node.effectiveBlendMode);
 
   bool _placeholder;
   bool get placeholder => _placeholder;
@@ -505,6 +675,7 @@ abstract class RenderStageBox extends RenderBox {
 
   double get _opacity => effectiveOpacity.clamp(0.0, 1.0);
 
+  @pragma('vm:prefer-inline')
   static bool _compositingOpacity(double o) => o > 0 && o < 1;
 
   /// Whether a group opacity below 1 needs an opacity layer. A subclass
@@ -516,10 +687,12 @@ abstract class RenderStageBox extends RenderBox {
 
   /// The opacity a subclass must apply to its own paints: the node's
   /// opacity when it folds opacity into its paints ([opacityNeedsLayer] is
-  /// false), else 1 because a layer applies it.
+  /// false), else 1 because a layer applies it. A repaint boundary always
+  /// applies it with its composited `OpacityLayer`, so opacity changes do
+  /// not re-record its picture.
   @protected
   double get paintOpacity =>
-      opacityNeedsLayer || isolatesBlend ? 1.0 : _opacity;
+      opacityNeedsLayer || isolatesBlend || isRepaintBoundary ? 1.0 : _opacity;
 
   /// Whether the node paints compositing layers of its own (layer or
   /// background blur), which makes it need compositing.
@@ -532,16 +705,42 @@ abstract class RenderStageBox extends RenderBox {
   @protected
   bool get isolatesBlend => blendNeedsIsolation(node.effectiveBlendMode);
 
+  /// Opacity layers count only outside blended groups (inside, opacity is
+  /// a canvas `saveLayer`) and not on repaint boundaries (their composited
+  /// layer applies it). Inside a group, [hasEffectLayers] reports only the
+  /// effects that still need layers there (background blur).
   @override
-  bool get alwaysNeedsCompositing =>
-      (_compositingOpacity(effectiveOpacity) &&
-          opacityNeedsLayer &&
-          !isolatesBlend) ||
-      hasEffectLayers;
+  bool get alwaysNeedsCompositing {
+    if (_inBlendGroup) return hasEffectLayers;
+    return (!isRepaintBoundary &&
+            _compositingOpacity(effectiveOpacity) &&
+            opacityNeedsLayer &&
+            !isolatesBlend) ||
+        hasEffectLayers;
+  }
 
   final LayerHandle<TransformLayer> _transformLayer =
       LayerHandle<TransformLayer>();
   final LayerHandle<OpacityLayer> _opacityLayer = LayerHandle<OpacityLayer>();
+
+  static final Matrix4 _identity = Matrix4.identity();
+
+  int get _alpha => (_opacity * 255).round();
+
+  /// A repaint boundary's own layer is a `TransformLayer` carrying the
+  /// node's paint transform (identity without one), with an `OpacityLayer`
+  /// child (pushed by [paint]) carrying its opacity. Both are updated here,
+  /// so `opacity` and `motion.*` changes reach the screen without
+  /// re-recording the picture (architecture §17.1).
+  @override
+  OffsetLayer updateCompositedLayer({
+    required covariant TransformLayer? oldLayer,
+  }) {
+    final layer = oldLayer ?? TransformLayer();
+    layer.transform = paintTransform ?? _identity;
+    _opacityLayer.layer?.alpha = _alpha;
+    return layer;
+  }
 
   /// Paints the node's own content and its children at [offset], in its
   /// untransformed box. Exceptions are contained by the caller.
@@ -557,6 +756,23 @@ abstract class RenderStageBox extends RenderBox {
     if (!common.visible) return;
     if (_layoutFault || _placeholder) {
       _paintFaultBox(context, offset);
+      return;
+    }
+    assert(() {
+      debugNodePaintCount++;
+      return true;
+    }());
+    if (isRepaintBoundary) {
+      // The transform is this boundary's own layer (updateCompositedLayer);
+      // the opacity layer is kept even when opaque or transparent, so later
+      // changes only update its alpha.
+      _transformLayer.layer = null;
+      _opacityLayer.layer = context.pushOpacity(
+        offset,
+        _alpha,
+        _paintComposited,
+        oldLayer: _opacityLayer.layer,
+      );
       return;
     }
     if (_opacity <= 0) return;
@@ -575,11 +791,23 @@ abstract class RenderStageBox extends RenderBox {
     }
   }
 
+  void _paintComposited(PaintingContext context, Offset offset) {
+    if (isolatesBlend) {
+      _paintBlended(context, offset, 1);
+    } else {
+      _paintGuarded(context, offset);
+    }
+  }
+
   void _paintWithOpacity(PaintingContext context, Offset offset) {
     final o = _opacity;
     if (isolatesBlend) {
       _opacityLayer.layer = null;
       _paintBlended(context, offset, o);
+    } else if (o < 1 && opacityNeedsLayer && _inBlendGroup) {
+      // Inside a blended group: a canvas layer, never an OpacityLayer.
+      _opacityLayer.layer = null;
+      _paintBlended(context, offset, o, blendMode: BlendMode.srcOver);
     } else if (o < 1 && opacityNeedsLayer) {
       _opacityLayer.layer = context.pushOpacity(
         offset,
@@ -598,12 +826,17 @@ abstract class RenderStageBox extends RenderBox {
   /// descendants that start compositing layers of their own (repaint
   /// boundaries, opacity layers, blurs) paint outside it; keep blended
   /// groups free of those.
-  void _paintBlended(PaintingContext context, Offset offset, double opacity) {
+  void _paintBlended(
+    PaintingContext context,
+    Offset offset,
+    double opacity, {
+    BlendMode? blendMode,
+  }) {
     final canvas = context.canvas;
     canvas.saveLayer(
       null,
       Paint()
-        ..blendMode = flutterBlendMode(node.effectiveBlendMode)
+        ..blendMode = blendMode ?? flutterBlendMode(node.effectiveBlendMode)
         ..color = Color.fromARGB((opacity * 255).round(), 255, 255, 255),
     );
     _paintGuarded(context, offset);
