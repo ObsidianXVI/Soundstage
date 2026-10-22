@@ -92,4 +92,48 @@ void main() {
     );
     animator.dispose();
   });
+
+  test('animator: 200 mixed paint/opacity/motion tracks per frame', () {
+    final (:animator, :boxes) = boundMixedAnimator();
+    expect(animator.boundTrackCount, 200);
+    final channels = boxes.fold(
+      0,
+      (n, b) => n + (b.appearanceOverrides?.channels.length ?? 0),
+    );
+    expect(channels, 140, reason: 'every paint track is typed');
+    expect(boxes.every((b) => b.isRepaintBoundary), isTrue);
+    const frames = 2000;
+    void run(int offset) {
+      for (var f = 0; f < frames; f++) {
+        animator.sceneScrolled(
+          's',
+          progress: sweep(f + offset, 240),
+          visible: true,
+        );
+      }
+    }
+
+    for (var w = 0; w < 5; w++) {
+      run(w);
+    }
+    final perFrameMs = <double>[];
+    for (var r = 0; r < 15; r++) {
+      final sw = Stopwatch()..start();
+      run(r * 7);
+      perFrameMs.add(sw.elapsedMicroseconds / 1000 / frames);
+    }
+    final ms = _median(perFrameMs);
+    // ignore: avoid_print
+    print(
+      'animator: 200 mixed tracks (140 typed paint, 60 slot) on 40 '
+      'frames/shapes: ${ms.toStringAsFixed(4)} ms/frame, '
+      '${(ms * 1e6 / 200).toStringAsFixed(1)} ns/track/frame '
+      '(budget $_budgetMs ms)',
+    );
+    expect(ms, lessThan(_budgetMs));
+    for (final b in boxes) {
+      expect(identical(b.node, b.baseNode), isTrue, reason: 'no node copies');
+    }
+    animator.dispose();
+  });
 }
