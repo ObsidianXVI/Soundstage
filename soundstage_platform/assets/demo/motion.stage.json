@@ -215,11 +215,11 @@
               "name": "photo",
               "visible": true,
               "locked": false,
-              "opacity": 0.55,
+              "opacity": 0.45,
               "x": 0.0,
-              "y": 0.0,
+              "y": -140.0,
               "width": 1440.0,
-              "height": 1000.0,
+              "height": 1140.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -332,10 +332,10 @@
               "visible": true,
               "locked": false,
               "opacity": 1.0,
-              "x": 980.0,
-              "y": 140.0,
-              "width": 220.0,
-              "height": 220.0,
+              "x": 890.0,
+              "y": 350.0,
+              "width": 180.0,
+              "height": 180.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -355,8 +355,8 @@
                 "horizontalSizing": "fixed",
                 "verticalSizing": "fixed",
                 "constraints": {
-                  "horizontal": "scale",
-                  "vertical": "scale"
+                  "horizontal": "center",
+                  "vertical": "center"
                 },
                 "grid": {
                   "columnSpan": 1,
@@ -369,19 +369,19 @@
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
-                    "value": 220.0,
+                    "value": 215.0,
                     "type": "number"
                   },
                   "y": {
-                    "value": 120.0,
+                    "value": 330.0,
                     "type": "number"
                   },
                   "width": {
-                    "value": 120.0,
+                    "value": 110.0,
                     "type": "number"
                   },
                   "height": {
-                    "value": 120.0,
+                    "value": 110.0,
                     "type": "number"
                   }
                 }
@@ -447,10 +447,10 @@
               "visible": true,
               "locked": false,
               "opacity": 1.0,
-              "x": -40.0,
-              "y": 520.0,
-              "width": 1520.0,
-              "height": 1160.0,
+              "x": -240.0,
+              "y": 560.0,
+              "width": 2160.0,
+              "height": 900.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -487,8 +487,10 @@
               "interactions": []
             },
             "geometry": {
-              "pointCount": 3,
-              "type": "polygon"
+              "arcStart": 0.0,
+              "arcEnd": 360.0,
+              "innerRadius": 0.0,
+              "type": "ellipse"
             },
             "appearance": {
               "fills": [
@@ -534,10 +536,10 @@
               "visible": true,
               "locked": false,
               "opacity": 1.0,
-              "x": -40.0,
-              "y": 600.0,
-              "width": 1520.0,
-              "height": 1000.0,
+              "x": -360.0,
+              "y": 630.0,
+              "width": 2160.0,
+              "height": 900.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -574,8 +576,10 @@
               "interactions": []
             },
             "geometry": {
-              "pointCount": 3,
-              "type": "polygon"
+              "arcStart": 0.0,
+              "arcEnd": 360.0,
+              "innerRadius": 0.0,
+              "type": "ellipse"
             },
             "appearance": {
               "fills": [
@@ -621,10 +625,10 @@
               "visible": true,
               "locked": false,
               "opacity": 1.0,
-              "x": -40.0,
-              "y": 680.0,
-              "width": 1520.0,
-              "height": 840.0,
+              "x": -300.0,
+              "y": 700.0,
+              "width": 2160.0,
+              "height": 900.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -661,8 +665,10 @@
               "interactions": []
             },
             "geometry": {
-              "pointCount": 3,
-              "type": "polygon"
+              "arcStart": 0.0,
+              "arcEnd": 360.0,
+              "innerRadius": 0.0,
+              "type": "ellipse"
             },
             "appearance": {
               "fills": [
@@ -708,10 +714,10 @@
               "visible": true,
               "locked": false,
               "opacity": 1.0,
-              "x": -40.0,
-              "y": 760.0,
-              "width": 1520.0,
-              "height": 680.0,
+              "x": -240.0,
+              "y": 770.0,
+              "width": 2160.0,
+              "height": 900.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -748,8 +754,10 @@
               "interactions": []
             },
             "geometry": {
-              "pointCount": 3,
-              "type": "polygon"
+              "arcStart": 0.0,
+              "arcEnd": 360.0,
+              "innerRadius": 0.0,
+              "type": "ellipse"
             },
             "appearance": {
               "fills": [
@@ -796,9 +804,9 @@
               "locked": false,
               "opacity": 1.0,
               "x": -40.0,
-              "y": 820.0,
+              "y": 840.0,
               "width": 1520.0,
-              "height": 560.0,
+              "height": 900.0,
               "rotation": 0.0,
               "flipX": false,
               "flipY": false,
@@ -1003,7 +1011,7 @@
               "locked": false,
               "opacity": 1.0,
               "x": 370.0,
-              "y": 470.0,
+              "y": 600.0,
               "width": 700.0,
               "height": 0.0,
               "rotation": 0.0,
@@ -1043,7 +1051,7 @@
                     "type": "number"
                   },
                   "y": {
-                    "value": 420.0,
+                    "value": 560.0,
                     "type": "number"
                   },
                   "width": {
@@ -1146,7 +1154,7 @@
               "id": "tr0-k1",
               "t": 1.0,
               "value": {
-                "value": -40.0,
+                "value": 80.0,
                 "type": "number"
               },
               "easing": {
@@ -1270,7 +1278,7 @@
               "id": "tr4-k1",
               "t": 1.0,
               "value": {
-                "value": 260.0,
+                "value": -230.0,
                 "type": "number"
               },
               "easing": {
@@ -1300,7 +1308,7 @@
               "id": "tr5-k1",
               "t": 1.0,
               "value": {
-                "value": -60.0,
+                "value": 60.0,
                 "type": "number"
               },
               "easing": {
@@ -1330,7 +1338,7 @@
               "id": "tr6-k1",
               "t": 1.0,
               "value": {
-                "value": -140.0,
+                "value": 140.0,
                 "type": "number"
               },
               "easing": {
@@ -1360,7 +1368,7 @@
               "id": "tr7-k1",
               "t": 1.0,
               "value": {
-                "value": -260.0,
+                "value": 240.0,
                 "type": "number"
               },
               "easing": {
@@ -1390,7 +1398,7 @@
               "id": "tr8-k1",
               "t": 1.0,
               "value": {
-                "value": -420.0,
+                "value": 360.0,
                 "type": "number"
               },
               "easing": {
@@ -1420,7 +1428,7 @@
               "id": "tr9-k1",
               "t": 1.0,
               "value": {
-                "value": -640.0,
+                "value": 500.0,
                 "type": "number"
               },
               "easing": {
@@ -1545,21 +1553,7 @@
           "keyframes": [
             {
               "id": "tr12-k0",
-              "t": 0.1,
-              "value": {
-                "value": 0.0,
-                "type": "number"
-              },
-              "easing": {
-                "mass": 1.0,
-                "stiffness": 120.0,
-                "damping": 10.0,
-                "type": "spring"
-              }
-            },
-            {
-              "id": "tr12-k1",
-              "t": 0.35,
+              "t": 0.0,
               "value": {
                 "value": 1.0,
                 "type": "number"
@@ -1569,8 +1563,8 @@
               }
             },
             {
-              "id": "tr12-k2",
-              "t": 0.75,
+              "id": "tr12-k1",
+              "t": 0.55,
               "value": {
                 "value": 1.0,
                 "type": "number"
@@ -1581,8 +1575,8 @@
               }
             },
             {
-              "id": "tr12-k3",
-              "t": 0.9,
+              "id": "tr12-k2",
+              "t": 0.75,
               "value": {
                 "value": 0.0,
                 "type": "number"
@@ -1601,9 +1595,9 @@
           "keyframes": [
             {
               "id": "tr13-k0",
-              "t": 0.1,
+              "t": 0.5,
               "value": {
-                "value": 40.0,
+                "value": 0.0,
                 "type": "number"
               },
               "easing": {
@@ -1615,9 +1609,9 @@
             },
             {
               "id": "tr13-k1",
-              "t": 0.35,
+              "t": 0.75,
               "value": {
-                "value": 0.0,
+                "value": -60.0,
                 "type": "number"
               },
               "easing": {
@@ -2320,8 +2314,8 @@
                 "horizontalSizing": "fixed",
                 "verticalSizing": "fixed",
                 "constraints": {
-                  "horizontal": "scale",
-                  "vertical": "scale"
+                  "horizontal": "center",
+                  "vertical": "center"
                 },
                 "grid": {
                   "columnSpan": 1,
@@ -2425,8 +2419,8 @@
                 "horizontalSizing": "fixed",
                 "verticalSizing": "fixed",
                 "constraints": {
-                  "horizontal": "scale",
-                  "vertical": "scale"
+                  "horizontal": "center",
+                  "vertical": "center"
                 },
                 "grid": {
                   "columnSpan": 1,
@@ -2530,8 +2524,8 @@
                 "horizontalSizing": "fixed",
                 "verticalSizing": "fixed",
                 "constraints": {
-                  "horizontal": "scale",
-                  "vertical": "scale"
+                  "horizontal": "center",
+                  "vertical": "center"
                 },
                 "grid": {
                   "columnSpan": 1,
@@ -2613,8 +2607,8 @@
               "locked": false,
               "opacity": 1.0,
               "x": 160.0,
-              "y": 640.0,
-              "width": 560.0,
+              "y": 110.0,
+              "width": 620.0,
               "height": 0.0,
               "rotation": 0.0,
               "flipX": false,
@@ -2653,7 +2647,7 @@
                     "type": "number"
                   },
                   "y": {
-                    "value": 400.0,
+                    "value": 60.0,
                     "type": "number"
                   },
                   "width": {
@@ -2752,8 +2746,8 @@
                 "horizontalSizing": "fixed",
                 "verticalSizing": "fixed",
                 "constraints": {
-                  "horizontal": "scale",
-                  "vertical": "scale"
+                  "horizontal": "leftRight",
+                  "vertical": "topBottom"
                 },
                 "grid": {
                   "columnSpan": 1,
@@ -2839,8 +2833,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -2947,8 +2941,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -3055,8 +3049,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -3163,8 +3157,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -3271,8 +3265,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -3379,8 +3373,8 @@
                     "horizontalSizing": "fixed",
                     "verticalSizing": "fixed",
                     "constraints": {
-                      "horizontal": "scale",
-                      "vertical": "scale"
+                      "horizontal": "center",
+                      "vertical": "center"
                     },
                     "grid": {
                       "columnSpan": 1,
@@ -4939,8 +4933,8 @@
               "motion": {
                 "translateX": 0.0,
                 "translateY": 0.0,
-                "scaleX": 0.85,
-                "scaleY": 0.85,
+                "scaleX": 0.74,
+                "scaleY": 0.74,
                 "rotate": 0.0,
                 "skewX": 0.0,
                 "skewY": 0.0,
@@ -4974,11 +4968,11 @@
                     "type": "number"
                   },
                   "motion.scaleX": {
-                    "value": 0.36,
+                    "value": 0.32,
                     "type": "number"
                   },
                   "motion.scaleY": {
-                    "value": 0.36,
+                    "value": 0.32,
                     "type": "number"
                   }
                 }

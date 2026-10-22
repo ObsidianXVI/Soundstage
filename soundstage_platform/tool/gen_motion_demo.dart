@@ -178,11 +178,12 @@ Scene _hero() {
   final tracks = <Track>[];
   // Five mountain/ground layers, back to front; nearer layers move faster.
   const layers = [
-    ('far', '#3b2a5c', 520.0, 380.0, -60.0),
-    ('ridge', '#4b2e63', 600.0, 300.0, -140.0),
-    ('hills', '#6a3566', 680.0, 220.0, -260.0),
-    ('near', '#8c3b5e', 760.0, 140.0, -420.0),
-    ('ground', '#1d1230', 820.0, 80.0, -640.0),
+    // (name, colour, top, sink distance over the scene)
+    ('far', '#3b2a5c', 560.0, 60.0),
+    ('ridge', '#4b2e63', 630.0, 140.0),
+    ('hills', '#6a3566', 700.0, 240.0),
+    ('near', '#8c3b5e', 770.0, 360.0),
+    ('ground', '#1d1230', 840.0, 500.0),
   ];
   final children = <Node>[
     // A photo layer behind everything, slowest of all.
@@ -191,10 +192,10 @@ Scene _hero() {
         id: 'hero-photo',
         name: 'photo',
         x: 0,
-        y: 0,
+        y: -140,
         width: 1440,
-        height: 1000,
-        opacity: 0.55,
+        height: 1140,
+        opacity: 0.45,
         layoutChild: _scaleBoth,
         breakpointOverrides: _mobileGeo(-200, 0, 790, 940),
       ),
@@ -210,21 +211,23 @@ Scene _hero() {
     ),
     _shape(
       'hero-sun',
-      x: 980,
-      y: 140,
-      w: 220,
-      h: 220,
+      // Over the photo's own sun; centred so it stays round at any aspect.
+      x: 890,
+      y: 350,
+      w: 180,
+      h: 180,
       color: '#ffd58a',
       geometry: const ShapeGeometry.ellipse(),
       effects: const [Effect.layerBlur(id: 'blur', radius: 24)],
-      overrides: _mobileGeo(220, 120, 120, 120),
+      lc: _centerBoth,
+      overrides: _mobileGeo(215, 330, 110, 110),
     ),
   ];
   tracks
     ..add(
       _track('hero-photo', 'motion.translateY', clock, [
         (0, _n(0), _lin),
-        (1, _n(-40), _lin),
+        (1, _n(80), _lin),
       ]),
     )
     ..add(
@@ -248,22 +251,22 @@ Scene _hero() {
     ..add(
       _track('hero-sun', 'motion.translateY', clock, [
         (0, _n(0), _easeInOut),
-        (1, _n(260), _lin),
+        (1, _n(-230), _lin),
       ]),
     );
-  for (final (name, color, top, h, travel) in layers) {
+  for (final (name, color, top, travel) in layers) {
     final id = 'hero-$name';
     children.add(
       _shape(
         id,
-        x: -40,
+        x: name == 'ground' ? -40 : -360 + (top % 3) * 60,
         y: top,
-        w: 1520,
-        h: 900 - top + 400 + h,
+        w: name == 'ground' ? 1520 : 2160,
+        h: 900,
         color: color,
         geometry: name == 'ground'
             ? const ShapeGeometry.rectangle()
-            : const ShapeGeometry.polygon(pointCount: 3),
+            : const ShapeGeometry.ellipse(),
         lc: _lc(HorizontalConstraint.scale, VerticalConstraint.scale),
       ),
     );
@@ -295,7 +298,7 @@ Scene _hero() {
       'hero-sub',
       'Scroll to play the scene. Every layer is a track on the scroll clock.',
       x: 370,
-      y: 470,
+      y: 600,
       w: 700,
       size: 22,
       font: 'sans',
@@ -303,7 +306,7 @@ Scene _hero() {
       overrides: {
         'mobile': {
           'x': _n(30),
-          'y': _n(420),
+          'y': _n(560),
           'width': _n(330),
           'style.fontSize': _n(17),
         },
@@ -329,16 +332,16 @@ Scene _hero() {
     )
     ..add(
       _track('hero-sub', 'opacity', clock, [
-        (0.1, _n(0), const Easing.spring(stiffness: 120, damping: 10)),
-        (0.35, _n(1), _lin),
-        (0.75, _n(1), _easeIn),
-        (0.9, _n(0), _lin),
+        // Visible from the top (it tells the reader to scroll).
+        (0, _n(1), _lin),
+        (0.55, _n(1), _easeIn),
+        (0.75, _n(0), _lin),
       ]),
     )
     ..add(
       _track('hero-sub', 'motion.translateY', clock, [
-        (0.1, _n(40), const Easing.spring(stiffness: 120, damping: 10)),
-        (0.35, _n(0), _lin),
+        (0.5, _n(0), const Easing.spring(stiffness: 120, damping: 10)),
+        (0.75, _n(-60), _lin),
       ]),
     )
     ..add(
@@ -456,6 +459,7 @@ Scene _pulse() {
         h: 320,
         color: color,
         radius: 28,
+        lc: _centerBoth,
         overrides: _mobileGeo(30 + i * 20, 160 + i * 40, 300, 200),
       ),
     );
@@ -486,6 +490,7 @@ Scene _pulse() {
         h: 60,
         color: '#f2a65a',
         geometry: const ShapeGeometry.ellipse(),
+        lc: _centerBoth,
         overrides: _mobileGeo(
           195 + 80 * math.cos(a) - 20,
           640 + 80 * math.sin(a) - 20,
@@ -521,14 +526,14 @@ Scene _pulse() {
       'A timeline clock (pingPong, plays on scene enter) and two pointer clocks. '
           'Move the mouse over the stage.',
       x: 160,
-      y: 640,
-      w: 560,
+      y: 110,
+      w: 620,
       size: 20,
       font: 'sans',
       color: '#dbe7f5',
       align: TextAlignHorizontal.left,
       overrides: {
-        'mobile': {'x': _n(30), 'y': _n(400), 'width': _n(330)},
+        'mobile': {'x': _n(30), 'y': _n(60), 'width': _n(330)},
       },
     ),
   );
@@ -552,7 +557,10 @@ Scene _pulse() {
       name: 'orbit',
       width: 1440,
       height: 900,
-      layoutChild: _scaleBoth,
+      layoutChild: _lc(
+        HorizontalConstraint.leftRight,
+        VerticalConstraint.topBottom,
+      ),
       motion: const MotionTransform(originX: 1040 / 1440, originY: 0.5),
       breakpointOverrides: {
         'mobile': {
@@ -670,13 +678,13 @@ Scene _tiles() {
       width: gridW,
       height: gridH,
       layoutChild: _lc(HorizontalConstraint.center, VerticalConstraint.center),
-      motion: const MotionTransform(scaleX: 0.85, scaleY: 0.85),
+      motion: const MotionTransform(scaleX: 0.74, scaleY: 0.74),
       breakpointOverrides: {
         'mobile': {
           'x': _n((390 - gridW) / 2),
           'y': _n((844 - gridH) / 2),
-          'motion.scaleX': _n(0.36),
-          'motion.scaleY': _n(0.36),
+          'motion.scaleX': _n(0.32),
+          'motion.scaleY': _n(0.32),
         },
       },
     ),
