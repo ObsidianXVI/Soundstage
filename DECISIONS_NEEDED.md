@@ -41,3 +41,28 @@ file's OS/2 table when the font is loaded.
 **Provisional answer.** In the IR from v1, implemented best-effort in T0.4 by reading OS/2
 `sCapHeight` from loaded font bytes. If that proves unreliable, it ships later.
 **Needed by:** none (informational).
+
+## 6. Where clocks are declared (file format)
+**Context.** §10.1 gives every clock kind an optional `smoothing`, and tracks/text reveals/
+`clockReach` refer to clocks by `clockId`, but §3.2 only stores `timelines: [TimelineClock]` on a
+scene. Scroll, audio, pointer and behaviour clocks had nowhere to keep an id or smoothing.
+**Provisional answer (T0.2).** `Scene.clocks: [Clock]`, a sealed union of all five kinds, each
+with `id` + `smoothing`. `Scene.timelines` is a getter over it. Pointer clocks carry an `axis`
+(`x`|`y`). Alternative: keep `timelines` and add implicit ids like `sceneScroll:<sceneId>`, with
+smoothing on the track instead.
+**Needed by:** T0.6.
+
+## 7. Paint/effect style references on nodes (file format)
+**Context.** §8 defines `paintStyles` and `effectStyles`, and §11.3 resolves "style refs", but §4.2
+gives nodes no field that references them.
+**Provisional answer (T0.2).** `Appearance.fillStyleId`, `strokeStyleId` and `effectStyleId`
+(Figma's model). When set, the style's stack replaces the local one.
+**Needed by:** T0.3 (resolver).
+
+## 8. Effects/strokes/corners on text and video nodes
+**Context.** §4.2 limits fills/strokes/effects/corners to frames and shapes, so text can't take a
+drop shadow and video can't have rounded corners (both available in Figma). Adding these later is
+backward compatible: they would be new optional fields with defaults, so no migration is needed.
+**Provisional answer.** Follow the spec (none on text/video) for v1. Wrap the node in a frame to
+get the effect.
+**Needed by:** M1.
