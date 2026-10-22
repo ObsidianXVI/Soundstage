@@ -57,3 +57,16 @@
   *Provisional* — confirmation requested in DECISIONS_NEEDED.md.
 
 - **Agent config, `_dev/` and `.claude/` are git-ignored**, matching Letterpress.
+
+- **Clocks are declared in `Scene.clocks`**, a sealed union of every clock kind, each with an `id`
+  and `smoothing`; pointer clocks are single-axis. (Gap found in T0.2; adopted as built.)
+  Rationale: tracks, text reveals and `clockReach` all refer to clocks by id, and every kind can
+  be smoothed, so every kind needs a declaration.
+
+- **Nodes reference paint/effect styles via `Appearance.fillStyleId/strokeStyleId/effectStyleId`**,
+  and a set style replaces the local stack (Figma's model). (Gap found in T0.2; adopted as built.)
+
+- **Text nodes take strokes and effects; video nodes take corners, strokes and effects.**
+  Rationale: overrides the v1 spec's frames-and-shapes-only limit. Text shadows over imagery and
+  rounded video are everyday immersive-design needs, and Figma supports both. Added before the
+  property registry exists, so it costs one model change instead of a migration later.

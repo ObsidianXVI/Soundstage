@@ -92,7 +92,7 @@ Ensure the sub-agents are given enough context about the plans and approach to i
 4. Never use a third-party API without grounding evidence that it exists (pub.dev, package source).
 5. Never add API keys or secrets to any file. They live in `.env` and GCP Secret Manager (in prod).
 6. Generated files (`*.freezed.dart`, `*.g.dart`) and build output are git-ignored — never commit
-   them. Run `dart run build_runner build --delete-conflicting-outputs` after changing models.
+   them. Run `dart run build_runner build` after changing models.
 7. GCP/Firebase resources are created through Terraform, never `gcloud ... create`.
 
 ## Language notes

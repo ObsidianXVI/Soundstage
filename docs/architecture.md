@@ -83,7 +83,7 @@ Scene
   scrollLength: double        // pinned only: scroll distance while pinned, in viewport heights
   root: FrameNode             // the stage
   tracks: [Track]             // §10
-  timelines: [TimelineClock]  // §10.1, time-based clocks owned by this scene
+  clocks: [Clock]             // §10.1, every clock this scene's tracks use (all kinds)
   background: [Paint]
   modeOverrides: { collectionId: modeId }
   transitionIn: { kind: none | overlap | crossfade, amount }   // M3
@@ -105,10 +105,10 @@ Scene
 | Kind | Purpose |
 |---|---|
 | `FrameNode` | Container. Free (absolute children) or auto-layout (§4.4) or grid (§4.5). Has fills, strokes, effects, corners, clip. Also the "image layer": a frame with an `ImagePaint` fill. |
-| `TextNode` | Rich text (§7). |
+| `TextNode` | Rich text (§7). Also takes strokes and effects (text shadows, outlines). |
 | `ShapeNode` | `rectangle`, `ellipse` (with arc start/end/inner radius), `line`, `polygon` (point count), `star` (point count, inner ratio). Fills/strokes/effects. Vector paths are out of scope. |
 | `InstanceNode` | An instance of a component or variant (§9). |
-| `VideoNode` | Video with the same scale modes as images (§6). |
+| `VideoNode` | Video with the same scale modes as images (§6). Also takes corners, strokes and effects. |
 | `EmbedNode` | Rive or Lottie asset with state-machine inputs bindable to clocks (M3). |
 
 ### 4.2 Common properties (every node)
@@ -131,7 +131,9 @@ layoutChild: {                // how this node behaves inside its parent
                  vertical:   top|bottom|topBottom|center|scale }   // used when absolute
   grid: { column, row, columnSpan, rowSpan, alignX, alignY }       // used in a grid parent
 }
-fills, strokes, effects, cornerRadius   // on frames and shapes
+fills, strokes, effects, cornerRadius   // on frames and shapes (text: strokes + effects;
+                                        // video: corners + strokes + effects)
+fillStyleId, strokeStyleId, effectStyleId // style refs (§8); the style's stack replaces the local one
 mask: none | alpha | luminance          // M3: masks the siblings above it in the same parent
 breakpointOverrides: { bpId: Patch }
 bindings: { PropertyPath: TokenRef }    // token-bound properties (§8)
@@ -338,10 +340,11 @@ behaviours.
 | `sceneScroll(sceneId)` | 0–1 | §3.2 |
 | `timeline(id)` | seconds | `TimelineClock { duration, loop: none\|loop\|pingPong, rate, trigger: sceneEnter\|interaction\|autoplay }` |
 | `audio(trackId)` | seconds | audio playback position |
-| `pointer(frameId)` | x, y ∈ −1…1 | pointer position over a frame (hover parallax) |
+| `pointer(frameId, axis)` | −1…1 | pointer position over a frame (hover parallax) |
 | `behavior(nodeId, name)` | behaviour-defined | e.g. carousel index |
 
-Every clock may set `smoothing` (seconds): the evaluated value follows the raw value with a
+Clocks are declared in `Scene.clocks`, each with an `id` (referenced by `Track.clockId`,
+behaviours and interactions). A pointer clock has one `axis` (`x` or `y`). Every clock may set `smoothing` (seconds): the evaluated value follows the raw value with a
 critically damped spring. Scroll smoothing is what makes mouse-wheel scrolling feel continuous on
 the web.
 
