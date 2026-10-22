@@ -71,7 +71,16 @@ class StageEnterGate extends StatefulWidget {
     this.onEntered,
     this.coverFocal = const Offset(0.5, 0.5),
     this.buildChildOnEnter = false,
+    this.onReady,
+    this.onEnter,
   });
+
+  /// Called once the first scene's fonts, images and audio are loaded (the
+  /// gate can be activated and will not wait).
+  final VoidCallback? onReady;
+
+  /// Called when the gate starts fading out and the player is revealed.
+  final VoidCallback? onEnter;
 
   /// Mount [child] only when the gate starts fading out, so entry
   /// animations (a timeline that plays on scene enter) play in view rather
@@ -146,6 +155,7 @@ class _StageEnterGateState extends State<StageEnterGate> {
       widget.environment,
       audio: widget.audio,
     );
+    _preload.whenComplete(() => widget.onReady?.call());
     widget.environment.fonts.addListener(_fontLoaded);
   }
 
@@ -169,6 +179,7 @@ class _StageEnterGateState extends State<StageEnterGate> {
     _preload.whenComplete(() {
       if (!mounted) return;
       setState(() => _phase = _Phase.fading);
+      widget.onEnter?.call();
     });
   }
 

@@ -21,6 +21,12 @@ class StagePlayerController {
   StageAnimator? _animator;
   StageNodeRegistry? _nodes;
   ScrollController? _scroll;
+  FocusNode? _focusNode;
+
+  /// Gives the story keyboard focus (PageDown, Space and the arrows scroll
+  /// it). Call it when something that held focus, like the enter gate, is
+  /// gone; a pointer press on the story does it too.
+  void requestFocus() => _focusNode?.requestFocus();
 
   /// Whether a player is attached.
   bool get isAttached => _animator != null;
@@ -114,6 +120,12 @@ class StagePlayer extends StatefulWidget {
 class _StagePlayerState extends State<StagePlayer>
     with TickerProviderStateMixin {
   final ir.Resolver _resolver = ir.Resolver();
+
+  /// Keyboard scrolling (PageDown, Space, arrows, Home/End) needs a focused
+  /// widget under the scroll view: `ScrollAction` looks up the scrollable
+  /// from the primary focus. Without this node nothing has focus once the
+  /// enter gate is gone, and the keys do nothing.
+  final FocusNode _focus = FocusNode(debugLabel: 'StagePlayer');
   final StageNodeRegistry _registry = StageNodeRegistry();
   late final StageScrollController _scroll = StageScrollController(
     smoothing: widget.wheelSmoothing,
@@ -169,7 +181,8 @@ class _StagePlayerState extends State<StagePlayer>
     c
       .._animator = _animator
       .._nodes = _registry
-      .._scroll = _scroll;
+      .._scroll = _scroll
+      .._focusNode = _focus;
   }
 
   void _detachController(StagePlayerController? c) {
@@ -177,7 +190,8 @@ class _StagePlayerState extends State<StagePlayer>
     c
       .._animator = null
       .._nodes = null
-      .._scroll = null;
+      .._scroll = null
+      .._focusNode = null;
   }
 
   @override
@@ -220,6 +234,7 @@ class _StagePlayerState extends State<StagePlayer>
     _detachController(widget.controller);
     _animator.dispose();
     _scroll.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -330,6 +345,9 @@ class _StagePlayerState extends State<StagePlayer>
             onExit: (_) => _animator.pointerExited(),
             child: Listener(
               behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) {
+                if (!_focus.hasFocus) _focus.requestFocus();
+              },
               onPointerHover: (e) => _animator.pointerMoved(e.position),
               onPointerMove: (e) {
                 if (e.kind == PointerDeviceKind.mouse) {
@@ -338,13 +356,20 @@ class _StagePlayerState extends State<StagePlayer>
               },
               child: SizedBox.fromSize(
                 size: viewport,
-                child: CustomScrollView(
+                child: PrimaryScrollController(
                   controller: _scroll,
-                  physics: widget.physics,
-                  scrollCacheExtent: ScrollCacheExtent.viewport(
-                    widget.lazyWindow,
+                  child: Focus(
+                    focusNode: _focus,
+                    autofocus: true,
+                    child: CustomScrollView(
+                      controller: _scroll,
+                      physics: widget.physics,
+                      scrollCacheExtent: ScrollCacheExtent.viewport(
+                        widget.lazyWindow,
+                      ),
+                      slivers: _slivers,
+                    ),
                   ),
-                  slivers: _slivers,
                 ),
               ),
             ),

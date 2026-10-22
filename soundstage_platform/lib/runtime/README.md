@@ -502,3 +502,17 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     notches of 53/48 px pass the threshold, 3-line notches of 40 px on some setups sit on it.
     Pinned scenes already smooth through their clocks, so a smoothed notch adds its ~120 ms on
     top of the clock's. The demos turn it on, `?wheel=native` turns it off.
+51. **Keyboard scrolling needs focus (found in T0.8).** `ScrollAction` (PageDown, Space and the
+    arrows through the default shortcuts) resolves its scrollable from the *primary focus*. With
+    the enter gate gone nothing had focus, so every key did nothing. `StagePlayer` now owns a
+    `FocusNode` (autofocus, a pointer press re-requests it) inside a `PrimaryScrollController`
+    around its scroll view, and `StagePlayerController.requestFocus()` hands focus back when
+    something that held it, like the gate, goes away (`StageEnterGate.onEntered`). Space and the
+    arrows are default scroll shortcuts on the web only, PageDown everywhere. PageDown is
+    `ScrollAction`'s own ~100 ms ease (about 85 ms for 0.8 of a viewport in Chrome): brisk next to
+    a browser's.
+52. **Gate hooks.** `StageEnterGate.onReady` (first-scene fonts, images and audio loaded),
+    `onEnter` (the fade starts, the player mounts with `buildChildOnEnter`) and `onEntered`
+    (the fade is done). The demos' `?stats=1` mode logs them, the decoded-image cache and the
+    scroll offset (`window.__ss_offset`, per frame `__ss_offset_f`) and an independent audio clock
+    (`__ss_audio_clock`) for scripted measurements (`_dev/spike_report.md`).
