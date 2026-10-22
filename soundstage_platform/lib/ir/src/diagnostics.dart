@@ -44,6 +44,9 @@ enum IrDiagnosticKind {
 
   /// The document could not be parsed at all (`loadDocument`).
   invalidDocument,
+
+  /// A line of an LRC lyrics file could not be parsed (`parseLrc`).
+  invalidLyrics,
 }
 
 /// How serious a diagnostic is. Errors make a document unsafe to publish;
