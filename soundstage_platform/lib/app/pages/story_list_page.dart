@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
+import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
 import 'demo_page.dart';
+import 'story_actions.dart';
 
 /// `/`: the story list. Lists the author's stories (in memory until T1.11)
 /// and the bundled demos; "New story" creates a blank document.
@@ -41,11 +43,21 @@ class StoryListPage extends ConsumerWidget {
                   runSpacing: SsSpace.s3,
                   children: [
                     Text('Stories', style: t.text.heading),
-                    SsButton(
-                      label: 'New story',
-                      icon: SsIcons.plus,
-                      variant: SsButtonVariant.primary,
-                      onPressed: () => _create(context, ref),
+                    Wrap(
+                      spacing: SsSpace.s2,
+                      children: [
+                        SsButton(
+                          label: 'Import',
+                          icon: SsIcons.file,
+                          onPressed: () => StoryActions(context, ref).import(),
+                        ),
+                        SsButton(
+                          label: 'New story',
+                          icon: SsIcons.plus,
+                          variant: SsButtonVariant.primary,
+                          onPressed: () => _create(context, ref),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -61,6 +73,8 @@ class StoryListPage extends ConsumerWidget {
                   ),
                   _ => const SizedBox(height: 120),
                 },
+                const SizedBox(height: SsSpace.s6),
+                const _StorageFooter(),
                 const SizedBox(height: SsSpace.s8),
                 Text('DEVELOPMENT', style: t.text.overline),
                 const SizedBox(height: SsSpace.s2),
@@ -95,30 +109,59 @@ class _StoryRow extends ConsumerWidget {
 
   final StorySummary story;
 
-  List<SsMenuEntry> _menu(BuildContext context, WidgetRef ref) => [
-    SsMenuItem(
-      label: 'Open',
-      icon: SsIcons.pencil,
-      onSelected: () => context.go('/edit/${story.id}'),
-    ),
-    SsMenuItem(
-      label: 'Play',
-      icon: SsIcons.play,
-      onSelected: () => context.go('/play/${story.id}'),
-    ),
-    const SsMenuDivider(),
-    SsMenuItem(
-      label: 'Rename',
-      icon: SsIcons.pencil,
-      onSelected: () => _rename(context, ref),
-    ),
-    SsMenuItem(
-      label: 'Delete',
-      icon: SsIcons.trash2,
-      danger: true,
-      onSelected: () => _delete(context, ref),
-    ),
-  ];
+  List<SsMenuEntry> _menu(BuildContext context, WidgetRef ref) {
+    final actions = StoryActions(context, ref);
+    return [
+      SsMenuItem(
+        label: story.bundled ? 'Open (read-only)' : 'Open',
+        icon: SsIcons.pencil,
+        onSelected: () => actions.open(story),
+      ),
+      SsMenuItem(
+        label: 'Play',
+        icon: SsIcons.play,
+        onSelected: () => context.go('/play/${story.id}'),
+      ),
+      const SsMenuDivider(),
+      SsMenuItem(
+        label: story.bundled ? 'Duplicate to my stories' : 'Duplicate',
+        icon: SsIcons.copy,
+        onSelected: () => actions.duplicate(story),
+      ),
+      if (!story.bundled)
+        SsMenuItem(
+          label: 'Rename',
+          icon: SsIcons.pencil,
+          onSelected: () => _rename(context, ref),
+        ),
+      const SsMenuDivider(),
+      SsMenuItem(
+        label: 'Export .stage.json',
+        icon: SsIcons.file,
+        onSelected: () => actions.exportJson(story),
+      ),
+      SsMenuItem(
+        label: 'Export .stage.zip',
+        icon: SsIcons.file,
+        onSelected: () => actions.exportZip(story),
+      ),
+      if (!story.bundled)
+        SsMenuItem(
+          label: 'Revisions',
+          icon: SsIcons.rotateCcw,
+          onSelected: () => actions.revisions(story),
+        ),
+      if (!story.bundled) ...[
+        const SsMenuDivider(),
+        SsMenuItem(
+          label: 'Delete',
+          icon: SsIcons.trash2,
+          danger: true,
+          onSelected: () => _delete(context, ref),
+        ),
+      ],
+    ];
+  }
 
   Future<void> _rename(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController(text: story.title);
@@ -167,7 +210,7 @@ class _StoryRow extends ConsumerWidget {
     final t = context.ss;
     final c = t.colors;
     final meta = [
-      if (story.bundled) 'Bundled demo' else 'Draft',
+      if (story.bundled) 'Bundled demo (read-only)' else 'Draft',
       if (story.sceneCount != null)
         '${story.sceneCount} ${story.sceneCount == 1 ? 'scene' : 'scenes'}',
     ].join('  ·  ');
@@ -237,6 +280,53 @@ class _StoryRow extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Storage usage, persistence and clean-up.
+class _StorageFooter extends ConsumerWidget {
+  const _StorageFooter();
+
+  static String _size(int? b) {
+    if (b == null) return '?';
+    if (b < 1 << 20) return '${(b / 1024).toStringAsFixed(0)} KB';
+    if (b < 1 << 30) return '${(b / (1 << 20)).toStringAsFixed(1)} MB';
+    return '${(b / (1 << 30)).toStringAsFixed(2)} GB';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.ss;
+    final storage = ref.watch(appStorageProvider);
+    if (!storage.available) {
+      return Text(
+        'Browser storage is unavailable, so stories cannot be saved. '
+        'Export anything you want to keep.',
+        style: t.text.caption.copyWith(color: t.colors.danger),
+      );
+    }
+    final est = ref.watch(storageEstimateProvider).asData?.value;
+    final parts = [
+      if (est?.usage != null)
+        'Using ${_size(est!.usage)}${est.quota != null ? ' of ${_size(est.quota)}' : ''}',
+      if (est?.persisted == true) 'protected from clean-up by the browser',
+      if (est?.persisted == false) 'not yet protected from browser clean-up',
+    ];
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: SsSpace.s3,
+      children: [
+        Text(
+          parts.isEmpty ? 'Stored in this browser.' : parts.join('  ·  '),
+          style: t.text.caption,
+        ),
+        SsButton(
+          label: 'Clean up unused files',
+          variant: SsButtonVariant.ghost,
+          onPressed: () => StoryActions(context, ref).cleanUpAssets(),
+        ),
+      ],
     );
   }
 }

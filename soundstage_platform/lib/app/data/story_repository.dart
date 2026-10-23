@@ -321,3 +321,9 @@ final storyDocumentProvider = FutureProvider.family<ir.StageDocument?, String>((
 ) {
   return ref.watch(storyRepositoryProvider).load(id);
 });
+
+/// The story with load details (diagnostics, recovery from an older
+/// revision), or null if there is none.
+final storyLoadProvider = FutureProvider.family<StoryLoad?, String>((ref, id) {
+  return ref.watch(storyRepositoryProvider).open(id);
+});

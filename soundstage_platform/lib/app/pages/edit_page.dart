@@ -15,6 +15,17 @@ class EditPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(storyLoadProvider(storyId), (_, next) {
+      final load = next.asData?.value;
+      if (load != null && load.recovered && context.mounted) {
+        SsToast.show(
+          context,
+          'The latest save of this story was damaged. Opened revision '
+          '${load.recoveredFromRevision} instead.',
+          kind: SsToastKind.warning,
+        );
+      }
+    });
     return switch (ref.watch(storyDocumentProvider(storyId))) {
       AsyncData(:final value) when value != null => Scaffold(
         backgroundColor: context.ss.colors.surface0,
