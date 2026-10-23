@@ -25,6 +25,10 @@ abstract final class SsIcons {
     0xe26f,
     fontFamily: fontFamily,
   );
+  static const IconData alignHorizontalSpaceBetween = IconData(
+    0xe276,
+    fontFamily: fontFamily,
+  );
   static const IconData alignStartHorizontal = IconData(
     0xe270,
     fontFamily: fontFamily,
@@ -33,37 +37,74 @@ abstract final class SsIcons {
     0xe271,
     fontFamily: fontFamily,
   );
+  static const IconData alignVerticalSpaceBetween = IconData(
+    0xe27b,
+    fontFamily: fontFamily,
+  );
   static const IconData arrowDown = IconData(0xe042, fontFamily: fontFamily);
   static const IconData arrowLeft = IconData(0xe048, fontFamily: fontFamily);
+  static const IconData arrowLeftRight = IconData(
+    0xe24a,
+    fontFamily: fontFamily,
+  );
   static const IconData arrowRight = IconData(0xe049, fontFamily: fontFamily);
   static const IconData arrowUp = IconData(0xe04a, fontFamily: fontFamily);
+  static const IconData arrowUpDown = IconData(0xe37d, fontFamily: fontFamily);
   static const IconData audioLines = IconData(0xe55a, fontFamily: fontFamily);
+  static const IconData ban = IconData(0xe051, fontFamily: fontFamily);
+  static const IconData blend = IconData(0xe59c, fontFamily: fontFamily);
   static const IconData bookOpen = IconData(0xe05f, fontFamily: fontFamily);
   static const IconData check = IconData(0xe06c, fontFamily: fontFamily);
   static const IconData chevronDown = IconData(0xe06d, fontFamily: fontFamily);
   static const IconData chevronLeft = IconData(0xe06e, fontFamily: fontFamily);
   static const IconData chevronRight = IconData(0xe06f, fontFamily: fontFamily);
   static const IconData chevronUp = IconData(0xe070, fontFamily: fontFamily);
+  static const IconData chevronsUpDown = IconData(
+    0xe211,
+    fontFamily: fontFamily,
+  );
   static const IconData circle = IconData(0xe076, fontFamily: fontFamily);
   static const IconData circleAlert = IconData(0xe077, fontFamily: fontFamily);
   static const IconData circleCheck = IconData(0xe226, fontFamily: fontFamily);
+  static const IconData circleDashed = IconData(0xe4b0, fontFamily: fontFamily);
   static const IconData circleHelp = IconData(0xe082, fontFamily: fontFamily);
   static const IconData clapperboard = IconData(0xe29b, fontFamily: fontFamily);
   static const IconData command = IconData(0xe09a, fontFamily: fontFamily);
   static const IconData component = IconData(0xe2ad, fontFamily: fontFamily);
   static const IconData copy = IconData(0xe09e, fontFamily: fontFamily);
+  static const IconData crop = IconData(0xe0ab, fontFamily: fontFamily);
+  static const IconData droplet = IconData(0xe0b4, fontFamily: fontFamily);
   static const IconData ellipsis = IconData(0xe0b6, fontFamily: fontFamily);
+  static const IconData ellipsisVertical = IconData(
+    0xe0b7,
+    fontFamily: fontFamily,
+  );
+  static const IconData expand = IconData(0xe21a, fontFamily: fontFamily);
   static const IconData externalLink = IconData(0xe0b9, fontFamily: fontFamily);
   static const IconData eye = IconData(0xe0ba, fontFamily: fontFamily);
   static const IconData eyeClosed = IconData(0xe62e, fontFamily: fontFamily);
   static const IconData eyeOff = IconData(0xe0bb, fontFamily: fontFamily);
   static const IconData file = IconData(0xe0c0, fontFamily: fontFamily);
   static const IconData film = IconData(0xe0d0, fontFamily: fontFamily);
+  static const IconData flipHorizontal = IconData(
+    0xe35d,
+    fontFamily: fontFamily,
+  );
+  static const IconData flipVertical = IconData(0xe35f, fontFamily: fontFamily);
+  static const IconData foldHorizontal = IconData(
+    0xe43b,
+    fontFamily: fontFamily,
+  );
   static const IconData folder = IconData(0xe0d7, fontFamily: fontFamily);
   static const IconData frame = IconData(0xe291, fontFamily: fontFamily);
+  static const IconData gripHorizontal = IconData(
+    0xe0ea,
+    fontFamily: fontFamily,
+  );
   static const IconData gripVertical = IconData(0xe0eb, fontFamily: fontFamily);
   static const IconData hand = IconData(0xe1d7, fontFamily: fontFamily);
   static const IconData image = IconData(0xe0f6, fontFamily: fontFamily);
+  static const IconData imagePlus = IconData(0xe1f7, fontFamily: fontFamily);
   static const IconData info = IconData(0xe0f9, fontFamily: fontFamily);
   static const IconData keyboard = IconData(0xe284, fontFamily: fontFamily);
   static const IconData layers = IconData(0xe529, fontFamily: fontFamily);
@@ -84,6 +125,11 @@ abstract final class SsIcons {
     fontFamily: fontFamily,
   );
   static const IconData move = IconData(0xe121, fontFamily: fontFamily);
+  static const IconData moveHorizontal = IconData(
+    0xe1c6,
+    fontFamily: fontFamily,
+  );
+  static const IconData moveVertical = IconData(0xe1c7, fontFamily: fontFamily);
   static const IconData music = IconData(0xe122, fontFamily: fontFamily);
   static const IconData panelBottom = IconData(0xe42c, fontFamily: fontFamily);
   static const IconData panelLeft = IconData(0xe12a, fontFamily: fontFamily);
@@ -95,17 +141,25 @@ abstract final class SsIcons {
   static const IconData plus = IconData(0xe13d, fontFamily: fontFamily);
   static const IconData redo2 = IconData(0xe2a0, fontFamily: fontFamily);
   static const IconData rotateCcw = IconData(0xe148, fontFamily: fontFamily);
+  static const IconData rotateCw = IconData(0xe149, fontFamily: fontFamily);
   static const IconData ruler = IconData(0xe14b, fontFamily: fontFamily);
   static const IconData scaling = IconData(0xe2ec, fontFamily: fontFamily);
   static const IconData scan = IconData(0xe257, fontFamily: fontFamily);
   static const IconData search = IconData(0xe151, fontFamily: fontFamily);
   static const IconData settings = IconData(0xe154, fontFamily: fontFamily);
+  static const IconData shrink = IconData(0xe220, fontFamily: fontFamily);
   static const IconData slidersHorizontal = IconData(
     0xe29a,
     fontFamily: fontFamily,
   );
   static const IconData smartphone = IconData(0xe163, fontFamily: fontFamily);
   static const IconData square = IconData(0xe167, fontFamily: fontFamily);
+  static const IconData squareDashed = IconData(0xe1cb, fontFamily: fontFamily);
+  static const IconData squareRoundCorner = IconData(
+    0xe648,
+    fontFamily: fontFamily,
+  );
+  static const IconData sun = IconData(0xe178, fontFamily: fontFamily);
   static const IconData tablet = IconData(0xe17e, fontFamily: fontFamily);
   static const IconData trash2 = IconData(0xe18e, fontFamily: fontFamily);
   static const IconData triangleAlert = IconData(
@@ -114,7 +168,12 @@ abstract final class SsIcons {
   );
   static const IconData type = IconData(0xe198, fontFamily: fontFamily);
   static const IconData undo2 = IconData(0xe2a1, fontFamily: fontFamily);
+  static const IconData unfoldHorizontal = IconData(
+    0xe43d,
+    fontFamily: fontFamily,
+  );
   static const IconData unlink = IconData(0xe19c, fontFamily: fontFamily);
+  static const IconData wrapText = IconData(0xe248, fontFamily: fontFamily);
   static const IconData x = IconData(0xe1b2, fontFamily: fontFamily);
   static const IconData zoomIn = IconData(0xe1b6, fontFamily: fontFamily);
   static const IconData zoomOut = IconData(0xe1b7, fontFamily: fontFamily);
