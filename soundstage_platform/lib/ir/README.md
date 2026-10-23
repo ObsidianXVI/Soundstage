@@ -183,8 +183,8 @@ left dangling) don't stop an edit.
   insertion point counting the moved nodes; tree order kept; cycles refused; with
   `preservePosition` (default) a reparented, constraint-placed node keeps its visual position:
   its box (`boxes`, or derived from stored geometry at `breakpointId`) is converted through the
-  inverse §4.3 constraint math (`constraint_math.dart`, mirroring the runtime's and
-  cross-checked by a test), shifting patches and x/y tracks by the same delta; in-flow
+  inverse §4.3 constraint math (`constraint_math.dart`, the single implementation that the
+  runtime's layout re-exports), shifting patches and x/y tracks by the same delta; in-flow
   auto-layout children only reorder. Across scenes, tracks follow the nodes, the own scroll
   clock is rebound and any other clock is copied once with a fresh id, with references in the
   moved subtrees rebound; `cascade.clockIdMap`), `wrapInFrame` (rotated bounds, positions, numeric `x`/`y` patches and `x`/`y` tracks

@@ -16,7 +16,10 @@ Pure functions with no render objects, so they can be unit-tested (`test/runtime
   rotation, stroke outsets, plus `measure(w?, h?)` and `baseline(size)` callbacks.
 - `firstBaselineOf(children, boxes)`: a frame's first baseline (first child with text, in child order).
 - `resolveAxisConstraint` / `resolveConstraints`: §4.3, five constraints per axis against
-  reference size R and actual size P, then min/max, re-anchored.
+  reference size R and actual size P, then min/max, re-anchored. The per-axis math (and its
+  inverse, `inverseResolveAxisConstraint`) has a single implementation in the IR
+  (`lib/ir/src/edit/constraint_math.dart`); `constraints.dart` re-exports it and adds the
+  `Rect` forms `resolveConstraints` / `inverseResolveConstraints`.
 - `rotatedFootprint`, `sizeStageChild`, `stagePaintOrder`, `clampSize`.
 
 ## Render objects (`src/render/`)

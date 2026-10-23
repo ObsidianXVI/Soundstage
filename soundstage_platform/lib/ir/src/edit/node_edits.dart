@@ -682,8 +682,8 @@ class _MoveGeometry {
         (node is TextNode &&
             (node.autoResize == TextAutoResize.widthAndHeight ||
                 node.autoResize == TextAutoResize.height));
-    final h = inverseAxisConstraint(
-      constraint: horizontalEditConstraint(lc.constraints.horizontal),
+    final h = inverseResolveAxisConstraint(
+      constraint: horizontalAxisConstraint(lc.constraints.horizontal),
       offset: b.x - pb.x,
       size: b.width,
       reference: r.width,
@@ -692,8 +692,8 @@ class _MoveGeometry {
       max: lc.maxWidth,
       contentSize: hugX ? b.width : null,
     );
-    final v = inverseAxisConstraint(
-      constraint: verticalEditConstraint(lc.constraints.vertical),
+    final v = inverseResolveAxisConstraint(
+      constraint: verticalAxisConstraint(lc.constraints.vertical),
       offset: b.y - pb.y,
       size: b.height,
       reference: r.height,

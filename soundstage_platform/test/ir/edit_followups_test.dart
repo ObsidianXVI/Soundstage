@@ -1,12 +1,7 @@
 // T1.0 follow-ups (DECISIONS 23/10/26): removeNodes cascades, moveNodes
 // copies clocks across scenes and keeps visual positions.
-import 'dart:math';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/ir/ir.dart';
-import 'package:soundstage_platform/ir/src/edit/constraint_math.dart';
-import 'package:soundstage_platform/runtime/src/render/layout/constraints.dart'
-    as rt;
 
 const _bps = [
   Breakpoint(
@@ -389,8 +384,8 @@ void main() {
       expect(a1.y, 15);
       expect(a1.height, 5);
       // Forward map gives back the box.
-      final h = rt.resolveAxisConstraint(
-        constraint: rt.AxisConstraint.end,
+      final h = resolveAxisConstraint(
+        constraint: AxisConstraint.end,
         position: a1.x,
         size: a1.width,
         reference: 200,
@@ -472,40 +467,5 @@ void main() {
       );
       expect(a1.x, -390);
     });
-  });
-
-  test('the IR constraint inverse matches the runtime\'s', () {
-    final rnd = Random(3);
-    for (var i = 0; i < 500; i++) {
-      final c = EditAxisConstraint.values[rnd.nextInt(5)];
-      final offset = rnd.nextDouble() * 400 - 100;
-      final size = rnd.nextDouble() * 200;
-      final reference = [0.0, 100.0, 300.0][rnd.nextInt(3)];
-      final parent = [0.0, 150.0, 600.0][rnd.nextInt(3)];
-      final min = rnd.nextBool() ? 20.0 : null;
-      final max = rnd.nextBool() ? 150.0 : null;
-      final content = rnd.nextBool() ? 80.0 : null;
-      final a = inverseAxisConstraint(
-        constraint: c,
-        offset: offset,
-        size: size,
-        reference: reference,
-        parent: parent,
-        min: min,
-        max: max,
-        contentSize: content,
-      );
-      final b = rt.inverseResolveAxisConstraint(
-        constraint: rt.AxisConstraint.values[c.index],
-        offset: offset,
-        size: size,
-        reference: reference,
-        parent: parent,
-        min: min,
-        max: max,
-        contentSize: content,
-      );
-      expect((a.position, a.size), (b.position, b.size), reason: 'case $i');
-    }
   });
 }
