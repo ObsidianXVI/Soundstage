@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -141,6 +143,12 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
         _session = null;
         s.cancel();
         _setCursor(MouseCursor.defer);
+        // Every keyboard handler sees the key, so the shortcuts' Esc
+        // ("select parent") runs too; put the selection back after it.
+        final keep = _ctl.selectionState;
+        scheduleMicrotask(() {
+          if (mounted) _ctl.applySelection(keep);
+        });
         return true;
       }
       if (_isModifier(e.logicalKey)) s.update(_pointer, _modifiers());
@@ -601,6 +609,9 @@ class _MoveSession extends _Transform {
   late bool allInFlow;
   Matrix4? rootToWorld;
   String? rootId;
+
+  /// The shared parent's world bounds at the start.
+  Rect? parentWorldRect;
   final Map<String?, SnapIndex> _indexes = {};
   final Map<String, Rect> _targetRootBoxes = {};
 
@@ -626,6 +637,7 @@ class _MoveSession extends _Transform {
       moving[id] = id;
     }
     parentId = parents.length == 1 ? parents.single : null;
+    parentWorldRect = parentId == null ? null : g.worldRectFor(parentId!, bp);
     rootId = s._c.artboards[bp]?.scene?.root.id;
     rootToWorld = rootId == null ? null : g.worldTransformFor(rootId!, bp);
     canReparent =
@@ -668,6 +680,12 @@ class _MoveSession extends _Transform {
   /// the current parent with Cmd/Ctrl.
   String? _dropTarget(Offset screen, CanvasModifiers mods) {
     if (!canReparent || mods.deep) return parentId;
+    // Reordering wins inside the auto-layout parent: siblings (frames too)
+    // are not drop targets while the pointer stays within it (Figma).
+    final pr = parentWorldRect;
+    if (allInFlow && pr != null && pr.contains(s._world(screen))) {
+      return parentId;
+    }
     final hits = s._g.hitTest(screen);
     final index = ir.DocumentIndex.of(base);
     final movingSet = movingIds;

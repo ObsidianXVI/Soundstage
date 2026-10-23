@@ -1,4 +1,3 @@
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/editor/canvas/camera.dart';
@@ -30,11 +29,15 @@ void main() {
       const m = Rect.fromLTWH(427, 301, 50, 50);
       final r = index.snap(m, 5);
       expect(r.offset, const Offset(-2, 0));
-      expect(r.guides, hasLength(1));
-      final g = r.guides.single;
-      expect(g.a, const Offset(450, 100));
-      expect(g.b, const Offset(450, 351));
-      expect(g.label, 101); // b's bottom (200) to the box's top (301)
+      // The aligned line, then the labelled gap to the aligned box.
+      expect(r.guides, hasLength(2));
+      final line = r.guides.first, gap = r.guides.last;
+      expect(line.a, const Offset(450, 100));
+      expect(line.b, const Offset(450, 351));
+      expect(line.label, isNull);
+      expect(gap.a, const Offset(450, 200));
+      expect(gap.b, const Offset(450, 301));
+      expect(gap.label, 101); // b's bottom (200) to the box's top (301)
     });
 
     test('the artboard edges and centre are candidates', () {
@@ -91,6 +94,16 @@ void main() {
   });
 
   group('smart spacing', () {
+    test('markers only for pairs in the moving box\'s row', () {
+      const far1 = Rect.fromLTWH(100, 600, 100, 50);
+      const far2 = Rect.fromLTWH(250, 600, 100, 50); // gap 50, other row
+      final index = SnapIndex(siblings: [a, b, far1, far2]);
+      // Centred between a and b: gap 50 each, same as the far pair's.
+      final r = index.snap(const Rect.fromLTWH(252, 120, 100, 50), 5);
+      expect(r.gaps, hasLength(2));
+      expect(r.gaps.every((g) => g.area.top < 300), isTrue);
+    });
+
     test('centred between two neighbours, with both gap markers', () {
       final index = SnapIndex(siblings: [a, b]);
       // 100 wide between 200 and 400: centred at 250.

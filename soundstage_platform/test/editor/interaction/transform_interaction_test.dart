@@ -154,6 +154,45 @@ void main() {
       expect(_kids(h, 'row'), ['i1', 'i2', 'i3']);
     });
 
+    testWidgets('over a sibling frame inside the auto-layout parent: still a '
+        'reorder, not a reparent', (tester) async {
+      final h = await pumpCanvas(
+        tester,
+        doc: interactionDoc().copyWith(
+          scenes: [
+            for (final s in interactionDoc().scenes)
+              s.copyWith(
+                root: s.root.copyWith(
+                  children: [
+                    for (final c in s.root.children)
+                      if (c.id == 'row')
+                        (c as ir.FrameNode).copyWith(
+                          children: [
+                            ...c.children.take(2),
+                            const ir.FrameNode(
+                              common: ir.NodeCommon(
+                                id: 'i3',
+                                width: 100,
+                                height: 100,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        c,
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+      h.ctl.select({'i1'});
+      await tester.pump();
+      await h.drag(h.desk(160, 460), h.desk(400, 460));
+      expect(_parent(h, 'i1'), 'row');
+      expect(_kids(h, 'row'), ['i2', 'i3', 'i1']);
+    });
+
     testWidgets('a node dragged into an auto-layout frame joins the flow at '
         'the slot', (tester) async {
       final h = await pumpCanvas(tester);

@@ -276,7 +276,8 @@ class OverlayPainter extends CustomPainter {
           if (model.showHandles && interaction.showsHandles) {
             _handles(canvas, frame);
           }
-          if (interaction.gesture != CanvasGestureKind.marquee) {
+          if (interaction.gesture != CanvasGestureKind.marquee &&
+              interaction.measures.isEmpty) {
             _sizeLabel(canvas, frame, bp);
           }
         }
@@ -571,7 +572,15 @@ class OverlayPainter extends CustomPainter {
       }
       final label = g.label;
       if (label != null && label > 0.004) {
-        _badge(canvas, _num(label), (a + b) / 2, colors.measure, centred: true);
+        // A line too short for its badge gets the badge beside it.
+        final d = b - a;
+        var at = (a + b) / 2;
+        if (d.distance < 36) {
+          at += d.dx.abs() >= d.dy.abs()
+              ? const Offset(0, -12)
+              : const Offset(22, 0);
+        }
+        _badge(canvas, _num(label), at, colors.measure, centred: true);
       }
     }
     // Marquee.

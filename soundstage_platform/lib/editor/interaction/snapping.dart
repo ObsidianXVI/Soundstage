@@ -272,23 +272,55 @@ class SnapIndex {
     final r = moving.shift(offset);
     final guides = <Guide>[];
     final gaps = <GapMarker>[];
-    if (alignX) {
-      for (final q in [
-        if (edges.left) r.left,
-        if (edges.isMove) r.center.dx,
-        if (edges.right) r.right,
-      ]) {
-        _alignGuide(r, q, _x.sourcesAt(q), vertical: true, out: guides);
+    // Alignment: a line per aligned value, and one distance label per axis
+    // on the gap to the nearest aligned box.
+    void align(List<double> qs, _Axis axis, {required bool vertical}) {
+      _Gap? best;
+      for (final q in qs) {
+        final g = _alignGuide(r, q, axis.sourcesAt(q), vertical: vertical);
+        if (g == null) continue;
+        guides.add(g.$1);
+        final gap = g.$2;
+        if (gap != null && (best == null || gap.size < best.size)) best = gap;
+      }
+      if (best != null) {
+        guides.add(
+          vertical
+              ? Guide(
+                  Offset(best.q, best.from),
+                  Offset(best.q, best.to),
+                  label: best.size,
+                )
+              : Guide(
+                  Offset(best.from, best.q),
+                  Offset(best.to, best.q),
+                  label: best.size,
+                ),
+        );
       }
     }
+
+    if (alignX) {
+      align(
+        [
+          if (edges.left) r.left,
+          if (edges.isMove) r.center.dx,
+          if (edges.right) r.right,
+        ],
+        _x,
+        vertical: true,
+      );
+    }
     if (alignY) {
-      for (final q in [
-        if (edges.top) r.top,
-        if (edges.isMove) r.center.dy,
-        if (edges.bottom) r.bottom,
-      ]) {
-        _alignGuide(r, q, _y.sourcesAt(q), vertical: false, out: guides);
-      }
+      align(
+        [
+          if (edges.top) r.top,
+          if (edges.isMove) r.center.dy,
+          if (edges.bottom) r.bottom,
+        ],
+        _y,
+        vertical: false,
+      );
     }
     if (hs != null) gaps.addAll(_markers(r, hs, horizontal: true));
     if (vs != null) gaps.addAll(_markers(r, vs, horizontal: false));
@@ -303,34 +335,39 @@ class SnapIndex {
 
   static double _gridDelta(double v) => v.roundToDouble() - v;
 
-  /// A red alignment guide through [q] spanning [r] and the aligned boxes,
-  /// labelled with the distance to the nearest aligned box.
-  void _alignGuide(
+  /// A red alignment guide through [q] spanning [r] and the aligned boxes
+  /// (unlabelled), and the gap from [r] to the nearest aligned box along
+  /// it, or null when no box is aligned there.
+  (Guide, _Gap?)? _alignGuide(
     Rect r,
     double q,
     Iterable<int> sources, {
     required bool vertical,
-    required List<Guide> out,
   }) {
     var lo = vertical ? r.top : r.left;
     var hi = vertical ? r.bottom : r.right;
-    double? nearest;
+    final r0 = vertical ? r.top : r.left, r1 = vertical ? r.bottom : r.right;
+    _Gap? nearest;
     var any = false;
     for (final i in sources) {
       any = true;
       final s = boxes[i];
       final s0 = vertical ? s.top : s.left, s1 = vertical ? s.bottom : s.right;
-      final r0 = vertical ? r.top : r.left, r1 = vertical ? r.bottom : r.right;
       lo = math.min(lo, s0);
       hi = math.max(hi, s1);
-      final gap = s0 >= r1 ? s0 - r1 : (r0 >= s1 ? r0 - s1 : null);
-      if (gap != null && (nearest == null || gap < nearest)) nearest = gap;
+      final gap = s0 >= r1
+          ? _Gap(q, r1, s0)
+          : (r0 >= s1 ? _Gap(q, s1, r0) : null);
+      if (gap != null && (nearest == null || gap.size < nearest.size)) {
+        nearest = gap;
+      }
     }
-    if (!any) return;
-    out.add(
+    if (!any) return null;
+    return (
       vertical
-          ? Guide(Offset(q, lo), Offset(q, hi), label: nearest)
-          : Guide(Offset(lo, q), Offset(hi, q), label: nearest),
+          ? Guide(Offset(q, lo), Offset(q, hi))
+          : Guide(Offset(lo, q), Offset(hi, q)),
+      nearest,
     );
   }
 
@@ -364,6 +401,13 @@ class SnapIndex {
       }
     }
 
+    // Centred between both neighbours wins ties (it shows both gaps).
+    if (before != null && after != null) {
+      final free = s(boxes[after]) - e(boxes[before]) - size;
+      if (free > 0) {
+        consider(e(boxes[before]) + free / 2, free / 2, _Side.between);
+      }
+    }
     if (before != null) {
       for (final p in pairs) {
         if (p.gap <= 0) continue;
@@ -374,12 +418,6 @@ class SnapIndex {
       for (final p in pairs) {
         if (p.gap <= 0) continue;
         consider(s(boxes[after]) - p.gap - size, p.gap, _Side.after);
-      }
-    }
-    if (before != null && after != null) {
-      final free = s(boxes[after]) - e(boxes[before]) - size;
-      if (free > 0) {
-        consider(e(boxes[before]) + free / 2, free / 2, _Side.between);
       }
     }
     return best;
@@ -408,6 +446,13 @@ class SnapIndex {
     if (sp.side == _Side.between) return out;
     for (final p in horizontal ? _hPairs : _vPairs) {
       if ((p.gap - sp.gap).abs() > 0.01) continue;
+      // Only pairs in the moving box's row (column), as Figma shows them:
+      // the gap itself must share the box's band.
+      final area = between(boxes[p.a], boxes[p.b]);
+      final inBand = horizontal
+          ? _overlap(area.top, area.bottom, r.top, r.bottom)
+          : _overlap(area.left, area.right, r.left, r.right);
+      if (!inBand) continue;
       out.add(
         GapMarker(between(boxes[p.a], boxes[p.b]), horizontal: horizontal),
       );
@@ -418,6 +463,14 @@ class SnapIndex {
 }
 
 enum _Side { before, after, between }
+
+/// A gap along an alignment guide at [q], from [from] to [to].
+class _Gap {
+  _Gap(this.q, this.from, this.to);
+
+  final double q, from, to;
+  double get size => to - from;
+}
 
 class _Spacing {
   _Spacing(this.delta, this.gap, this.side, this.before, this.after);
