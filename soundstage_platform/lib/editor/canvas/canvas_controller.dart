@@ -6,6 +6,7 @@ import 'package:soundstage_platform/editor/core/editor_controller.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
+import '../overlay/interaction_model.dart';
 import '../overlay/overlay_geometry.dart';
 import 'camera.dart';
 
@@ -117,6 +118,9 @@ class CanvasController {
 
   /// Geometry queries for the overlay and for T1.4/T1.5.
   late final OverlayGeometry overlay = OverlayGeometry(this);
+
+  /// The canvas tools' transient overlay state (marquee, guides, ...).
+  final InteractionModel interaction = InteractionModel();
 
   /// Called by the artboard canvas after layout.
   void notifyGeometry() => _geometry.fire();
@@ -292,6 +296,7 @@ class CanvasController {
     _anim = null;
     camera.dispose();
     previewWidths.dispose();
+    interaction.dispose();
     _geometry.dispose();
   }
 }

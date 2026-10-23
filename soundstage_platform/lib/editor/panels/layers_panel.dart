@@ -18,7 +18,8 @@ import 'layers_model.dart';
 /// - Selection and hover are the editor's: a click selects, Shift extends a
 ///   range, Cmd/Ctrl toggles; the row under the pointer is the hovered node
 ///   on the canvas and vice versa.
-/// - Rows rename inline (double-click, Enter or F2), toggle visibility and
+/// - Rows rename inline (double-click, Enter or F2, or Cmd+R anywhere in the
+///   editor through `EditorController.events`), toggle visibility and
 ///   lock, and open a context menu. Keys: Up/Down move the selection,
 ///   Left/Right collapse and expand, Delete deletes.
 /// - Dragging a row reorders and reparents (one [MoveNodes] on drop, so one
@@ -67,6 +68,7 @@ class _LayersPanelState extends ConsumerState<LayersPanel> {
   _Drag? _drag;
   Offset? _dragStartGlobal;
   Timer? _autoScroll;
+  StreamSubscription<String>? _renames;
 
   EditorController get _ctl => ref.read(editorControllerProvider.notifier);
   EditorState get _state => ref.read(editorControllerProvider);
@@ -77,10 +79,20 @@ class _LayersPanelState extends ConsumerState<LayersPanel> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _reveal(_state.selection);
     });
+    // Cmd+R / F2 from anywhere in the editor (T1.4): reveal the row, then
+    // open its rename field once it is built.
+    _renames = _ctl.events.renameRequests.listen((id) {
+      if (!mounted) return;
+      _reveal({id});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _beginRename(id);
+      });
+    });
   }
 
   @override
   void dispose() {
+    unawaited(_renames?.cancel());
     _autoScroll?.cancel();
     _scroll.dispose();
     _focus.dispose();

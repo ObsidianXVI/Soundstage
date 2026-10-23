@@ -10,6 +10,7 @@ import 'package:soundstage_platform/editor/core/editor_state.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
+import '../interaction/canvas_interaction.dart';
 import '../overlay/canvas_overlay.dart';
 import 'artboard.dart';
 import 'artboard_canvas.dart';
@@ -29,6 +30,9 @@ const double kWheelZoomScale = 240;
 /// - zoom: Cmd/Ctrl+wheel and trackpad pinch, about the pointer;
 /// - keyboard zoom (Cmd+=, Cmd+-, Cmd+0, Shift+1, Shift+2) goes through
 ///   [CanvasController] from the shell's shortcut actions, animated.
+///
+/// Selection and transform tools are [CanvasInteraction] (T1.4/T1.5),
+/// between the overlay and the artboard chrome.
 ///
 /// The canvas frames every artboard (at most 100%) once they first lay out.
 class EditorCanvas extends ConsumerStatefulWidget {
@@ -212,6 +216,7 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
                     ],
                   ),
                   CanvasOverlay(controller: _c),
+                  CanvasInteraction(controller: _c, pansWith: _pansWith),
                   ArtboardChrome(controller: _c, breakpoints: boards),
                 ],
               ),

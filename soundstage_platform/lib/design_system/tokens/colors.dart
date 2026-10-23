@@ -31,9 +31,19 @@ class SsColors {
     required this.hoverLayer,
     required this.pressedLayer,
     required this.scrim,
+    this.measure = const Color(0xFFF24822),
+    this.spacing = const Color(0xFFE84BC0),
   });
 
   final Brightness brightness;
+
+  /// Canvas overlay: snapping guides and Alt measurements (Figma's red).
+  /// The same in both themes: it sits on the story, not on the chrome.
+  final Color measure;
+
+  /// Canvas overlay: smart-spacing (equal gap) markers and auto-layout
+  /// padding/gap hints (Figma's pink).
+  final Color spacing;
 
   /// The canvas surround / app background.
   final Color surface0;
