@@ -52,7 +52,7 @@ class FieldFrame extends ConsumerWidget {
     final scope = InspectorScope.of(context);
     final sources = [
       for (final p in paths)
-        ref.watch(valueSourceProvider(ReadKey(scope.ids, p))),
+        ref.watch(selectedNodesProvider.select((s) => valueSourceOf(s, p))),
     ];
     final source = _strongest(sources);
     if (source.kind == ValueSourceKind.own) return child;

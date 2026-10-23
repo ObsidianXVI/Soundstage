@@ -9,15 +9,17 @@ import '../property_writer.dart';
 import 'field_frame.dart';
 
 // The registry-driven controls. Each is one property path plus a control
-// kind: it reads the path through [propertyReadingProvider] (so it rebuilds
-// only when its own value changes), writes through the scope's
+// kind: it reads the path through [selectedNodesProvider] with a selector (so it
+// rebuilds only when its own value changes), writes through the scope's
 // [PropertyWriter], and wraps itself in the value-source chrome.
 
 /// Reads [path] of the scope's selection. Widgets using this rebuild only
 /// when this property's reading changes.
 PropertyReading watchReading(BuildContext context, WidgetRef ref, String path) {
-  final scope = InspectorScope.of(context);
-  return ref.watch(propertyReadingProvider(ReadKey(scope.ids, path)));
+  // The scope is the dependency that rebuilds on a new selection; the
+  // selector keeps this widget out of every edit but its own value's.
+  InspectorScope.of(context);
+  return ref.watch(selectedNodesProvider.select((s) => s.read(path)));
 }
 
 double _round(double v) => (v * 1e6).roundToDouble() / 1e6;

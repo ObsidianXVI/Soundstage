@@ -11,8 +11,9 @@ import '../core/core.dart';
 
 const String _sep = '\u0001';
 
-/// A property of a set of nodes: the key of the per-field providers.
-/// Compared by value, so equal keys share a provider.
+/// A property of a set of nodes, compared by value: the key of the small
+/// per-section `Provider.family`s that derive facts from the selection.
+/// (Fields themselves use [SelectedNodes.read].)
 @immutable
 class ReadKey {
   ReadKey(Iterable<String> ids, this.path) : idsKey = ids.join(_sep);
@@ -84,46 +85,161 @@ class PropertyReading {
   int get hashCode => Object.hash(value, mixed, applicable, total);
 }
 
-/// Reads [path] of [ids] from a resolved [index] (namespaced id → node).
-PropertyReading readProperty(
-  Map<String, ir.ResolvedNode> index,
-  Iterable<String> ids,
-  String path,
-) {
-  ir.IrValue? first;
-  var mixed = false;
-  var applicable = 0;
-  var total = 0;
-  for (final id in ids) {
-    final n = index[id];
-    if (n == null) continue;
-    total++;
-    final v = ir.resolvedPropertyValue(n, path);
-    if (v == null) continue;
-    applicable++;
-    if (first == null) {
-      first = v;
-    } else if (v != first) {
-      mixed = true;
+/// The selected nodes at the edited breakpoint: the single shared input of
+/// every field.
+///
+/// Fields do `ref.watch(selectedNodesProvider.select((s) => s.read(path)))`:
+/// one provider for the whole panel and one cheap selector per field, instead
+/// of a provider per field. The provider's value is compared by node
+/// identity, so an edit elsewhere in the story (which re-resolves only its
+/// own path) does not even run the selectors.
+@immutable
+class SelectedNodes {
+  const SelectedNodes({
+    required this.ids,
+    required this.resolved,
+    required this.authored,
+    required this.document,
+    required this.breakpointId,
+    this.resolver,
+  });
+
+  /// Ids of the selected nodes that exist at [breakpointId], in selection
+  /// order; [resolved] and [authored] are parallel to it ([authored] is null
+  /// for nodes inside instances).
+  final List<String> ids;
+  final List<ir.ResolvedNode> resolved;
+  final List<ir.Node?> authored;
+
+  /// The document these were read from (names in tooltips; not compared).
+  final ir.StageDocument document;
+
+  /// The edited breakpoint's long-lived resolver, current for [document]
+  /// (`explain` reuses its memo); null without a breakpoint. Not compared.
+  final ir.Resolver? resolver;
+  final String? breakpointId;
+
+  /// [path] across the selection.
+  PropertyReading read(String path) {
+    ir.IrValue? first;
+    var mixed = false;
+    var applicable = 0;
+    for (final n in resolved) {
+      final v = ir.resolvedPropertyValue(n, path);
+      if (v == null) continue;
+      applicable++;
+      if (first == null) {
+        first = v;
+      } else if (v != first) {
+        mixed = true;
+      }
     }
+    return PropertyReading(
+      value: first,
+      mixed: mixed,
+      applicable: applicable,
+      total: resolved.length,
+    );
   }
-  return PropertyReading(
-    value: first,
-    mixed: mixed,
-    applicable: applicable,
-    total: total,
-  );
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! SelectedNodes ||
+        other.breakpointId != breakpointId ||
+        other.ids.length != ids.length) {
+      return false;
+    }
+    for (var i = 0; i < ids.length; i++) {
+      if (other.ids[i] != ids[i] ||
+          !identical(other.resolved[i], resolved[i]) ||
+          !identical(other.authored[i], authored[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(breakpointId, Object.hashAll(ids));
 }
 
-/// [ReadKey.path] of [ReadKey.ids] at the edited breakpoint.
+/// The live selection as [SelectedNodes].
+final selectedNodesProvider = Provider.autoDispose<SelectedNodes>(
+  (ref) {
+    final ids = ref.watch(selectionIdsProvider);
+    final bp = ref.watch(
+      editorControllerProvider.select((s) => s.breakpointId),
+    );
+    if (bp == null || ids.isEmpty) {
+      return SelectedNodes(
+        ids: const [],
+        resolved: const [],
+        authored: const [],
+        document: ref.read(editorControllerProvider).document,
+        breakpointId: bp,
+      );
+    }
+    final art = ref.watch(resolvedForProvider(bp));
+    final index = ir.DocumentIndex.of(art.document);
+    final found = <String>[];
+    final resolved = <ir.ResolvedNode>[];
+    final authored = <ir.Node?>[];
+    for (final id in ids.ids) {
+      final n = art.resolved.nodeIndex[id];
+      if (n == null) continue;
+      found.add(id);
+      resolved.add(n);
+      authored.add(id.contains('/') ? null : index.node(id));
+    }
+    return SelectedNodes(
+      ids: found,
+      resolved: resolved,
+      authored: authored,
+      document: art.document,
+      breakpointId: bp,
+      resolver: ref.read(editorControllerProvider.notifier).resolverFor(bp),
+    );
+  },
+  dependencies: [
+    editorControllerProvider,
+    resolvedForProvider,
+    selectionIdsProvider,
+  ],
+);
+
+/// [ReadKey.path] of the nodes [ReadKey.ids] (any nodes, not just the
+/// selection) at the edited breakpoint. For one-off reads in section logic;
+/// fields use [SelectedNodes.read], which is much cheaper per field.
 final propertyReadingProvider = Provider.autoDispose
     .family<PropertyReading, ReadKey>((ref, key) {
       final bp = ref.watch(
         editorControllerProvider.select((s) => s.breakpointId),
       );
       if (bp == null) return PropertyReading.none;
-      final art = ref.watch(resolvedForProvider(bp));
-      return readProperty(art.resolved.nodeIndex, key.ids, key.path);
+      final index = ref.watch(resolvedForProvider(bp)).resolved.nodeIndex;
+      ir.IrValue? first;
+      var mixed = false;
+      var applicable = 0;
+      var total = 0;
+      for (final id in key.ids) {
+        final n = index[id];
+        if (n == null) continue;
+        total++;
+        final v = ir.resolvedPropertyValue(n, key.path);
+        if (v == null) continue;
+        applicable++;
+        if (first == null) {
+          first = v;
+        } else if (v != first) {
+          mixed = true;
+        }
+      }
+      return PropertyReading(
+        value: first,
+        mixed: mixed,
+        applicable: applicable,
+        total: total,
+      );
     }, dependencies: [editorControllerProvider, resolvedForProvider]);
 
 // ---- Selection ---------------------------------------------------------------
@@ -439,42 +555,51 @@ String _variableName(ir.StageDocument doc, String variableId) {
   return variableId;
 }
 
-/// Whether [node] could have a source other than its own value, so the
-/// (comparatively costly) explain is worth running.
-bool _mayHaveSource(String id, ir.Node? node) {
+bool _overlaps(String key, String path) =>
+    key == path || key.startsWith('$path.') || path.startsWith('$key.');
+
+/// Whether [node] could have a source other than its own value for [path]
+/// (a patch, binding or style on that path, or an instance's inner node),
+/// so the comparatively costly explain is worth running. Most fields of most
+/// nodes cost a few map-key comparisons.
+bool _mayHaveSource(String id, ir.Node? node, String path) {
   if (id.contains('/')) return true;
   if (node == null) return false;
   final c = node.common;
-  return c.breakpointOverrides.isNotEmpty ||
-      c.bindings.isNotEmpty ||
-      c.componentBindings.isNotEmpty;
+  for (final patch in c.breakpointOverrides.values) {
+    for (final k in patch.keys) {
+      if (_overlaps(k, path)) return true;
+    }
+  }
+  for (final k in c.bindings.keys) {
+    if (_overlaps(k, path)) return true;
+  }
+  for (final k in c.componentBindings.keys) {
+    if (_overlaps(k, path)) return true;
+  }
+  return _hasStyleRef(node, path);
 }
 
-/// The value source of [ReadKey.path] across [ReadKey.ids] at the edited
-/// breakpoint: the strongest of the nodes'. Most nodes (no patches,
-/// bindings or instance) cost one map lookup.
-final valueSourceProvider = Provider.autoDispose.family<ValueSource, ReadKey>((
-  ref,
-  key,
-) {
-  final doc = ref.watch(
-    editorControllerProvider.select((s) => Identity(s.document)),
-  );
-  // Sources differ per breakpoint (a patch is a source only there).
-  ref.watch(editorControllerProvider.select((s) => s.breakpointId));
-  final ctl = ref.read(editorControllerProvider.notifier);
-  final docIndex = ir.DocumentIndex.of(doc.value);
+/// The value source of [path] across [nodes] at the edited breakpoint: the
+/// strongest of the nodes' (an override outranks the rest).
+ValueSource valueSourceOf(SelectedNodes nodes, String path) {
+  final resolver = nodes.resolver;
+  if (resolver == null) return ValueSource.own;
+  final ctx = ir.ResolveContext(breakpointId: nodes.breakpointId);
+  final propertyPath = ir.PropertyPath(path);
   ValueSource? best;
-  for (final id in key.ids) {
-    final node = docIndex.node(id.split('/').first);
-    final styled = node != null && _hasStyleRef(node, key.path);
-    if (!_mayHaveSource(id, node) && !styled) continue;
-    final s = summariseProvenance(doc.value, ctl.provenanceFor(id, key.path));
+  for (var i = 0; i < nodes.ids.length; i++) {
+    final id = nodes.ids[i];
+    if (!_mayHaveSource(id, nodes.authored[i], path)) continue;
+    final s = summariseProvenance(
+      nodes.document,
+      resolver.explain(nodes.document, id, propertyPath, ctx),
+    );
     if (s.kind == ValueSourceKind.own) continue;
     if (best == null || s.isOverride && !best.isOverride) best = s;
   }
   return best ?? ValueSource.own;
-}, dependencies: [editorControllerProvider]);
+}
 
 bool _hasStyleRef(ir.Node n, String path) {
   final a = switch (n) {
