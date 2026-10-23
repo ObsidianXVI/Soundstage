@@ -19,8 +19,11 @@ const String kSpikeDemoAsset = 'assets/demo/spike.stage.json';
 
 /// The mouse-wheel smoothing for the demos: on by default, off with
 /// `?wheel=native` (to compare against the browser's own wheel scrolling).
-StageWheelSmoothing? demoWheelSmoothing() =>
-    Uri.base.queryParameters['wheel'] == 'native'
+///
+/// [native] is the routed `wheel=native` flag; null falls back to the
+/// browser's current URL.
+StageWheelSmoothing? demoWheelSmoothing([bool? native]) =>
+    (native ?? Uri.base.queryParameters['wheel'] == 'native')
     ? null
     : const StageWheelSmoothing();
 
@@ -39,19 +42,29 @@ class SoundDemoHarness extends ConsumerWidget {
     this.asset = kSoundDemoAsset,
     this.coverFocal = const Offset(0.68, 0.42),
     this.buildOnEnter = false,
+    this.wheelNative,
+    this.statsOn,
   });
 
   final String asset;
   final Offset coverFocal;
   final bool buildOnEnter;
 
+  /// The `?wheel=native` flag (null: read the browser URL).
+  final bool? wheelNative;
+
+  /// The `?stats=1` flag (null: read the browser URL).
+  final bool? statsOn;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (ref.watch(audioDemoDocumentProvider(asset))) {
-      AsyncData(:final value) => _SoundStage(
+      AsyncData(:final value) => GatedStagePlayer(
         document: value,
         coverFocal: coverFocal,
         buildOnEnter: buildOnEnter,
+        wheelNative: wheelNative,
+        statsOn: statsOn,
       ),
       AsyncError(:final error) => Center(
         child: Text('Could not load the sound demo: $error'),
@@ -61,22 +74,29 @@ class SoundDemoHarness extends ConsumerWidget {
   }
 }
 
-class _SoundStage extends StatefulWidget {
-  const _SoundStage({
+/// A story behind the enter gate, with its audio: the player the demos and
+/// `/play/:id` use.
+class GatedStagePlayer extends StatefulWidget {
+  const GatedStagePlayer({
+    super.key,
     required this.document,
-    required this.coverFocal,
-    required this.buildOnEnter,
+    this.coverFocal = const Offset(0.5, 0.5),
+    this.buildOnEnter = false,
+    this.wheelNative,
+    this.statsOn,
   });
 
   final ir.StageDocument document;
   final Offset coverFocal;
   final bool buildOnEnter;
+  final bool? wheelNative;
+  final bool? statsOn;
 
   @override
-  State<_SoundStage> createState() => _SoundStageState();
+  State<GatedStagePlayer> createState() => _GatedStagePlayerState();
 }
 
-class _SoundStageState extends State<_SoundStage> {
+class _GatedStagePlayerState extends State<GatedStagePlayer> {
   late final StageEnvironment _env = StageEnvironment.forDocument(
     widget.document,
   );
@@ -88,7 +108,8 @@ class _SoundStageState extends State<_SoundStage> {
   /// measurement; read it from the browser console).
   Timer? _stats;
   final StagePlayerController _controller = StagePlayerController();
-  final bool _statsOn = Uri.base.queryParameters['stats'] == '1';
+  late final bool _statsOn =
+      widget.statsOn ?? Uri.base.queryParameters['stats'] == '1';
 
   /// Logs a load milestone as a wall-clock time (compare with
   /// `performance.timeOrigin` in the page).
@@ -173,7 +194,7 @@ class _SoundStageState extends State<_SoundStage> {
         environment: _env,
         audio: _audio,
         controller: _controller,
-        wheelSmoothing: demoWheelSmoothing(),
+        wheelSmoothing: demoWheelSmoothing(widget.wheelNative),
       ),
     );
   }

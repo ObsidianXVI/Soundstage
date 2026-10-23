@@ -22,14 +22,16 @@ final motionDemoDocumentProvider = FutureProvider<ir.StageDocument>((
 
 /// Plays the motion demo in a [StagePlayer].
 class MotionDemoHarness extends ConsumerWidget {
-  const MotionDemoHarness({super.key});
+  const MotionDemoHarness({super.key, this.wheelNative});
+
+  final bool? wheelNative;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (ref.watch(motionDemoDocumentProvider)) {
       AsyncData(:final value) => StagePlayer(
         document: value,
-        wheelSmoothing: demoWheelSmoothing(),
+        wheelSmoothing: demoWheelSmoothing(wheelNative),
       ),
       AsyncError(:final error) => Center(
         child: Text('Could not load the motion demo: $error'),

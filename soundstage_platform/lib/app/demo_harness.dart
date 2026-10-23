@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
@@ -19,8 +20,7 @@ const Map<String, String> kDemoDocuments = {
 class DemoSelection extends Notifier<String> {
   @override
   String build() {
-    final q = Uri.base.queryParameters['demo'];
-    return kDemoDocuments.containsKey(q) ? q! : 'static';
+    return 'static';
   }
 
   void select(String key) {
@@ -64,11 +64,41 @@ final resolvedDemoProvider = Provider.family<ir.ResolvedDocument?, String>((
 /// The M0 development harness: renders every scene of the demo document,
 /// stacked in a plain scroll view, at the window's size. Scroll-driven
 /// pinning and motion arrive with `StagePlayer` (T0.6).
-class DemoHarness extends ConsumerWidget {
-  const DemoHarness({super.key});
+class DemoHarness extends ConsumerStatefulWidget {
+  /// [demoKey] selects the demo (`static` or `gallery`); null keeps the
+  /// provider's current selection.
+  const DemoHarness({super.key, this.demoKey});
+
+  final String? demoKey;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DemoHarness> createState() => _DemoHarnessState();
+}
+
+class _DemoHarnessState extends ConsumerState<DemoHarness> {
+  @override
+  void initState() {
+    super.initState();
+    _apply();
+  }
+
+  @override
+  void didUpdateWidget(DemoHarness old) {
+    super.didUpdateWidget(old);
+    if (old.demoKey != widget.demoKey) _apply();
+  }
+
+  void _apply() {
+    final k = widget.demoKey;
+    if (k == null) return;
+    // Providers may not be modified during build; do it right after.
+    Future<void>.microtask(() {
+      if (mounted) ref.read(demoSelectionProvider.notifier).select(k);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return switch (ref.watch(demoDocumentProvider)) {
       AsyncData(:final value) => Stack(
         children: [
@@ -142,7 +172,13 @@ class _DemoPicker extends ConsumerWidget {
               DropdownMenuItem(value: k, child: Text(k)),
           ],
           onChanged: (k) {
-            if (k != null) ref.read(demoSelectionProvider.notifier).select(k);
+            if (k == null) return;
+            final router = GoRouter.maybeOf(context);
+            if (router != null) {
+              router.go('/demo/$k');
+            } else {
+              ref.read(demoSelectionProvider.notifier).select(k);
+            }
           },
         ),
       ),

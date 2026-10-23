@@ -44,6 +44,9 @@ createServer((req, res) => {
   let path = normalize(join(root, decodeURIComponent(url.pathname)));
   if (!path.startsWith(normalize(root))) { res.writeHead(403).end(); return; }
   if (existsSync(path) && statSync(path).isDirectory()) path = join(path, 'index.html');
+  // Path URLs (/edit/abc): any missing path without a file extension is a
+  // client-side route, so serve the app shell, like the hosting rewrite.
+  if (!existsSync(path) && extname(path) === '') path = join(root, 'index.html');
   if (!existsSync(path)) { res.writeHead(404).end('not found'); return; }
   const ext = extname(path);
   const accept = req.headers['accept-encoding'] ?? '';
