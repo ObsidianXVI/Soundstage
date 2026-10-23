@@ -179,12 +179,14 @@ class _AlignRow extends ConsumerWidget {
       key: ValueKey<String>('align:${edge.name}'),
       icon: icon,
       semanticLabel: label,
+      size: 24,
       onPressed: () => w.run(AlignNodes(scope.ids, edge)),
     );
     Widget d(IconData icon, String label, bool horizontal) => SsIconButton(
       key: ValueKey<String>('distribute:${horizontal ? 'h' : 'v'}'),
       icon: icon,
       semanticLabel: label,
+      size: 24,
       onPressed: n >= 3
           ? () => w.run(DistributeNodes(scope.ids, horizontal: horizontal))
           : null,
