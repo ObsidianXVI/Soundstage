@@ -115,9 +115,10 @@ class StoryActions {
         width: 440,
         content: revs.isEmpty
             ? const Text('No saved revisions yet.')
-            : SizedBox(
-                height: 320,
+            : ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
                 child: ListView(
+                  shrinkWrap: true,
                   children: [
                     for (var i = 0; i < revs.length; i++)
                       _RevisionRow(
