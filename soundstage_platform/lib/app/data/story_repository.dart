@@ -313,17 +313,47 @@ final storyListProvider = FutureProvider<List<StorySummary>>((ref) {
   return ref.watch(storyRepositoryProvider).list();
 });
 
+/// Writes still in flight per story (the editor's final autosave flush when
+/// it closes). Story loads wait for them, so reopening a story right after
+/// leaving the editor reads what was saved.
+class StoryWriteBarrier {
+  final Map<String, Future<void>> _pending = {};
+
+  /// Registers [write] for story [id] until it completes.
+  void track(String id, Future<void> write) {
+    final prev = _pending[id];
+    final all = prev == null ? write : Future.wait([prev, write]).then((_) {});
+    final guarded = all.catchError((Object _) {});
+    _pending[id] = guarded;
+    guarded.whenComplete(() {
+      if (identical(_pending[id], guarded)) _pending.remove(id);
+    });
+  }
+
+  /// Completes when no write of [id] is in flight.
+  Future<void> wait(String id) => _pending[id] ?? Future<void>.value();
+}
+
+final storyWriteBarrierProvider = Provider<StoryWriteBarrier>(
+  (ref) => StoryWriteBarrier(),
+);
+
 /// The story with the given id (the "current story" of a route), or null if
 /// there is none.
 final storyDocumentProvider = FutureProvider.family<ir.StageDocument?, String>((
   ref,
   id,
-) {
+) async {
+  await ref.read(storyWriteBarrierProvider).wait(id);
   return ref.watch(storyRepositoryProvider).load(id);
 });
 
 /// The story with load details (diagnostics, recovery from an older
 /// revision), or null if there is none.
-final storyLoadProvider = FutureProvider.family<StoryLoad?, String>((ref, id) {
+final storyLoadProvider = FutureProvider.family<StoryLoad?, String>((
+  ref,
+  id,
+) async {
+  await ref.read(storyWriteBarrierProvider).wait(id);
   return ref.watch(storyRepositoryProvider).open(id);
 });

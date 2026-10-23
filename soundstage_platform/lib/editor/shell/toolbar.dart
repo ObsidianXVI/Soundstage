@@ -2,19 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
-import '../shortcuts/intents.dart';
+import '../canvas/camera.dart';
+import '../canvas/canvas_controller.dart';
+import '../core/editor_controller.dart';
+import '../core/editor_state.dart';
 import '../shortcuts/shortcut_map.dart';
 import 'editor_layout.dart';
 
-/// The editor toolbar: back, title, tools, edit scope, zoom, history, panel
-/// toggles, preview and help. Most controls are placeholders until their
-/// tasks land (T1.2 history, T1.3 zoom, T1.4/T1.9 tools).
+/// The editor toolbar: back, title, tools, edit scope, save status,
+/// undo/redo, zoom, panel toggles, preview and help, bound to the
+/// `EditorController` and the canvas camera. Insert tools select but do
+/// nothing yet (T1.9).
 class EditorToolbar extends ConsumerWidget {
   const EditorToolbar({
     required this.title,
     required this.onBack,
     required this.onPreview,
     required this.onHelp,
+    this.saveStatus,
     super.key,
   });
 
@@ -22,6 +27,9 @@ class EditorToolbar extends ConsumerWidget {
   final VoidCallback onBack;
   final VoidCallback onPreview;
   final VoidCallback onHelp;
+
+  /// The app's autosave indicator.
+  final Widget? saveStatus;
 
   static const _tools = <(EditorTool, IconData, String, String)>[
     (EditorTool.move, SsIcons.mousePointer2, 'Move', 'toolMove'),
@@ -38,6 +46,18 @@ class EditorToolbar extends ConsumerWidget {
     final c = t.colors;
     final layout = ref.watch(editorLayoutProvider);
     final notifier = ref.read(editorLayoutProvider.notifier);
+    final editor = ref.read(editorControllerProvider.notifier);
+    final tool = ref.watch(editorControllerProvider.select((s) => s.tool));
+    final scope = ref.watch(
+      editorControllerProvider.select((s) => s.effectiveScope),
+    );
+    final flipped = ref.watch(
+      editorControllerProvider.select((s) => s.scopeFlipped),
+    );
+    final history = ref.watch(
+      editorControllerProvider.select((s) => s.history),
+    );
+    final canvas = ref.watch(canvasControllerProvider);
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: SsSpace.s2),
@@ -67,13 +87,13 @@ class EditorToolbar extends ConsumerWidget {
             ),
           ),
           const _Divider(),
-          for (final (tool, icon, label, id) in _tools)
+          for (final (t, icon, label, id) in _tools)
             SsIconButton(
               icon: icon,
               semanticLabel: label,
               shortcut: shortcutLabel(id),
-              selected: layout.tool == tool,
-              onPressed: () => notifier.setTool(tool),
+              selected: tool == t,
+              onPressed: () => editor.setTool(t),
             ),
           const Spacer(),
           SsTooltip(
@@ -82,9 +102,12 @@ class EditorToolbar extends ConsumerWidget {
                 'Alt flips scope',
             placement: SsPlacement.belowCenter,
             child: SsSegmented<EditScope>(
-              semanticLabel: 'Edit scope',
-              selected: layout.scope,
-              onChanged: notifier.setScope,
+              key: ValueKey<String>('edit-scope${flipped ? '-flipped' : ''}'),
+              semanticLabel: flipped
+                  ? 'Edit scope (flipped by Alt)'
+                  : 'Edit scope',
+              selected: scope,
+              onChanged: (v) => editor.setEditScope(flipped ? v.flipped : v),
               segments: const [
                 SsSegment(value: EditScope.both, label: 'Both'),
                 SsSegment(
@@ -95,18 +118,25 @@ class EditorToolbar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
+          if (saveStatus != null) ...[saveStatus!, const _Divider()],
           SsIconButton(
             icon: SsIcons.undo2,
-            semanticLabel: 'Undo',
+            semanticLabel: history.undoLabel == null
+                ? 'Undo'
+                : 'Undo ${history.undoLabel}',
             shortcut: shortcutLabel('undo'),
+            onPressed: history.canUndo ? editor.undo : null,
           ),
           SsIconButton(
             icon: SsIcons.redo2,
-            semanticLabel: 'Redo',
+            semanticLabel: history.redoLabel == null
+                ? 'Redo'
+                : 'Redo ${history.redoLabel}',
             shortcut: shortcutLabel('redo'),
+            onPressed: history.canRedo ? editor.redo : null,
           ),
           const _Divider(),
-          const _ZoomReadout(),
+          _ZoomReadout(controller: canvas),
           const _Divider(),
           SsIconButton(
             icon: SsIcons.panelLeft,
@@ -161,23 +191,47 @@ class _Divider extends StatelessWidget {
   );
 }
 
+/// The live zoom; clicking it zooms to fit. Rebuilds only itself on zoom.
 class _ZoomReadout extends StatelessWidget {
-  const _ZoomReadout();
+  const _ZoomReadout({required this.controller});
+
+  final CanvasController controller;
 
   @override
   Widget build(BuildContext context) {
     final t = context.ss;
-    return Semantics(
-      label: 'Zoom',
-      value: '100 percent',
-      child: SizedBox(
-        width: 44,
-        child: Text(
-          '100%',
-          textAlign: TextAlign.center,
-          style: t.text.numeric.copyWith(color: t.colors.textSecondary),
-        ),
-      ),
+    return ValueListenableBuilder<CanvasCamera>(
+      valueListenable: controller.camera,
+      builder: (context, cam, _) {
+        final label = CanvasController.zoomLabel(cam.zoom);
+        return SsTooltip(
+          message: 'Zoom to fit',
+          shortcut: shortcutLabel('zoomFit'),
+          placement: SsPlacement.belowCenter,
+          child: Semantics(
+            label: 'Zoom',
+            value: label,
+            button: true,
+            child: GestureDetector(
+              onTap: controller.zoomToFit,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: SizedBox(
+                  width: 52,
+                  child: Text(
+                    label,
+                    key: const ValueKey<String>('zoom-readout'),
+                    textAlign: TextAlign.center,
+                    style: t.text.numeric.copyWith(
+                      color: t.colors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

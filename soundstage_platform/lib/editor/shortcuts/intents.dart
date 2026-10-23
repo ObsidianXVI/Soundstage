@@ -1,149 +1,67 @@
 import 'package:flutter/widgets.dart';
+import 'package:soundstage_platform/editor/core/editor_state.dart';
 
-/// The editor's command intents. T1.1 defines them and the keys that fire
-/// them; T1.2 binds the ones that act on the document with `Actions`.
+/// The editor's UI-only intents: tools, zoom, panels, preview, save and the
+/// help overlay. The shell binds them with `Actions`.
 ///
-/// Only [ShowShortcutHelpIntent], the panel toggles and [PreviewIntent] are
-/// handled by the shell today.
-sealed class EditorIntent extends Intent {
-  const EditorIntent();
+/// Document and selection intents (undo, delete, group, nudge, select
+/// parent, …) are `EditorIntent`s in `lib/editor/core/shortcuts.dart`;
+/// `actionForIntent` turns them into commands. The keys for both live in
+/// one table, [kEditorShortcuts](shortcut_map.dart).
+sealed class ShellIntent extends Intent {
+  const ShellIntent();
 }
 
 // -- Edit ------------------------------------------------------------------
-class UndoIntent extends EditorIntent {
-  const UndoIntent();
-}
 
-class RedoIntent extends EditorIntent {
-  const RedoIntent();
-}
-
-class CopyNodesIntent extends EditorIntent {
-  const CopyNodesIntent();
-}
-
-class CutNodesIntent extends EditorIntent {
-  const CutNodesIntent();
-}
-
-class PasteNodesIntent extends EditorIntent {
-  const PasteNodesIntent();
-}
-
-class DuplicateIntent extends EditorIntent {
-  const DuplicateIntent();
-}
-
-class DeleteNodesIntent extends EditorIntent {
-  const DeleteNodesIntent();
-}
-
-class SelectAllIntent extends EditorIntent {
-  const SelectAllIntent();
-}
-
-class SelectParentIntent extends EditorIntent {
-  const SelectParentIntent();
-}
-
-class SelectChildrenIntent extends EditorIntent {
-  const SelectChildrenIntent();
-}
-
-class RenameIntent extends EditorIntent {
-  const RenameIntent();
-}
-
-class SaveIntent extends EditorIntent {
+/// Writes pending changes now (autosave flush).
+class SaveIntent extends ShellIntent {
   const SaveIntent();
 }
 
-/// Arrow-key nudge of the selection by [dx]/[dy] design pixels (10 with
-/// Shift).
-class NudgeIntent extends EditorIntent {
-  const NudgeIntent(this.dx, this.dy, {this.large = false});
-
-  final int dx;
-  final int dy;
-  final bool large;
-}
-
-// -- Structure -------------------------------------------------------------
-class GroupIntent extends EditorIntent {
-  const GroupIntent();
-}
-
-class UngroupIntent extends EditorIntent {
-  const UngroupIntent();
-}
-
-class FrameSelectionIntent extends EditorIntent {
-  const FrameSelectionIntent();
-}
-
-class BringForwardIntent extends EditorIntent {
-  const BringForwardIntent({this.toFront = false});
-  final bool toFront;
-}
-
-class SendBackwardIntent extends EditorIntent {
-  const SendBackwardIntent({this.toBack = false});
-  final bool toBack;
-}
-
-class ToggleVisibilityIntent extends EditorIntent {
-  const ToggleVisibilityIntent();
-}
-
-class ToggleLockIntent extends EditorIntent {
-  const ToggleLockIntent();
-}
-
 // -- Tools -----------------------------------------------------------------
-enum EditorTool { move, frame, text, rectangle, ellipse, line, hand }
-
-class SelectToolIntent extends EditorIntent {
+class SelectToolIntent extends ShellIntent {
   const SelectToolIntent(this.tool);
   final EditorTool tool;
 }
 
 // -- View ------------------------------------------------------------------
-class ZoomInIntent extends EditorIntent {
+class ZoomInIntent extends ShellIntent {
   const ZoomInIntent();
 }
 
-class ZoomOutIntent extends EditorIntent {
+class ZoomOutIntent extends ShellIntent {
   const ZoomOutIntent();
 }
 
-class ZoomTo100Intent extends EditorIntent {
+class ZoomTo100Intent extends ShellIntent {
   const ZoomTo100Intent();
 }
 
-class ZoomToFitIntent extends EditorIntent {
+class ZoomToFitIntent extends ShellIntent {
   const ZoomToFitIntent();
 }
 
-class ZoomToSelectionIntent extends EditorIntent {
+class ZoomToSelectionIntent extends ShellIntent {
   const ZoomToSelectionIntent();
 }
 
-class ToggleLeftPanelIntent extends EditorIntent {
+class ToggleLeftPanelIntent extends ShellIntent {
   const ToggleLeftPanelIntent();
 }
 
-class ToggleRightPanelIntent extends EditorIntent {
+class ToggleRightPanelIntent extends ShellIntent {
   const ToggleRightPanelIntent();
 }
 
-class ToggleTimelineIntent extends EditorIntent {
+class ToggleTimelineIntent extends ShellIntent {
   const ToggleTimelineIntent();
 }
 
-class PreviewIntent extends EditorIntent {
+class PreviewIntent extends ShellIntent {
   const PreviewIntent();
 }
 
-class ShowShortcutHelpIntent extends EditorIntent {
+class ShowShortcutHelpIntent extends ShellIntent {
   const ShowShortcutHelpIntent();
 }

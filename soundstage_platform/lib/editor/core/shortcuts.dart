@@ -1,6 +1,4 @@
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
-import 'package:flutter/widgets.dart'
-    show Intent, ShortcutActivator, SingleActivator;
+import 'package:flutter/widgets.dart' show Intent;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import 'command.dart';
@@ -9,10 +7,13 @@ import 'commands/property_commands.dart';
 import 'editor_state.dart';
 import 'selection.dart';
 
-// Command-level keyboard shortcuts (Figma's bindings). Pure intent →
-// action mappings: the shell hosts the `Shortcuts`/`Actions` widgets with
-// [editorShortcuts] and forwards intents to `EditorController.perform`.
-// Text editing and canvas tools (V, F, T, …) bind in the shell.
+// The document and selection intents of the editor and what they do
+// ([actionForIntent], the single source of commands for keyboard input).
+// The keys that fire them are in the one shortcut table,
+// `lib/editor/shortcuts/shortcut_map.dart`; `EditorShortcuts` hosts the
+// `Shortcuts`/`Actions` widgets and forwards these intents to
+// `EditorController.perform`. UI-only intents (tools, zoom, panels, help)
+// are in `lib/editor/shortcuts/intents.dart`.
 
 /// A keyboard intent of the editor.
 sealed class EditorIntent extends Intent {
@@ -73,6 +74,13 @@ class SelectNoneIntent extends EditorIntent {
 /// Cmd+R: start renaming the selected layer (a UI action).
 class RenameSelectionIntent extends EditorIntent {
   const RenameSelectionIntent();
+}
+
+/// Cmd+] / Cmd+[ (forward / backward), with Alt: to front / back.
+class ReorderSelectionIntent extends EditorIntent {
+  const ReorderSelectionIntent(this.direction);
+
+  final ReorderDirection direction;
 }
 
 /// Cmd+Shift+H.
@@ -139,76 +147,6 @@ class NoAction extends EditorAction {
   const NoAction();
 }
 
-/// The shortcut map. [apple]: Cmd on macOS, Ctrl elsewhere (where redo
-/// also answers to Ctrl+Y).
-///
-/// Select none is Cmd+Shift+A (Illustrator's "Deselect"; Figma has no
-/// default binding). Nudge by 10 is Shift+arrow.
-Map<ShortcutActivator, EditorIntent> editorShortcuts({required bool apple}) {
-  SingleActivator cmd(
-    LogicalKeyboardKey key, {
-    bool shift = false,
-    bool alt = false,
-  }) => SingleActivator(
-    key,
-    meta: apple,
-    control: !apple,
-    shift: shift,
-    alt: alt,
-  );
-
-  return {
-    cmd(LogicalKeyboardKey.keyZ): const UndoIntent(),
-    cmd(LogicalKeyboardKey.keyZ, shift: true): const RedoIntent(),
-    if (!apple)
-      const SingleActivator(LogicalKeyboardKey.keyY, control: true):
-          const RedoIntent(),
-    const SingleActivator(LogicalKeyboardKey.delete):
-        const DeleteSelectionIntent(),
-    const SingleActivator(LogicalKeyboardKey.backspace):
-        const DeleteSelectionIntent(),
-    cmd(LogicalKeyboardKey.keyD): const DuplicateSelectionIntent(),
-    cmd(LogicalKeyboardKey.keyG): const GroupSelectionIntent(),
-    cmd(LogicalKeyboardKey.keyG, alt: true): const FrameSelectionIntent(),
-    cmd(LogicalKeyboardKey.keyG, shift: true): const UngroupSelectionIntent(),
-    const SingleActivator(LogicalKeyboardKey.keyA, shift: true):
-        const AddAutoLayoutIntent(),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft): const NudgeIntent(
-      -1,
-      0,
-    ),
-    const SingleActivator(LogicalKeyboardKey.arrowRight): const NudgeIntent(
-      1,
-      0,
-    ),
-    const SingleActivator(LogicalKeyboardKey.arrowUp): const NudgeIntent(0, -1),
-    const SingleActivator(LogicalKeyboardKey.arrowDown): const NudgeIntent(
-      0,
-      1,
-    ),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true):
-        const NudgeIntent(-10, 0),
-    const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true):
-        const NudgeIntent(10, 0),
-    const SingleActivator(LogicalKeyboardKey.arrowUp, shift: true):
-        const NudgeIntent(0, -10),
-    const SingleActivator(LogicalKeyboardKey.arrowDown, shift: true):
-        const NudgeIntent(0, 10),
-    cmd(LogicalKeyboardKey.keyA): const SelectAllIntent(),
-    cmd(LogicalKeyboardKey.keyA, shift: true): const SelectNoneIntent(),
-    cmd(LogicalKeyboardKey.keyR): const RenameSelectionIntent(),
-    cmd(LogicalKeyboardKey.keyH, shift: true): const ToggleVisibilityIntent(),
-    cmd(LogicalKeyboardKey.keyL, shift: true): const ToggleLockIntent(),
-    const SingleActivator(LogicalKeyboardKey.escape):
-        const SelectParentIntent(),
-    const SingleActivator(LogicalKeyboardKey.enter):
-        const SelectChildrenIntent(),
-    const SingleActivator(LogicalKeyboardKey.tab): const SelectSiblingIntent(),
-    const SingleActivator(LogicalKeyboardKey.tab, shift: true):
-        const SelectSiblingIntent(backwards: true),
-  };
-}
-
 /// What [intent] does in [state]. [tree] is the active scene's
 /// [SelectionTree] (needed by the selection intents; without it they do
 /// nothing).
@@ -242,6 +180,9 @@ EditorAction actionForIntent(
     UngroupSelectionIntent() => run(UnwrapFrame(sel)),
     AddAutoLayoutIntent() => run(AddAutoLayout(sel)),
     NudgeIntent(:final dx, :final dy) => run(NudgeNodes(sel, dx, dy)),
+    ReorderSelectionIntent(:final direction) => run(
+      ReorderNodes(sel, direction),
+    ),
     SelectAllIntent() => select((t) => selectAll(t, current)),
     SelectNoneIntent() => ApplySelection(selectNone(current)),
     RenameSelectionIntent() =>

@@ -2,6 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'package:soundstage_platform/editor/core/commands/node_commands.dart'
+    show ReorderDirection;
+import 'package:soundstage_platform/editor/core/editor_state.dart';
+import 'package:soundstage_platform/editor/core/shortcuts.dart';
+
 import 'intents.dart';
 
 /// A key combination as data, so it can both fire an intent and be shown in
@@ -16,6 +21,7 @@ class ShortcutKey {
     this.shift = false,
     this.alt = false,
     this.character,
+    this.offMacOnly = false,
   });
 
   final LogicalKeyboardKey key;
@@ -26,6 +32,9 @@ class ShortcutKey {
   /// Fires on the typed character (for `?`, which needs Shift on most
   /// layouts) instead of a physical key.
   final String? character;
+
+  /// Bound only off macOS (Ctrl+Y redo, which macOS doesn't use).
+  final bool offMacOnly;
 
   ShortcutActivator activator({required bool mac}) {
     if (character != null) return CharacterActivator(character!);
@@ -48,16 +57,10 @@ class ShortcutKey {
     return [if (mod) 'Ctrl', if (alt) 'Alt', if (shift) 'Shift', k].join('+');
   }
 
-  /// Bare keys (no modifier) conflict with typing into text fields.
-  bool get isBare =>
-      !mod && !alt && (character != null || !_isNonPrintable(key));
-
-  static bool _isNonPrintable(LogicalKeyboardKey k) =>
-      k == LogicalKeyboardKey.escape ||
-      k == LogicalKeyboardKey.enter ||
-      k == LogicalKeyboardKey.f2 ||
-      k == LogicalKeyboardKey.delete ||
-      k == LogicalKeyboardKey.backspace;
+  /// Keys without Cmd/Ctrl conflict with typing into a text field: letters
+  /// and `?` type, Alt+digit types a symbol on macOS, and arrows, Tab,
+  /// Enter, Escape, Backspace and Delete edit or move the caret.
+  bool get isBare => !mod;
 
   static String _keyLabel(LogicalKeyboardKey k) {
     if (k == LogicalKeyboardKey.arrowUp) return '↑';
@@ -97,10 +100,11 @@ class ShortcutDef {
   final List<ShortcutKey> keys;
 }
 
-const _a = LogicalKeyboardKey.keyA;
-
-/// The editor's shortcut table. Cmd on macOS, Ctrl elsewhere (see
-/// [ShortcutKey.mod]).
+/// The editor's one shortcut table: document and selection intents
+/// (`EditorIntent`, turned into commands by `actionForIntent`) and the
+/// shell's UI intents ([ShellIntent]). Cmd on macOS, Ctrl elsewhere (see
+/// [ShortcutKey.mod]). Every entry is wired: the help overlay lists exactly
+/// what works.
 const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
   // Edit
   ShortcutDef(
@@ -117,69 +121,58 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     intent: RedoIntent(),
     keys: [
       ShortcutKey(LogicalKeyboardKey.keyZ, mod: true, shift: true),
-      ShortcutKey(LogicalKeyboardKey.keyY, mod: true),
+      ShortcutKey(LogicalKeyboardKey.keyY, mod: true, offMacOnly: true),
     ],
-  ),
-  ShortcutDef(
-    id: 'copy',
-    label: 'Copy',
-    group: 'Edit',
-    intent: CopyNodesIntent(),
-    keys: [ShortcutKey(LogicalKeyboardKey.keyC, mod: true)],
-  ),
-  ShortcutDef(
-    id: 'cut',
-    label: 'Cut',
-    group: 'Edit',
-    intent: CutNodesIntent(),
-    keys: [ShortcutKey(LogicalKeyboardKey.keyX, mod: true)],
-  ),
-  ShortcutDef(
-    id: 'paste',
-    label: 'Paste',
-    group: 'Edit',
-    intent: PasteNodesIntent(),
-    keys: [ShortcutKey(LogicalKeyboardKey.keyV, mod: true)],
   ),
   ShortcutDef(
     id: 'duplicate',
     label: 'Duplicate',
     group: 'Edit',
-    intent: DuplicateIntent(),
+    intent: DuplicateSelectionIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.keyD, mod: true)],
   ),
   ShortcutDef(
     id: 'delete',
     label: 'Delete',
     group: 'Edit',
-    intent: DeleteNodesIntent(),
+    intent: DeleteSelectionIntent(),
     keys: [
       ShortcutKey(LogicalKeyboardKey.backspace),
       ShortcutKey(LogicalKeyboardKey.delete),
     ],
   ),
   ShortcutDef(
-    id: 'selectAll',
-    label: 'Select all',
-    group: 'Edit',
-    intent: SelectAllIntent(),
-    keys: [ShortcutKey(_a, mod: true)],
-  ),
-  ShortcutDef(
     id: 'rename',
     label: 'Rename',
     group: 'Edit',
-    intent: RenameIntent(),
-    keys: [ShortcutKey(LogicalKeyboardKey.f2)],
+    intent: RenameSelectionIntent(),
+    keys: [
+      ShortcutKey(LogicalKeyboardKey.keyR, mod: true),
+      ShortcutKey(LogicalKeyboardKey.f2),
+    ],
   ),
   ShortcutDef(
     id: 'save',
-    label: 'Save',
+    label: 'Save now',
     group: 'Edit',
     intent: SaveIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.keyS, mod: true)],
   ),
   // Selection
+  ShortcutDef(
+    id: 'selectAll',
+    label: 'Select all',
+    group: 'Selection',
+    intent: SelectAllIntent(),
+    keys: [ShortcutKey(LogicalKeyboardKey.keyA, mod: true)],
+  ),
+  ShortcutDef(
+    id: 'selectNone',
+    label: 'Select none',
+    group: 'Selection',
+    intent: SelectNoneIntent(),
+    keys: [ShortcutKey(LogicalKeyboardKey.keyA, mod: true, shift: true)],
+  ),
   ShortcutDef(
     id: 'selectParent',
     label: 'Select parent',
@@ -193,6 +186,20 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     group: 'Selection',
     intent: SelectChildrenIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.enter)],
+  ),
+  ShortcutDef(
+    id: 'selectNext',
+    label: 'Select next sibling',
+    group: 'Selection',
+    intent: SelectSiblingIntent(),
+    keys: [ShortcutKey(LogicalKeyboardKey.tab)],
+  ),
+  ShortcutDef(
+    id: 'selectPrevious',
+    label: 'Select previous sibling',
+    group: 'Selection',
+    intent: SelectSiblingIntent(backwards: true),
+    keys: [ShortcutKey(LogicalKeyboardKey.tab, shift: true)],
   ),
   ShortcutDef(
     id: 'nudgeLeft',
@@ -226,43 +233,43 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     id: 'nudgeLeftBig',
     label: 'Nudge left by 10',
     group: 'Selection',
-    intent: NudgeIntent(-10, 0, large: true),
+    intent: NudgeIntent(-10, 0),
     keys: [ShortcutKey(LogicalKeyboardKey.arrowLeft, shift: true)],
   ),
   ShortcutDef(
     id: 'nudgeRightBig',
     label: 'Nudge right by 10',
     group: 'Selection',
-    intent: NudgeIntent(10, 0, large: true),
+    intent: NudgeIntent(10, 0),
     keys: [ShortcutKey(LogicalKeyboardKey.arrowRight, shift: true)],
   ),
   ShortcutDef(
     id: 'nudgeUpBig',
     label: 'Nudge up by 10',
     group: 'Selection',
-    intent: NudgeIntent(0, -10, large: true),
+    intent: NudgeIntent(0, -10),
     keys: [ShortcutKey(LogicalKeyboardKey.arrowUp, shift: true)],
   ),
   ShortcutDef(
     id: 'nudgeDownBig',
     label: 'Nudge down by 10',
     group: 'Selection',
-    intent: NudgeIntent(0, 10, large: true),
+    intent: NudgeIntent(0, 10),
     keys: [ShortcutKey(LogicalKeyboardKey.arrowDown, shift: true)],
   ),
-  // Structure
+  // Arrange
   ShortcutDef(
     id: 'group',
     label: 'Group',
     group: 'Arrange',
-    intent: GroupIntent(),
+    intent: GroupSelectionIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.keyG, mod: true)],
   ),
   ShortcutDef(
     id: 'ungroup',
     label: 'Ungroup',
     group: 'Arrange',
-    intent: UngroupIntent(),
+    intent: UngroupSelectionIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.keyG, mod: true, shift: true)],
   ),
   ShortcutDef(
@@ -273,31 +280,38 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     keys: [ShortcutKey(LogicalKeyboardKey.keyG, mod: true, alt: true)],
   ),
   ShortcutDef(
+    id: 'addAutoLayout',
+    label: 'Add auto layout',
+    group: 'Arrange',
+    intent: AddAutoLayoutIntent(),
+    keys: [ShortcutKey(LogicalKeyboardKey.keyA, shift: true)],
+  ),
+  ShortcutDef(
     id: 'bringForward',
     label: 'Bring forward',
     group: 'Arrange',
-    intent: BringForwardIntent(),
+    intent: ReorderSelectionIntent(ReorderDirection.forward),
     keys: [ShortcutKey(LogicalKeyboardKey.bracketRight, mod: true)],
   ),
   ShortcutDef(
     id: 'sendBackward',
     label: 'Send backward',
     group: 'Arrange',
-    intent: SendBackwardIntent(),
+    intent: ReorderSelectionIntent(ReorderDirection.backward),
     keys: [ShortcutKey(LogicalKeyboardKey.bracketLeft, mod: true)],
   ),
   ShortcutDef(
     id: 'bringToFront',
     label: 'Bring to front',
     group: 'Arrange',
-    intent: BringForwardIntent(toFront: true),
+    intent: ReorderSelectionIntent(ReorderDirection.front),
     keys: [ShortcutKey(LogicalKeyboardKey.bracketRight, mod: true, alt: true)],
   ),
   ShortcutDef(
     id: 'sendToBack',
     label: 'Send to back',
     group: 'Arrange',
-    intent: SendBackwardIntent(toBack: true),
+    intent: ReorderSelectionIntent(ReorderDirection.back),
     keys: [ShortcutKey(LogicalKeyboardKey.bracketLeft, mod: true, alt: true)],
   ),
   ShortcutDef(
@@ -384,7 +398,10 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     label: 'Zoom to 100%',
     group: 'View',
     intent: ZoomTo100Intent(),
-    keys: [ShortcutKey(LogicalKeyboardKey.digit0, shift: true)],
+    keys: [
+      ShortcutKey(LogicalKeyboardKey.digit0, mod: true),
+      ShortcutKey(LogicalKeyboardKey.digit0, shift: true),
+    ],
   ),
   ShortcutDef(
     id: 'zoomFit',
@@ -428,6 +445,7 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     intent: PreviewIntent(),
     keys: [ShortcutKey(LogicalKeyboardKey.enter, mod: true, alt: true)],
   ),
+  // Help
   ShortcutDef(
     id: 'help',
     label: 'Keyboard shortcuts',
@@ -448,7 +466,8 @@ Map<ShortcutActivator, Intent> buildShortcutMap({bool? mac}) {
   final isMac = mac ?? isMacPlatform();
   return <ShortcutActivator, Intent>{
     for (final def in kEditorShortcuts)
-      for (final k in def.keys) k.activator(mac: isMac): def.intent,
+      for (final k in def.keys)
+        if (!(isMac && k.offMacOnly)) k.activator(mac: isMac): def.intent,
   };
 }
 
@@ -461,7 +480,7 @@ String? shortcutLabel(String id, {bool? mac}) {
   return null;
 }
 
-/// Whether [intent] fires from a bare key (no modifier), which must not
+/// Whether [intent] fires from a key without Cmd/Ctrl, which must not
 /// trigger while typing into a text field.
 bool intentIsTextSensitive(Intent intent) {
   for (final d in kEditorShortcuts) {
@@ -469,6 +488,13 @@ bool intentIsTextSensitive(Intent intent) {
   }
   return false;
 }
+
+/// The document and selection intents of the table, one per type (the
+/// `Actions` map is keyed by type).
+Iterable<Type> get editorIntentTypes => {
+  for (final d in kEditorShortcuts)
+    if (d.intent is EditorIntent) d.intent.runtimeType,
+};
 
 /// True when the primary focus is inside an editable text.
 bool primaryFocusIsTextInput() {

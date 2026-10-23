@@ -1,10 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../canvas/canvas_controller.dart';
+import '../canvas/editor_canvas.dart';
+import '../core/editor_controller.dart';
 import '../shortcuts/editor_shortcuts.dart';
 import '../shortcuts/intents.dart';
 import '../shortcuts/shortcut_help.dart';
@@ -16,47 +20,142 @@ import 'toolbar.dart';
 /// The editor frame for one story: toolbar, resizable left panel, canvas,
 /// inspector and the timeline strip.
 ///
-/// The panels, canvas and inspector are placeholders; T1.3-T1.8 fill them.
-/// Below [kEditorMinWidth] it shows [ContentModeScreen] instead.
-class EditorShell extends ConsumerWidget {
+/// The shell opens its own editor: a `ProviderScope` overrides
+/// [initialDocumentProvider] with [document], so the `EditorController`,
+/// its resolvers and the canvas state belong to this editor. Every later
+/// document change is reported to [onDocumentChanged] (the app's
+/// autosave). Below [kEditorMinWidth] it shows [ContentModeScreen] instead.
+class EditorShell extends StatelessWidget {
   const EditorShell({
     required this.document,
     required this.onBack,
     required this.onPreview,
+    this.onDocumentChanged,
+    this.onSave,
+    this.saveStatus,
     super.key,
   });
 
+  /// The document the editor opens with.
   final ir.StageDocument document;
   final VoidCallback onBack;
 
   /// Opens the player for this story (`/play/:id`).
   final VoidCallback onPreview;
 
-  String get _title =>
-      document.meta.title.isEmpty ? 'Untitled story' : document.meta.title;
+  /// Called with the new document after every change (edits, undo, redo).
+  final ValueChanged<ir.StageDocument>? onDocumentChanged;
+
+  /// Cmd+S: write pending changes now.
+  final VoidCallback? onSave;
+
+  /// The save indicator shown in the toolbar (the app's autosave status).
+  final Widget? saveStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    return ProviderScope(
+      overrides: [initialDocumentProvider.overrideWithValue(document)],
+      child: _EditorScope(
+        onBack: onBack,
+        onPreview: onPreview,
+        onDocumentChanged: onDocumentChanged,
+        onSave: onSave,
+        saveStatus: saveStatus,
+      ),
+    );
+  }
+}
+
+/// The shell inside the editor's provider scope.
+class _EditorScope extends ConsumerWidget {
+  const _EditorScope({
+    required this.onBack,
+    required this.onPreview,
+    required this.onDocumentChanged,
+    required this.onSave,
+    required this.saveStatus,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onPreview;
+  final ValueChanged<ir.StageDocument>? onDocumentChanged;
+  final VoidCallback? onSave;
+  final Widget? saveStatus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(
+      editorControllerProvider.select((s) => Identity(s.document)),
+      (_, next) => onDocumentChanged?.call(next.value),
+    );
+    final document = ref
+        .watch(editorControllerProvider.select((s) => Identity(s.document)))
+        .value;
+    final title = document.meta.title.isEmpty
+        ? 'Untitled story'
+        : document.meta.title;
     return LayoutBuilder(
       builder: (context, box) {
         if (box.maxWidth < kEditorMinWidth) {
           return ContentModeScreen(
-            title: _title,
+            title: title,
             scenes: document.scenes,
             onPlay: onPreview,
             onBack: onBack,
           );
         }
-        return _DockedEditor(
-          document: document,
-          title: _title,
-          width: box.maxWidth,
-          onBack: onBack,
-          onPreview: onPreview,
+        return _AltScopeFlip(
+          child: _DockedEditor(
+            document: document,
+            title: title,
+            width: box.maxWidth,
+            onBack: onBack,
+            onPreview: onPreview,
+            onSave: onSave,
+            saveStatus: saveStatus,
+          ),
         );
       },
     );
   }
+}
+
+/// Holding Alt flips the edit scope for the edits made while it is down,
+/// and the toolbar shows the flipped scope live.
+class _AltScopeFlip extends ConsumerStatefulWidget {
+  const _AltScopeFlip({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_AltScopeFlip> createState() => _AltScopeFlipState();
+}
+
+class _AltScopeFlipState extends ConsumerState<_AltScopeFlip> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    super.dispose();
+  }
+
+  bool _onKey(KeyEvent e) {
+    if (mounted) {
+      ref
+          .read(editorControllerProvider.notifier)
+          .setScopeFlipped(HardwareKeyboard.instance.isAltPressed);
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _DockedEditor extends ConsumerWidget {
@@ -66,6 +165,8 @@ class _DockedEditor extends ConsumerWidget {
     required this.width,
     required this.onBack,
     required this.onPreview,
+    required this.onSave,
+    required this.saveStatus,
   });
 
   final ir.StageDocument document;
@@ -73,6 +174,8 @@ class _DockedEditor extends ConsumerWidget {
   final double width;
   final VoidCallback onBack;
   final VoidCallback onPreview;
+  final VoidCallback? onSave;
+  final Widget? saveStatus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -99,74 +202,94 @@ class _DockedEditor extends ConsumerWidget {
     );
 
     void help() => showShortcutHelp(context);
+    final editor = ref.read(editorControllerProvider.notifier);
+    final canvas = ref.read(canvasControllerProvider);
 
     return EditorShortcuts(
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          ShowShortcutHelpIntent: EditorAction<ShowShortcutHelpIntent>(
-            (_) => help(),
-          ),
-          ToggleLeftPanelIntent: EditorAction<ToggleLeftPanelIntent>(
-            (_) => notifier.toggleLeft(),
-          ),
-          ToggleRightPanelIntent: EditorAction<ToggleRightPanelIntent>(
-            (_) => notifier.toggleRight(),
-          ),
-          ToggleTimelineIntent: EditorAction<ToggleTimelineIntent>(
-            (_) => notifier.toggleTimeline(),
-          ),
-          PreviewIntent: EditorAction<PreviewIntent>((_) => onPreview()),
-        },
-        child: Focus(
-          autofocus: true,
-          child: ColoredBox(
-            color: c.surface0,
-            child: Column(
-              children: [
-                EditorToolbar(
-                  title: title,
-                  onBack: onBack,
-                  onPreview: onPreview,
-                  onHelp: help,
-                ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (layout.leftOpen) ...[
-                        SizedBox(
-                          width: leftW.toDouble(),
-                          child: _LeftPanel(document: document),
-                        ),
-                        ResizeHandle(
-                          semanticLabel: 'Resize left panel',
-                          onDelta: (d) => notifier.setLeftWidth(
-                            leftW + d,
-                            available: width,
-                          ),
-                          onReset: () => notifier.setLeftWidth(264),
-                        ),
-                      ],
-                      Expanded(child: _CanvasPlaceholder(document: document)),
-                      if (layout.rightOpen) ...[
-                        ResizeHandle(
-                          semanticLabel: 'Resize inspector',
-                          onDelta: (d) => notifier.setRightWidth(
-                            rightW - d,
-                            available: width,
-                          ),
-                          onReset: () => notifier.setRightWidth(288),
-                        ),
-                        SizedBox(
-                          width: rightW.toDouble(),
-                          child: const _InspectorPlaceholder(),
-                        ),
-                      ],
+      onEditorIntent: editor.perform,
+      actions: <Type, Action<Intent>>{
+        ShowShortcutHelpIntent: EditorShortcutAction<ShowShortcutHelpIntent>(
+          (_) => help(),
+        ),
+        ToggleLeftPanelIntent: EditorShortcutAction<ToggleLeftPanelIntent>(
+          (_) => notifier.toggleLeft(),
+        ),
+        ToggleRightPanelIntent: EditorShortcutAction<ToggleRightPanelIntent>(
+          (_) => notifier.toggleRight(),
+        ),
+        ToggleTimelineIntent: EditorShortcutAction<ToggleTimelineIntent>(
+          (_) => notifier.toggleTimeline(),
+        ),
+        PreviewIntent: EditorShortcutAction<PreviewIntent>((_) => onPreview()),
+        SaveIntent: EditorShortcutAction<SaveIntent>((_) => onSave?.call()),
+        SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
+          (i) => editor.setTool(i.tool),
+        ),
+        ZoomInIntent: EditorShortcutAction<ZoomInIntent>(
+          (_) => canvas.zoomIn(),
+        ),
+        ZoomOutIntent: EditorShortcutAction<ZoomOutIntent>(
+          (_) => canvas.zoomOut(),
+        ),
+        ZoomTo100Intent: EditorShortcutAction<ZoomTo100Intent>(
+          (_) => canvas.zoomTo100(),
+        ),
+        ZoomToFitIntent: EditorShortcutAction<ZoomToFitIntent>(
+          (_) => canvas.zoomToFit(),
+        ),
+        ZoomToSelectionIntent: EditorShortcutAction<ZoomToSelectionIntent>((_) {
+          final st = ref.read(editorControllerProvider);
+          canvas.zoomToNodes(st.selection, breakpointId: st.breakpointId);
+        }),
+      },
+      child: Focus(
+        autofocus: true,
+        child: ColoredBox(
+          color: c.surface0,
+          child: Column(
+            children: [
+              EditorToolbar(
+                title: title,
+                onBack: onBack,
+                onPreview: onPreview,
+                onHelp: help,
+                saveStatus: saveStatus,
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    if (layout.leftOpen) ...[
+                      SizedBox(
+                        width: leftW.toDouble(),
+                        child: _LeftPanel(document: document),
+                      ),
+                      ResizeHandle(
+                        semanticLabel: 'Resize left panel',
+                        onDelta: (d) =>
+                            notifier.setLeftWidth(leftW + d, available: width),
+                        onReset: () => notifier.setLeftWidth(264),
+                      ),
                     ],
-                  ),
+                    const Expanded(child: EditorCanvas()),
+                    if (layout.rightOpen) ...[
+                      ResizeHandle(
+                        semanticLabel: 'Resize inspector',
+                        onDelta: (d) => notifier.setRightWidth(
+                          rightW - d,
+                          available: width,
+                        ),
+                        onReset: () => notifier.setRightWidth(288),
+                      ),
+                      SizedBox(
+                        width: rightW.toDouble(),
+                        child: const _InspectorPlaceholder(),
+                      ),
+                    ],
+                  ],
                 ),
-                _TimelineStrip(open: layout.timelineOpen),
-              ],
-            ),
+              ),
+              _TimelineStrip(open: layout.timelineOpen),
+            ],
           ),
         ),
       ),
@@ -279,17 +402,91 @@ class _LeftPanel extends ConsumerWidget {
   }
 }
 
-class _InspectorPlaceholder extends StatelessWidget {
+/// The inspector arrives in T1.7; until then it names the selection.
+class _InspectorPlaceholder extends ConsumerWidget {
   const _InspectorPlaceholder();
 
+  static String kindOf(ir.Node n) => switch (n) {
+    ir.FrameNode(:final autoLayout) =>
+      autoLayout == null ? 'Frame' : 'Frame · auto layout',
+    ir.TextNode() => 'Text',
+    ir.ShapeNode(:final geometry) => switch (geometry) {
+      ir.RectangleGeometry() => 'Rectangle',
+      ir.EllipseGeometry() => 'Ellipse',
+      ir.LineGeometry() => 'Line',
+      ir.PolygonGeometry() => 'Polygon',
+      ir.StarGeometry() => 'Star',
+    },
+    ir.InstanceNode() => 'Instance',
+    ir.VideoNode() => 'Video',
+    ir.EmbedNode() => 'Embed',
+  };
+
   @override
-  Widget build(BuildContext context) {
-    final c = context.ss.colors;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.ss;
+    final c = t.colors;
+    final selection = ref.watch(
+      editorControllerProvider.select((s) => s.selection),
+    );
+    final bp = ref.watch(
+      editorControllerProvider.select((s) => s.breakpointId),
+    );
+    Widget body;
+    if (selection.isEmpty || bp == null) {
+      body = const _EmptyState(
+        icon: SsIcons.slidersHorizontal,
+        title: 'Nothing selected',
+        body: 'Select a layer to edit its properties.',
+      );
+    } else {
+      final index = ref.watch(resolvedForProvider(bp)).resolved.nodeIndex;
+      final nodes = [
+        for (final id in selection)
+          if (index[id] case final n?) n.node,
+      ];
+      body = Padding(
+        padding: const EdgeInsets.all(SsSpace.s3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (nodes.length == 1) ...[
+              Text(
+                nodes.single.common.name.isEmpty
+                    ? kindOf(nodes.single)
+                    : nodes.single.common.name,
+                key: const ValueKey<String>('inspector-selection-name'),
+                style: t.text.bodyStrong,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: SsSpace.s1),
+              Text(
+                kindOf(nodes.single),
+                key: const ValueKey<String>('inspector-selection-kind'),
+                style: t.text.small.copyWith(color: c.textSecondary),
+              ),
+            ] else
+              Text(
+                '${selection.length} layers selected',
+                key: const ValueKey<String>('inspector-selection-name'),
+                style: t.text.bodyStrong,
+              ),
+            const SizedBox(height: SsSpace.s3),
+            Text(
+              'Properties arrive with the inspector.',
+              style: t.text.caption,
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       color: c.surface1,
-      child: const Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
+          const SizedBox(
             height: 36,
             child: Align(
               alignment: Alignment.centerLeft,
@@ -299,13 +496,7 @@ class _InspectorPlaceholder extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            child: _EmptyState(
-              icon: SsIcons.slidersHorizontal,
-              title: 'Nothing selected',
-              body: 'Select a layer to edit its properties.',
-            ),
-          ),
+          Expanded(child: body),
         ],
       ),
     );
@@ -318,130 +509,6 @@ class _InspectorTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Text('Inspector', style: context.ss.text.bodyStrong);
-}
-
-/// Two artboards (the widest and narrowest breakpoints) side by side, as
-/// the real canvas will lay them out (T1.3).
-class _CanvasPlaceholder extends StatelessWidget {
-  const _CanvasPlaceholder({required this.document});
-
-  final ir.StageDocument document;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.ss;
-    final c = t.colors;
-    final bps = [...document.breakpoints]
-      ..sort((a, b) => b.minWidth.compareTo(a.minWidth));
-    final boards = <ir.Breakpoint>[
-      if (bps.isNotEmpty) bps.first,
-      if (bps.length > 1) bps.last,
-    ];
-    return ClipRect(
-      child: Semantics(
-        label: 'Canvas',
-        container: true,
-        child: CustomPaint(
-          painter: _DotGridPainter(c.borderSubtle),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              const pad = SsSpace.s8;
-              const gap = SsSpace.s8;
-              final availW = math.max(
-                1.0,
-                box.maxWidth - pad * 2 - gap * (boards.length - 1),
-              );
-              final availH = math.max(1.0, box.maxHeight - pad * 2 - 24);
-              final totalW = boards.fold<double>(
-                0,
-                (s, b) => s + b.designSize.width,
-              );
-              final maxH = boards.fold<double>(
-                0,
-                (s, b) => math.max(s, b.designSize.height),
-              );
-              // A board's caption needs at least [labelW]; narrow boards
-              // (mobile) get padded, so solve the scale in two passes.
-              const labelW = 120.0;
-              var scale = math.min(availW / totalW, availH / maxH);
-              for (var pass = 0; pass < 2; pass++) {
-                var extra = 0.0;
-                var fixedW = 0.0;
-                for (final b in boards) {
-                  if (b.designSize.width * scale < labelW) {
-                    fixedW += labelW;
-                  } else {
-                    fixedW += 0;
-                    extra += b.designSize.width;
-                  }
-                }
-                scale = math.min(
-                  extra == 0 ? double.infinity : (availW - fixedW) / extra,
-                  availH / maxH,
-                );
-              }
-              scale = math.max(scale, 0.01);
-              return Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < boards.length; i++) ...[
-                      if (i > 0) const SizedBox(width: gap),
-                      SizedBox(
-                        width: math.max(
-                          boards[i].designSize.width * scale,
-                          labelW,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${boards[i].name}  ${boards[i].designSize.width.round()}×${boards[i].designSize.height.round()}',
-                              style: t.text.caption,
-                            ),
-                            const SizedBox(height: SsSpace.s1),
-                            Container(
-                              width: boards[i].designSize.width * scale,
-                              height: boards[i].designSize.height * scale,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFFFFFF),
-                                boxShadow: SsElevation.e2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DotGridPainter extends CustomPainter {
-  const _DotGridPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = color;
-    for (var y = 12.0; y < size.height; y += 24) {
-      for (var x = 12.0; x < size.width; x += 24) {
-        canvas.drawCircle(Offset(x, y), 1, p);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DotGridPainter old) => old.color != color;
 }
 
 class _TimelineStrip extends ConsumerWidget {

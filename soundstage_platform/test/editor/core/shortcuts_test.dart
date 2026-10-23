@@ -2,11 +2,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
+import 'package:soundstage_platform/editor/shortcuts/shortcut_map.dart';
+import 'package:soundstage_platform/ir/ir.dart' show FrameNode;
 
 import 'fixtures.dart';
 
-EditorIntent? _find(
-  Map<ShortcutActivator, EditorIntent> map,
+// The keys come from the editor's one shortcut table
+// (`lib/editor/shortcuts/shortcut_map.dart`); this suite checks that the
+// table fires the Figma bindings of the core intents, and what
+// `actionForIntent` does with them.
+
+Intent? _find(
+  Map<ShortcutActivator, Intent> map,
   LogicalKeyboardKey key, {
   bool meta = false,
   bool control = false,
@@ -14,7 +21,8 @@ EditorIntent? _find(
   bool alt = false,
 }) {
   for (final e in map.entries) {
-    final a = e.key as SingleActivator;
+    final a = e.key;
+    if (a is! SingleActivator) continue;
     if (a.trigger == key &&
         a.meta == meta &&
         a.control == control &&
@@ -28,8 +36,8 @@ EditorIntent? _find(
 
 void main() {
   test('Cmd on Apple platforms, Ctrl elsewhere', () {
-    final mac = editorShortcuts(apple: true);
-    final win = editorShortcuts(apple: false);
+    final mac = buildShortcutMap(mac: true);
+    final win = buildShortcutMap(mac: false);
     expect(_find(mac, LogicalKeyboardKey.keyZ, meta: true), isA<UndoIntent>());
     expect(
       _find(win, LogicalKeyboardKey.keyZ, control: true),
@@ -47,7 +55,7 @@ void main() {
   });
 
   test('the full Figma map', () {
-    final m = editorShortcuts(apple: true);
+    final m = buildShortcutMap(mac: true);
     final expected = <(LogicalKeyboardKey, bool, bool, bool, Type)>[
       // key, cmd, shift, alt
       (LogicalKeyboardKey.delete, false, false, false, DeleteSelectionIntent),
@@ -71,6 +79,21 @@ void main() {
       (LogicalKeyboardKey.escape, false, false, false, SelectParentIntent),
       (LogicalKeyboardKey.enter, false, false, false, SelectChildrenIntent),
       (LogicalKeyboardKey.tab, false, false, false, SelectSiblingIntent),
+      (LogicalKeyboardKey.tab, false, true, false, SelectSiblingIntent),
+      (
+        LogicalKeyboardKey.bracketRight,
+        true,
+        false,
+        false,
+        ReorderSelectionIntent,
+      ),
+      (
+        LogicalKeyboardKey.bracketLeft,
+        true,
+        false,
+        true,
+        ReorderSelectionIntent,
+      ),
     ];
     for (final (key, cmd, shift, alt, type) in expected) {
       final i = _find(m, key, meta: cmd, shift: shift, alt: alt);
@@ -81,6 +104,25 @@ void main() {
     expect((nudge.dx, nudge.dy), (-10.0, 0.0));
     final down = _find(m, LogicalKeyboardKey.arrowDown)! as NudgeIntent;
     expect((down.dx, down.dy), (0.0, 1.0));
+    final back =
+        _find(m, LogicalKeyboardKey.bracketLeft, meta: true, alt: true)!
+            as ReorderSelectionIntent;
+    expect(back.direction, ReorderDirection.back);
+    final prev =
+        _find(m, LogicalKeyboardKey.tab, shift: true)! as SelectSiblingIntent;
+    expect(prev.backwards, isTrue);
+  });
+
+  test('every core intent in the table has an action', () {
+    final c = editorContainer();
+    c.ctl.select({'a1'});
+    final tree = c.ctl.selectionTree();
+    for (final d in kEditorShortcuts) {
+      final intent = d.intent;
+      if (intent is! EditorIntent) continue;
+      final action = actionForIntent(intent, c.st, tree: tree);
+      expect(action, isNot(isA<NoAction>()), reason: d.id);
+    }
   });
 
   test('intents map to commands; nothing selected is no action', () {
@@ -135,5 +177,8 @@ void main() {
     c.ctl.perform(const SelectNoneIntent());
     expect(c.st.selection, isEmpty);
     expect(c.ctl.perform(const DuplicateSelectionIntent()), isA<NoAction>());
+    c.ctl.select({'a1'});
+    c.ctl.perform(const ReorderSelectionIntent(ReorderDirection.front));
+    expect((c.node('a') as FrameNode).children.last.id, 'a1');
   });
 }

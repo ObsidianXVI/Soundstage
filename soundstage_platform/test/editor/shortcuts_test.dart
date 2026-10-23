@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soundstage_platform/editor/core/core.dart';
 import 'package:soundstage_platform/editor/shortcuts/editor_shortcuts.dart';
 import 'package:soundstage_platform/editor/shortcuts/intents.dart';
 import 'package:soundstage_platform/editor/shortcuts/shortcut_help.dart';
@@ -63,30 +64,83 @@ void main() {
     expect(
       types,
       containsAll(<Type>[
+        // Core (document and selection) intents.
         UndoIntent,
         RedoIntent,
-        CopyNodesIntent,
-        CutNodesIntent,
-        PasteNodesIntent,
-        DuplicateIntent,
-        DeleteNodesIntent,
+        DuplicateSelectionIntent,
+        DeleteSelectionIntent,
         SelectAllIntent,
-        GroupIntent,
-        UngroupIntent,
+        SelectNoneIntent,
+        GroupSelectionIntent,
+        UngroupSelectionIntent,
+        FrameSelectionIntent,
+        AddAutoLayoutIntent,
+        ReorderSelectionIntent,
         NudgeIntent,
+        RenameSelectionIntent,
+        ToggleVisibilityIntent,
+        ToggleLockIntent,
+        SelectParentIntent,
+        SelectChildrenIntent,
+        SelectSiblingIntent,
+        // UI intents.
         SelectToolIntent,
         ZoomInIntent,
         ZoomOutIntent,
+        ZoomTo100Intent,
         ZoomToFitIntent,
+        ZoomToSelectionIntent,
         ToggleLeftPanelIntent,
         ToggleRightPanelIntent,
         ToggleTimelineIntent,
         PreviewIntent,
         ShowShortcutHelpIntent,
         SaveIntent,
-        RenameIntent,
       ]),
     );
+    // Every intent is either a core intent (actionForIntent) or a UI one.
+    for (final d in kEditorShortcuts) {
+      expect(
+        d.intent is EditorIntent || d.intent is ShellIntent,
+        isTrue,
+        reason: d.id,
+      );
+    }
+  });
+
+  test('zoom keys: Cmd+0 is 100%, Shift+1 fit, Shift+2 selection', () {
+    expect(shortcutLabel('zoom100', mac: true), '⌘0');
+    expect(shortcutLabel('zoomFit', mac: true), '⇧1');
+    expect(shortcutLabel('zoomSelection', mac: false), 'Shift+2');
+    expect(shortcutLabel('rename', mac: true), '⌘R');
+  });
+
+  testWidgets('core intents reach onEditorIntent; UI intents their actions', (
+    tester,
+  ) async {
+    final log = <String>[];
+    await pumpChrome(
+      tester,
+      EditorShortcuts(
+        mac: false,
+        onEditorIntent: (i) => log.add(i.runtimeType.toString()),
+        actions: {
+          ZoomToFitIntent: EditorShortcutAction<ZoomToFitIntent>(
+            (_) => log.add('fit'),
+          ),
+        },
+        child: const Focus(autofocus: true, child: SizedBox()),
+      ),
+    );
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyG);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(log, ['UndoIntent', 'GroupSelectionIntent', 'NudgeIntent', 'fit']);
   });
 
   testWidgets('a key fires its intent through Shortcuts and Actions', (
@@ -99,8 +153,10 @@ void main() {
         mac: false,
         child: Actions(
           actions: {
-            UndoIntent: EditorAction<UndoIntent>((_) => log.add('undo')),
-            SelectToolIntent: EditorAction<SelectToolIntent>(
+            UndoIntent: EditorShortcutAction<UndoIntent>(
+              (_) => log.add('undo'),
+            ),
+            SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
               (i) => log.add('tool:${i.tool.name}'),
             ),
           },
@@ -125,10 +181,15 @@ void main() {
         mac: false,
         child: Actions(
           actions: {
-            SelectToolIntent: EditorAction<SelectToolIntent>(
+            SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
               (i) => log.add('tool:${i.tool.name}'),
             ),
-            UndoIntent: EditorAction<UndoIntent>((_) => log.add('undo')),
+            UndoIntent: EditorShortcutAction<UndoIntent>(
+              (_) => log.add('undo'),
+            ),
+            DeleteSelectionIntent: EditorShortcutAction<DeleteSelectionIntent>(
+              (_) => log.add('delete'),
+            ),
           },
           child: const SizedBox(width: 200, child: TextField(autofocus: true)),
         ),
@@ -136,6 +197,7 @@ void main() {
     );
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     expect(log, isEmpty);
     // Modifier shortcuts still work.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);

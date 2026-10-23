@@ -3,16 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../shortcuts/intents.dart';
-
 /// The narrowest window the full editor supports. Below it, `/edit/:id`
 /// shows the content-mode screen instead.
 const double kEditorMinWidth = 1024;
-
-/// Which breakpoints an edit applies to: "Both" writes through to the
-/// shared (base) value; "This breakpoint" writes an override. Alt flips it
-/// for one gesture. Not wired to anything yet.
-enum EditScope { both, thisBreakpoint }
 
 enum LeftPanelTab { scenes, layers, assets }
 
@@ -24,8 +17,9 @@ const double kRightPanelMax = 480;
 /// Narrowest the canvas may get when panels are widened.
 const double kCanvasMinWidth = 360;
 
-/// Panel sizes and toggles. Lives in the provider scope, so it is
+/// Panel sizes and toggles. Lives in the root provider scope, so it is
 /// remembered for the session (across route changes), not across reloads.
+/// The edit scope and the tool are editor state (`EditorController`).
 @immutable
 class EditorLayoutState {
   const EditorLayoutState({
@@ -35,8 +29,6 @@ class EditorLayoutState {
     this.rightOpen = true,
     this.timelineOpen = false,
     this.leftTab = LeftPanelTab.scenes,
-    this.scope = EditScope.both,
-    this.tool = EditorTool.move,
   });
 
   final double leftWidth;
@@ -45,8 +37,6 @@ class EditorLayoutState {
   final bool rightOpen;
   final bool timelineOpen;
   final LeftPanelTab leftTab;
-  final EditScope scope;
-  final EditorTool tool;
 
   EditorLayoutState copyWith({
     double? leftWidth,
@@ -55,8 +45,6 @@ class EditorLayoutState {
     bool? rightOpen,
     bool? timelineOpen,
     LeftPanelTab? leftTab,
-    EditScope? scope,
-    EditorTool? tool,
   }) => EditorLayoutState(
     leftWidth: leftWidth ?? this.leftWidth,
     rightWidth: rightWidth ?? this.rightWidth,
@@ -64,8 +52,6 @@ class EditorLayoutState {
     rightOpen: rightOpen ?? this.rightOpen,
     timelineOpen: timelineOpen ?? this.timelineOpen,
     leftTab: leftTab ?? this.leftTab,
-    scope: scope ?? this.scope,
-    tool: tool ?? this.tool,
   );
 }
 
@@ -106,13 +92,6 @@ class EditorLayoutNotifier extends Notifier<EditorLayoutState> {
   void toggleTimeline() =>
       state = state.copyWith(timelineOpen: !state.timelineOpen);
   void setLeftTab(LeftPanelTab t) => state = state.copyWith(leftTab: t);
-  void setScope(EditScope s) => state = state.copyWith(scope: s);
-  void flipScope() => state = state.copyWith(
-    scope: state.scope == EditScope.both
-        ? EditScope.thisBreakpoint
-        : EditScope.both,
-  );
-  void setTool(EditorTool t) => state = state.copyWith(tool: t);
 }
 
 final editorLayoutProvider =

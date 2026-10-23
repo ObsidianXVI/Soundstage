@@ -19,7 +19,7 @@ enum EditScope {
 }
 
 /// The active canvas tool. Insert tools land in T1.9.
-enum EditorTool { move, hand, frame, text, rectangle, ellipse, image }
+enum EditorTool { move, hand, frame, text, rectangle, ellipse, line, image }
 
 /// The undo/redo availability the toolbar shows.
 @freezed

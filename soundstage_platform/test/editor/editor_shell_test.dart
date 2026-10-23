@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/editor/canvas/artboard.dart';
+import 'package:soundstage_platform/editor/canvas/editor_canvas.dart';
+import 'package:soundstage_platform/editor/core/core.dart';
 import 'package:soundstage_platform/editor/shell/content_mode_screen.dart';
 import 'package:soundstage_platform/editor/shell/editor_layout.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
@@ -30,6 +33,10 @@ ir.StageDocument _doc() {
     ],
   );
 }
+
+/// The editor's own (scoped) provider container.
+ProviderContainer _editor(WidgetTester tester) =>
+    ProviderScope.containerOf(tester.element(find.byType(EditorCanvas)));
 
 Finder _glyph(IconData i) => find.text(String.fromCharCode(i.codePoint));
 
@@ -80,9 +87,9 @@ void main() {
         expect(find.text('Opening'), findsOneWidget);
         expect(find.text('Nothing selected'), findsOneWidget);
         expect(find.text('Timeline'), findsOneWidget);
-        // Both artboards are drawn side by side.
-        expect(find.textContaining('Desktop'), findsOneWidget);
-        expect(find.textContaining('Mobile'), findsOneWidget);
+        // One artboard per primary breakpoint (desktop and mobile).
+        expect(find.byType(Artboard), findsNWidgets(2));
+        expect(find.byType(EditorCanvas), findsOneWidget);
       },
     );
   }
@@ -90,13 +97,17 @@ void main() {
   testWidgets(
     'the toolbar has the edit-scope segmented control with the Alt hint',
     (tester) async {
-      final c = await _pump(tester, const Size(1440, 900));
+      await _pump(tester, const Size(1440, 900));
       expect(find.text('Both'), findsOneWidget);
       expect(find.text('This breakpoint'), findsOneWidget);
-      expect(c.read(editorLayoutProvider).scope, EditScope.both);
+      final e = _editor(tester);
+      expect(e.read(editorControllerProvider).editScope, EditScope.both);
       await tester.tap(find.text('This breakpoint'));
       await tester.pump();
-      expect(c.read(editorLayoutProvider).scope, EditScope.thisBreakpoint);
+      expect(
+        e.read(editorControllerProvider).editScope,
+        EditScope.thisBreakpoint,
+      );
 
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await mouse.addPointer(location: Offset.zero);
