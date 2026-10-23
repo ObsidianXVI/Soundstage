@@ -78,7 +78,13 @@ abstract class ResolvedParagraph with _$ResolvedParagraph {
 /// - `isPlaceholder`: the node stands in for something that failed to
 ///   resolve (missing component, component cycle); there is a diagnostic.
 ///   The editor shows it, the player skips it (§17.2).
-@freezed
+///
+/// Collections are returned as stored (not re-wrapped per read), so the
+/// render tree's `identical()` checks hold across reads: freezed's default
+/// wraps a list in a new unmodifiable view on every access, which made every
+/// text node relayout on every edit (T1.5 perf). The resolver never mutates
+/// them after construction.
+@Freezed(makeCollectionsUnmodifiable: false)
 abstract class ResolvedNode with _$ResolvedNode {
   const factory ResolvedNode({
     required String id,

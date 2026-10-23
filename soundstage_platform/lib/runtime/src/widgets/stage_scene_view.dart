@@ -23,6 +23,7 @@ class StageSceneView extends StatelessWidget {
     required this.scene,
     required this.viewportSize,
     this.breakpoint,
+    this.extraRepaintBoundaryIds = const {},
   });
 
   final ir.ResolvedScene scene;
@@ -30,6 +31,10 @@ class StageSceneView extends StatelessWidget {
 
   /// The breakpoint the scene was resolved for (`ResolvedDocument.breakpoint`).
   final ir.Breakpoint? breakpoint;
+
+  /// More nodes to make repaint boundaries (the editor isolates large
+  /// subtrees so an edit re-records only the path to it).
+  final Set<String> extraRepaintBoundaryIds;
 
   /// The reference size of [scene]'s root at [breakpoint].
   static Size referenceSizeFor(
@@ -63,6 +68,7 @@ class StageSceneView extends StatelessWidget {
           root.id,
           for (final t in scene.tracks) t.target,
           ...behaviorTargetIds(scene),
+          ...extraRepaintBoundaryIds,
         },
       ),
     );

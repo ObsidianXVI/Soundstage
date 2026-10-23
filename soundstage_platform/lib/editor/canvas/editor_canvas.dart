@@ -131,13 +131,16 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   }
 
   StageEnvironment _environment(ir.StageDocument doc) {
+    // freezed returns a new unmodifiable view of a list on every read, so
+    // these never compare identical; compare by value (short lists of
+    // shared objects). A new environment relays out every text node.
     final key = (doc.fonts, doc.assets, doc.audioTracks);
     final last = _envKey as (Object, Object, Object)?;
     if (_env == null ||
         last == null ||
-        !identical(last.$1, key.$1) ||
-        !identical(last.$2, key.$2) ||
-        !identical(last.$3, key.$3)) {
+        last.$1 != key.$1 ||
+        last.$2 != key.$2 ||
+        last.$3 != key.$3) {
       _envKey = key;
       _env = StageEnvironment.forDocument(doc, mode: StageRenderMode.edit);
     }

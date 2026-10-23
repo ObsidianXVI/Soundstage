@@ -164,9 +164,52 @@ class _ArtboardState extends ConsumerState<Artboard>
                   scene: scene,
                   viewportSize: viewport,
                   breakpoint: effective,
+                  extraRepaintBoundaryIds: editRepaintBoundaries(scene.root),
                 ),
         ),
       ),
     );
   }
+}
+
+/// Frames with at least this many descendants are repaint boundaries on
+/// the artboards.
+const int kEditRepaintBoundaryMin = 16;
+
+final Expando<int> _descendants = Expando('descendants');
+
+int _countDescendants(ir.ResolvedNode n) {
+  final cached = _descendants[n];
+  if (cached != null) return cached;
+  var c = 0;
+  for (final k in n.children) {
+    c += 1 + _countDescendants(k);
+  }
+  _descendants[n] = c;
+  return c;
+}
+
+/// The frames of [root]'s tree (not the root, already a boundary) with at
+/// least [kEditRepaintBoundaryMin] descendants.
+///
+/// In the editor a drag or an edit marks its node's ancestors for paint;
+/// without boundaries below the scene root, every node of the scene would
+/// re-record its picture each frame (9,990 paints per move on the 5,000-node
+/// bench). With large subtrees isolated, an edit re-records the ancestor
+/// path and the small subtrees beside it. Counts are memoised per resolved
+/// node, and untouched subtrees keep their identity across edits, so this
+/// costs the edited path only.
+Set<String> editRepaintBoundaries(ir.ResolvedNode root) {
+  final out = <String>{};
+  void walk(ir.ResolvedNode n) {
+    for (final k in n.children) {
+      if (_countDescendants(k) >= kEditRepaintBoundaryMin) {
+        out.add(k.id);
+        walk(k);
+      }
+    }
+  }
+
+  walk(root);
+  return out;
 }
