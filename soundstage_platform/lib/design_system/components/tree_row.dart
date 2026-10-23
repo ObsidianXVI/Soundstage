@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -28,6 +31,11 @@ class SsTreeRow extends StatefulWidget {
     this.showToggles = true,
     this.renameEnabled = true,
     this.dimmed = false,
+    this.highlighted = false,
+    this.trailing,
+    this.startRenaming = false,
+    this.onRenameEnd,
+    this.onKeyEvent,
     this.onTap,
     this.onExpandedChanged,
     this.onRename,
@@ -53,6 +61,25 @@ class SsTreeRow extends StatefulWidget {
 
   /// Draw the row faded (a hidden node).
   final bool dimmed;
+
+  /// Draw the hover layer although the pointer is elsewhere (the node is
+  /// hovered on the canvas).
+  final bool highlighted;
+
+  /// A small widget between the label and the toggles (a role badge, a
+  /// read-only mark).
+  final Widget? trailing;
+
+  /// Begins renaming when it turns true (or when the row is built with it).
+  /// The owner clears it from [onRenameEnd].
+  final bool startRenaming;
+
+  /// Called when renaming ends, whether committed or cancelled.
+  final VoidCallback? onRenameEnd;
+
+  /// Key handling offered before the row's own (arrows, F2); return
+  /// [KeyEventResult.ignored] to fall through to it.
+  final FocusOnKeyEventCallback? onKeyEvent;
   final VoidCallback? onTap;
   final ValueChanged<bool>? onExpandedChanged;
   final ValueChanged<String>? onRename;
@@ -79,18 +106,45 @@ class _SsTreeRowState extends State<SsTreeRow> {
     _editFocus.addListener(() {
       if (!_editFocus.hasFocus && _renaming) _commit();
     });
+    if (widget.startRenaming) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startRename();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(SsTreeRow old) {
+    super.didUpdateWidget(old);
+    if (widget.startRenaming && !old.startRenaming && !_renaming) {
+      _startRename();
+    }
   }
 
   @override
   void dispose() {
+    _doubleTapWindow?.cancel();
     _text.dispose();
     _editFocus.dispose();
     _rowFocus.dispose();
     super.dispose();
   }
 
+  Timer? _doubleTapWindow;
+
+  void _onTap() {
+    widget.onTap?.call();
+    if (_doubleTapWindow?.isActive ?? false) {
+      _doubleTapWindow!.cancel();
+      _startRename();
+    } else {
+      _doubleTapWindow = Timer(kDoubleTapTimeout, () {});
+    }
+  }
+
   void _startRename() {
     if (!widget.renameEnabled || widget.onRename == null || widget.locked) {
+      widget.onRenameEnd?.call();
       return;
     }
     _original = widget.label;
@@ -111,12 +165,14 @@ class _SsTreeRowState extends State<SsTreeRow> {
     setState(() => _renaming = false);
     if (value.isNotEmpty && value != _original) widget.onRename?.call(value);
     _rowFocus.requestFocus();
+    widget.onRenameEnd?.call();
   }
 
   void _cancel() {
     if (!_renaming) return;
     setState(() => _renaming = false);
     _rowFocus.requestFocus();
+    widget.onRenameEnd?.call();
   }
 
   @override
@@ -135,11 +191,16 @@ class _SsTreeRowState extends State<SsTreeRow> {
             ? (w.expanded ? 'Expanded' : 'Collapsed')
             : null,
         enabled: !_renaming,
-        onTap: w.onTap,
-        onDoubleTap: _startRename,
+        // A second tap inside the window renames. Not a double-tap
+        // recognizer: it would delay every single tap (selection) by its
+        // timeout.
+        onTap: _onTap,
         onSecondaryTapDown: w.onSecondaryTapDown,
         onKeyEvent: (node, event) {
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (w.onKeyEvent?.call(node, event) == KeyEventResult.handled) {
+            return KeyEventResult.handled;
+          }
           final k = event.logicalKey;
           if (k == LogicalKeyboardKey.arrowRight &&
               w.hasChildren &&
@@ -162,7 +223,7 @@ class _SsTreeRowState extends State<SsTreeRow> {
               ? c.selection
               : s.contains(WidgetState.pressed)
               ? c.pressedLayer
-              : hover
+              : hover || w.highlighted
               ? c.hoverLayer
               : const Color(0x00000000);
           final fg = w.dimmed || !w.visible ? c.textDisabled : c.textPrimary;
@@ -217,6 +278,10 @@ class _SsTreeRowState extends State<SsTreeRow> {
                             style: t.text.body.copyWith(color: fg),
                           ),
                   ),
+                  if (w.trailing != null) ...[
+                    const SizedBox(width: SsSpace.s1),
+                    w.trailing!,
+                  ],
                   if (showToggles) ...[
                     _RowToggle(
                       active: w.locked,

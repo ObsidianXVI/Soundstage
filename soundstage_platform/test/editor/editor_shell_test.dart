@@ -48,7 +48,9 @@ Future<ProviderContainer> _pump(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final container = ProviderContainer();
+  final container = ProviderContainer(
+    overrides: [initialDocumentProvider.overrideWithValue(_doc())],
+  );
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(

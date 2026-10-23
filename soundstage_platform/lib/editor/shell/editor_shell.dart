@@ -9,6 +9,8 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../core/editor_controller.dart';
+import '../panels/layers_panel.dart';
+import '../panels/scenes_panel.dart';
 import '../shortcuts/editor_shortcuts.dart';
 import '../shortcuts/intents.dart';
 import '../shortcuts/shortcut_help.dart';
@@ -362,31 +364,8 @@ class _LeftPanel extends ConsumerWidget {
             child: SsTabPanel(
               label: '${tab.name} panel',
               child: switch (tab) {
-                LeftPanelTab.scenes =>
-                  document.scenes.isEmpty
-                      ? const _EmptyState(
-                          icon: SsIcons.clapperboard,
-                          title: 'No scenes yet',
-                          body: 'Scenes you add will be listed here.',
-                        )
-                      : ListView(
-                          padding: const EdgeInsets.all(SsSpace.s2),
-                          children: [
-                            for (var i = 0; i < document.scenes.length; i++)
-                              SsTreeRow(
-                                icon: SsIcons.clapperboard,
-                                label: document.scenes[i].name.isEmpty
-                                    ? 'Scene ${i + 1}'
-                                    : document.scenes[i].name,
-                                renameEnabled: false,
-                              ),
-                          ],
-                        ),
-                LeftPanelTab.layers => const _EmptyState(
-                  icon: SsIcons.layers,
-                  title: 'Layers',
-                  body: 'The layer tree of the selected scene appears here.',
-                ),
+                LeftPanelTab.scenes => const ScenesPanel(),
+                LeftPanelTab.layers => const LayersPanel(),
                 LeftPanelTab.assets => const _EmptyState(
                   icon: SsIcons.image,
                   title: 'Assets',
