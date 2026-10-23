@@ -297,7 +297,7 @@ void main() {
       expect(_errors(r.document), isEmpty);
     });
 
-    test('warns about clocks left pointing at a removed node', () {
+    test('removes clocks bound to a removed node', () {
       final doc = _doc();
       final withClock = updateScene(
         doc,
@@ -311,8 +311,10 @@ void main() {
       ).document;
       final r = removeNodes(withClock, ['b']);
       expect(r.ok, isTrue);
-      expect(r.diagnostics.single.kind, IrDiagnosticKind.missingNode);
-      expect(r.diagnostics.single.severity, IrSeverity.warning);
+      expect(r.diagnostics, isEmpty);
+      expect(r.cascade.removedClockIds, ['pc']);
+      expect(r.document.scenes[0].clocks.map((c) => c.id), ['clk1', 'tl1']);
+      expect(_errors(r.document), isEmpty);
     });
 
     test('roots and unknown ids are errors and change nothing', () {
@@ -340,7 +342,13 @@ void main() {
 
     test('reparents several nodes, keeping tree order', () {
       final doc = _doc();
-      final r = moveNodes(doc, ['b1', 'a2', 'a1'], 'b', 0);
+      final r = moveNodes(
+        doc,
+        ['b1', 'a2', 'a1'],
+        'b',
+        0,
+        preservePosition: false,
+      );
       expect(r.ok, isTrue);
       expect(_kids(r.document, 'b'), ['a1', 'a2', 'b1']);
       expect(_kids(r.document, 'a'), isEmpty);
@@ -382,10 +390,22 @@ void main() {
       expect(Resolver().resolve(r.document).diagnostics, isEmpty);
     });
 
-    test('a track on another clock moves with a warning', () {
-      final r = moveNodes(_doc(), ['inst'], 'c', 0);
+    test('a track on another clock copies the clock', () {
+      final r = moveNodes(
+        _doc(),
+        ['inst'],
+        'c',
+        0,
+        idGenerator: IdGenerator.seeded(1),
+      );
       expect(r.ok, isTrue);
-      expect(_kinds(r), [IrDiagnosticKind.missingClock]);
+      expect(r.diagnostics, isEmpty);
+      final copy = r.cascade.clockIdMap['tl1']!;
+      final s2 = r.document.scenes[1];
+      expect(s2.clocks.map((c) => c.id), ['clk2', copy]);
+      expect(s2.tracks.firstWhere((t) => t.id == 't2').clockId, copy);
+      expect(r.document.scenes[0].clocks.map((c) => c.id), ['clk1', 'tl1']);
+      expect(_errors(r.document), isEmpty);
     });
   });
 
