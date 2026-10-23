@@ -63,11 +63,8 @@ ir.Scene _flow(String id, double height) => ir.Scene(
   clocks: [ir.Clock.sceneScroll(id: '$id-c', sceneId: id)],
 );
 
-ir.StageDocument _doc(List<ir.Scene> scenes) => ir.StageDocument(
-  id: 'doc',
-  breakpoints: const [_bp],
-  scenes: scenes,
-);
+ir.StageDocument _doc(List<ir.Scene> scenes) =>
+    ir.StageDocument(id: 'doc', breakpoints: const [_bp], scenes: scenes);
 
 /// flow A (400) · pinned P (scrollLength 2, extent 1800) · flow B (500).
 ir.StageDocument _threeScenes({List<ir.Track> tracks = const []}) => _doc([

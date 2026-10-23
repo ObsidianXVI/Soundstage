@@ -110,18 +110,32 @@ void main() {
   testWidgets('the inspector names the selection', (tester) async {
     await _pumpShell(tester);
     final ctl = _editor(tester).read(editorControllerProvider.notifier);
-    expect(find.text('Nothing selected'), findsOneWidget);
+    // Nothing selected: the active scene's settings.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('inspector')),
+        matching: find.text('Scene settings'),
+      ),
+      findsOneWidget,
+    );
+    String name() => tester
+        .widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const ValueKey<String>('inspector-selection-name')),
+            matching: find.byType(EditableText),
+          ),
+        )
+        .controller
+        .text;
     ctl.select({'a'});
     await tester.pump();
-    expect(find.text('Card'), findsOneWidget);
-    expect(find.text('Frame'), findsOneWidget);
+    expect(name(), 'Card');
     ctl.select({'rot'});
     await tester.pump();
-    expect(find.text('ROT'), findsOneWidget);
-    expect(find.text('Rectangle'), findsOneWidget);
+    expect(name(), 'ROT');
     ctl.select({'a', 'rot'});
     await tester.pump();
-    expect(find.text('2 layers selected'), findsOneWidget);
+    expect(find.text('2 layers'), findsOneWidget);
   });
 
   testWidgets('edit scope: bound to the controller, Alt shows it flipped', (

@@ -180,9 +180,7 @@ StageDocument _doc() => StageDocument(
       root: FrameNode(
         common: NodeCommon(id: 'root2', width: 1000, height: 800),
         children: [
-          FrameNode(
-            common: NodeCommon(id: 'c', width: 1000, height: 800),
-          ),
+          FrameNode(common: NodeCommon(id: 'c', width: 1000, height: 800)),
         ],
       ),
       clocks: [Clock.sceneScroll(id: 'clk2', sceneId: 's2')],
