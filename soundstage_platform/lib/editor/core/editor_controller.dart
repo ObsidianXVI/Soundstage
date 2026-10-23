@@ -19,11 +19,17 @@ final initialDocumentProvider = Provider<ir.StageDocument>((ref) {
     name: 'Scene 1',
   );
   return doc.copyWith(scenes: [scene]);
-});
+}, dependencies: const []);
 
 /// The editor's state and its mutations (architecture §15).
+///
+/// Scoped with [initialDocumentProvider]: a `ProviderScope` that overrides
+/// the initial document gets its own controller (one per open editor).
 final editorControllerProvider =
-    NotifierProvider<EditorController, EditorState>(EditorController.new);
+    NotifierProvider<EditorController, EditorState>(
+      EditorController.new,
+      dependencies: [initialDocumentProvider],
+    );
 
 /// The document resolved for one breakpoint's artboard.
 ///
@@ -58,7 +64,7 @@ final resolvedForProvider = Provider.family<ResolvedArtboard, String>((
 ) {
   ref.watch(editorControllerProvider.select((s) => Identity(s.document)));
   return ref.read(editorControllerProvider.notifier).resolvedFor(breakpointId);
-});
+}, dependencies: [editorControllerProvider]);
 
 /// A value compared by identity, for `select` over large immutable values
 /// (`ref.watch(editorControllerProvider.select((s) => Identity(s.document)))`).
