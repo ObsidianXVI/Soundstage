@@ -4,6 +4,7 @@ import '../breakpoint.dart';
 import '../components.dart';
 import '../diagnostics.dart';
 import '../document.dart';
+import '../edit/document_index.dart';
 import '../motion.dart';
 import '../nodes/appearance.dart';
 import '../nodes/effect.dart';
@@ -16,7 +17,9 @@ import '../registry/property_registry.dart';
 import '../scene.dart';
 import '../tokens.dart';
 import '../values/ir_value.dart';
+import '../values/property_path.dart';
 import 'breakpoints.dart';
+import 'provenance.dart';
 import 'resolved_tree.dart';
 
 /// Resolves [doc] for [context] with the standard registry.
@@ -70,6 +73,442 @@ class Resolver {
     _memo.commit(pass.memoNext);
     return out;
   }
+
+  /// How property [path] of node [nodeId] gets its value when [doc] is
+  /// resolved for [context]: every contributing layer in pipeline order
+  /// (base or component default → breakpoint patches along the chain →
+  /// component bindings → instance placement → instance overrides → tokens
+  /// → styles), each with the value it produced, and the final value. See
+  /// [Provenance].
+  ///
+  /// [nodeId] is a resolved id: a scene or overlay node, or
+  /// `<instanceId>/<innerId>[/…]` inside instances. Only the path to the
+  /// node is resolved afresh; when [doc] and [context] match this
+  /// resolver's last pass, everything else is reused from the memo. The
+  /// memo itself is not changed. Never throws: an unknown node gives no
+  /// entries, a null `finalValue` and a `missingNode` diagnostic.
+  Provenance explain(
+    StageDocument doc,
+    String nodeId,
+    PropertyPath path, [
+    ResolveContext context = const ResolveContext(),
+  ]) {
+    final p = path.value;
+    Provenance missing() => Provenance(
+      nodeId: nodeId,
+      path: p,
+      entries: const [],
+      diagnostics: [
+        IrDiagnostic(
+          IrDiagnosticKind.missingNode,
+          'Node "$nodeId" does not exist.',
+          nodeId: nodeId,
+          path: p,
+        ),
+      ],
+    );
+    final slash = nodeId.indexOf('/');
+    final head = slash < 0 ? nodeId : nodeId.substring(0, slash);
+    final index = DocumentIndex.of(doc);
+    final loc = index.locate(head);
+    if (loc == null) return missing();
+    final bypass = LinkedHashSet<Node>.identity();
+    Node n = index.rootOf(loc);
+    bypass.add(n);
+    for (final i in loc.childPath) {
+      n = (n as FrameNode).children[i];
+      bypass.add(n);
+    }
+    final tracer = _Tracer(nodeId, p, registry, bypass);
+    final pass = _Pass(
+      doc,
+      context,
+      registry,
+      _memo.isValidFor(doc, context) ? _memo : _Memo(),
+      tracer,
+    );
+    pass.explainRun(loc.sceneIndex);
+    final resolved = tracer.resolved;
+    if (resolved == null) return missing();
+    final IrValue? finalValue;
+    final List<ProvenanceEntry> entries;
+    if (tracer.textEntries case final te?) {
+      entries = te;
+      finalValue = tracer.textFinal;
+    } else {
+      entries = tracer.entries;
+      finalValue = _styleRefPaths.contains(p)
+          ? (entries.isEmpty ? null : entries.last.value)
+          : resolvedPropertyValue(resolved, p, registry: registry);
+    }
+    return Provenance(
+      nodeId: nodeId,
+      path: p,
+      entries: List.unmodifiable(entries),
+      finalValue: finalValue,
+      diagnostics: List.unmodifiable(
+        pass.diagnostics.where((d) => d.nodeId == nodeId),
+      ),
+    );
+  }
+}
+
+const Set<String> _styleRefPaths = {
+  'textStyleId',
+  'fillStyleId',
+  'strokeStyleId',
+  'effectStyleId',
+};
+
+final RegExp _spanStylePath = RegExp(
+  r'^content\.(\d+)\.spans\.(\d+)\.style\.(.+)$',
+);
+
+/// Property [path] of a resolved node, as the inspector and `explain` see
+/// it: through the registry, except that text style paths read the merged
+/// cascade (`style.*` from [ResolvedNode.textStyle], span style paths
+/// `content.<p>.spans.<s>.style.*` from the span's merged style), since
+/// the resolved node's own style overrides are emptied. Null when the
+/// property does not exist on the node.
+IrValue? resolvedPropertyValue(
+  ResolvedNode node,
+  String path, {
+  PropertyRegistry? registry,
+}) {
+  final reg = registry ?? PropertyRegistry.standard;
+  final n = node.node;
+  if (n is TextNode) {
+    if (path.startsWith('style.')) {
+      final s = node.textStyle;
+      if (s != null) return reg.get(_styleCarrier(s), path);
+    }
+    final m = _spanStylePath.firstMatch(path);
+    final paras = node.paragraphs;
+    if (m != null && paras != null) {
+      final pi = int.parse(m.group(1)!), si = int.parse(m.group(2)!);
+      if (pi >= paras.length || si >= paras[pi].spans.length) return null;
+      return reg.get(
+        _styleCarrier(paras[pi].spans[si].style),
+        'style.${m.group(3)}',
+      );
+    }
+  }
+  return reg.get(n, path);
+}
+
+/// A text node whose override holds every field of [s], for registry
+/// reads of merged styles.
+TextNode _styleCarrier(TextStyle s) => TextNode(
+  common: const NodeCommon(id: ''),
+  style: _fullOverride(s),
+);
+
+TextStyleOverride _fullOverride(TextStyle s) => TextStyleOverride(
+  fontFamilyId: s.fontFamilyId,
+  fontWeight: s.fontWeight,
+  italic: s.italic,
+  fontVariations: s.fontVariations,
+  fontSize: s.fontSize,
+  lineHeight: s.lineHeight,
+  letterSpacing: s.letterSpacing,
+  paragraphSpacing: s.paragraphSpacing,
+  paragraphIndent: s.paragraphIndent,
+  textCase: s.textCase,
+  decoration: s.decoration,
+  fills: s.fills,
+  openType: s.openType,
+  baselineShift: s.baselineShift,
+  listStyle: s.listStyle,
+);
+
+bool _overlaps(String a, String b) =>
+    a == b || a.startsWith('$b.') || b.startsWith('$a.');
+
+/// Records the provenance of one property of one node during a traced pass
+/// (`Resolver.explain`). Only the target node's steps record anything.
+class _Tracer {
+  _Tracer(this.targetId, this.path, this.registry, this.bypass) {
+    final m = _spanStylePath.firstMatch(path);
+    if (m != null) {
+      spanParagraph = int.parse(m.group(1)!);
+      spanIndex = int.parse(m.group(2)!);
+      styleField = m.group(3);
+      nodeStylePath = 'style.$styleField';
+    } else if (path.startsWith('style.')) {
+      styleField = path.substring(6);
+      nodeStylePath = path;
+    }
+  }
+
+  final String targetId;
+  final String path;
+  final PropertyRegistry registry;
+
+  /// Scene-level nodes on the path to the target: never served from the
+  /// memo, so their steps run (and record).
+  final Set<Node> bypass;
+
+  /// Text style paths: the style field (`fontSize`, `fills.p.color`).
+  String? styleField;
+
+  /// `style.<field>`: the node-level override path of a text style path.
+  String? nodeStylePath;
+  int? spanParagraph;
+  int? spanIndex;
+
+  List<ProvenanceEntry> entries = [];
+
+  /// Node-level override layers of a span style path.
+  List<ProvenanceEntry> nodeStyleEntries = [];
+  final Map<String, IrValue?> _last = {};
+
+  /// The instance node's own chain, held until its placement.
+  List<ProvenanceEntry>? _instanceChain;
+  InstanceNode? _instance;
+
+  ResolvedNode? resolved;
+
+  /// The composed chain and final value of a text style path.
+  List<ProvenanceEntry>? textEntries;
+  IrValue? textFinal;
+
+  bool get _styleRef => _styleRefPaths.contains(path);
+
+  /// Records [source] if the step on [id] overlapped the path (one of
+  /// [keys]) or changed its value, or [always] (base values).
+  void step(
+    String id,
+    Node n,
+    ProvenanceSource source, {
+    required String nodeId,
+    Iterable<String> keys = const [],
+    bool always = false,
+  }) {
+    if (id != targetId) return;
+    _record(path, entries, n, source, nodeId, keys, always);
+    final ns = nodeStylePath;
+    if (ns != null && ns != path) {
+      _record(ns, nodeStyleEntries, n, source, nodeId, keys, always);
+    }
+  }
+
+  void _record(
+    String w,
+    List<ProvenanceEntry> out,
+    Node n,
+    ProvenanceSource source,
+    String nodeId,
+    Iterable<String> keys,
+    bool always,
+  ) {
+    final v = registry.get(n, w);
+    final touched = [
+      for (final k in keys)
+        if (_overlaps(k, w)) k,
+    ];
+    final changed = !_last.containsKey(w) || _last[w] != v;
+    _last[w] = v;
+    if (v == null) return;
+    if (always || touched.isNotEmpty || changed) {
+      out.add(
+        ProvenanceEntry(
+          source: source,
+          value: v,
+          nodeId: nodeId,
+          keys: touched,
+        ),
+      );
+    }
+  }
+
+  /// The target is an instance about to be expanded: its chain so far is
+  /// held back until the component root is placed.
+  void enterInstance(String id, InstanceNode inst) {
+    if (id != targetId) return;
+    _instanceChain = entries;
+    _instance = inst;
+    entries = [];
+    nodeStyleEntries = [];
+    _last.clear();
+  }
+
+  /// The component root of the target instance was placed.
+  void placed(String id, Node n, String instanceId, String rootId) {
+    if (id != targetId) return;
+    final chain = _instanceChain, inst = _instance;
+    _instanceChain = null;
+    _instance = null;
+    if (chain != null &&
+        inst != null &&
+        _placedPath(path, inst) &&
+        chain.isNotEmpty) {
+      entries.addAll(chain);
+      _last[path] = chain.last.value;
+    }
+    step(
+      id,
+      n,
+      ProvenanceSource.instancePlacement(instanceId),
+      nodeId: inst?.id ?? instanceId,
+    );
+  }
+
+  /// Whether `_place` takes [p] from [inst].
+  static bool _placedPath(String p, InstanceNode inst) {
+    final c = inst.common;
+    return switch (p) {
+      'visible' ||
+      'locked' ||
+      'opacity' ||
+      'x' ||
+      'y' ||
+      'width' ||
+      'height' ||
+      'rotation' ||
+      'flipX' ||
+      'flipY' ||
+      'mask' => true,
+      'name' => c.name.isNotEmpty,
+      'blendMode' => c.blendMode != null,
+      'role' => c.role != NodeRole.none,
+      'readingOrder' => c.readingOrder != null,
+      'altText' => c.altText != null,
+      _ => p.startsWith('motion.') || p.startsWith('layoutChild.'),
+    };
+  }
+
+  /// Records paint and effect styles applied to the target.
+  void styles(String id, Node before, Node after, StageDocument doc) {
+    if (id != targetId || _styleRef) return;
+    final (fill, stroke, effect) = switch (before) {
+      FrameNode(:final appearance) ||
+      ShapeNode(:final appearance) ||
+      VideoNode(:final appearance) => (
+        appearance.fillStyleId,
+        appearance.strokeStyleId,
+        appearance.effectStyleId,
+      ),
+      TextNode(:final appearance) => (
+        null,
+        appearance.strokeStyleId,
+        appearance.effectStyleId,
+      ),
+      _ => (null, null, null),
+    };
+    final tokens = doc.tokens;
+    if (fill != null && tokens.paintStyles.containsKey(fill)) {
+      step(
+        id,
+        after,
+        ProvenanceSource.paintStyle(fill),
+        nodeId: before.id,
+        keys: const ['fills'],
+      );
+    }
+    if (stroke != null && tokens.paintStyles.containsKey(stroke)) {
+      step(
+        id,
+        after,
+        ProvenanceSource.paintStyle(stroke),
+        nodeId: before.id,
+        keys: const ['strokes.paints'],
+      );
+    }
+    if (effect != null && tokens.effectStyles.containsKey(effect)) {
+      step(
+        id,
+        after,
+        ProvenanceSource.effectStyle(effect),
+        nodeId: before.id,
+        keys: const ['effects'],
+      );
+    }
+  }
+
+  /// Composes the chain of a text style path for the target text node:
+  /// document default → named style (and its tokens) → the node's override
+  /// layers → paragraph style → the span's override layers.
+  void text(
+    String id,
+    TextNode n,
+    TextStyle defaultStyle,
+    TextStyleDef? named,
+    TextStyle namedMerged,
+    TextStyle merged,
+    List<ResolvedParagraph> paragraphs,
+    String? Function(String variableId) modeOf,
+  ) {
+    final field = styleField;
+    if (id != targetId || field == null) return;
+    final w = 'style.$field';
+    IrValue? read(TextStyle s) => registry.get(_styleCarrier(s), w);
+    final out = <ProvenanceEntry>[];
+    void add(ProvenanceSource src, IrValue? v, {List<String> keys = const []}) {
+      if (v != null && v is! NoneValue) {
+        out.add(
+          ProvenanceEntry(source: src, value: v, nodeId: n.id, keys: keys),
+        );
+      }
+    }
+
+    add(const ProvenanceSource.documentDefault(), read(defaultStyle));
+    if (named != null && n.textStyleId != null) {
+      final own = registry.get(
+        TextNode(common: n.common, style: named.style),
+        w,
+      );
+      final bound = [
+        for (final k in named.bindings.keys)
+          if (_overlaps(k, field)) k,
+      ];
+      final v = read(namedMerged);
+      if ((own != null && own is! NoneValue) || bound.isNotEmpty) {
+        add(ProvenanceSource.textStyle(n.textStyleId!), v);
+        for (final k in bound) {
+          final ref = named.bindings[k]!;
+          add(
+            ProvenanceSource.token(ref.variableId, modeOf(ref.variableId)),
+            v,
+            keys: [k],
+          );
+        }
+      }
+    }
+    final span = spanParagraph != null;
+    for (final e in span ? nodeStyleEntries : entries) {
+      if (e.value is! NoneValue) out.add(e);
+    }
+    if (span) {
+      final pi = spanParagraph!, si = spanIndex!;
+      if (pi < n.content.length && pi < paragraphs.length) {
+        final ps = n.content[pi].style;
+        final pv = switch (field) {
+          'paragraphSpacing' => ps?.paragraphSpacing,
+          'paragraphIndent' => ps?.paragraphIndent,
+          _ => null,
+        };
+        if (pv != null) {
+          add(ProvenanceSource.paragraphStyle(pi), IrValue.number(pv));
+        } else if (field == 'listStyle' && ps?.listStyle != null) {
+          add(
+            ProvenanceSource.paragraphStyle(pi),
+            IrValue.enumValue(ps!.listStyle!.name),
+          );
+        }
+        for (final e in entries) {
+          if (e.value is! NoneValue) out.add(e);
+        }
+        textFinal = si < paragraphs[pi].spans.length
+            ? read(paragraphs[pi].spans[si].style)
+            : null;
+      } else {
+        textFinal = null;
+      }
+    } else {
+      textFinal = read(merged);
+    }
+    textEntries = out;
+  }
 }
 
 /// One memoised scene-level subtree.
@@ -92,14 +531,10 @@ class _Memo {
   ResolveContext? _ctx;
   _MemoMap previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
 
-  /// Drops the memo unless the shared inputs are unchanged.
-  void prepare(StageDocument doc, ResolveContext ctx) {
+  /// Whether the memo is valid for [doc] and [ctx] (see [prepare]).
+  bool isValidFor(StageDocument doc, ResolveContext ctx) {
     final d = _doc;
-    // freezed collection getters return fresh read-only views, so `identical`
-    // never holds for them; `==` is cheap here because freezed values
-    // short-circuit on identity and these inputs are small or unchanged.
-    final same =
-        d != null &&
+    return d != null &&
         identical(d.tokens, doc.tokens) &&
         identical(d.defaultTextStyle, doc.defaultTextStyle) &&
         d.breakpoints == doc.breakpoints &&
@@ -107,7 +542,16 @@ class _Memo {
         d.variantSets == doc.variantSets &&
         d.components == doc.components &&
         _ctx == ctx;
-    if (!same) previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+  }
+
+  /// Drops the memo unless the shared inputs are unchanged.
+  void prepare(StageDocument doc, ResolveContext ctx) {
+    // freezed collection getters return fresh read-only views, so `identical`
+    // never holds for them; `==` is cheap here because freezed values
+    // short-circuit on identity and these inputs are small or unchanged.
+    if (!isValidFor(doc, ctx)) {
+      previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+    }
     _doc = doc;
     _ctx = ctx;
   }
@@ -142,12 +586,17 @@ class _InstanceFrame {
   final Map<String, IrValue> props;
 
   /// Override patches by inner path (relative to this instance), in
-  /// application order (the instance's own first, then enclosing instances').
-  final Map<String, List<Patch>> overrides;
+  /// application order (the instance's own first, then enclosing
+  /// instances'), each with the namespaced id of the instance holding it and
+  /// its inner path there.
+  final Map<String, List<_Override>> overrides;
 
   /// Components being expanded, outermost first (cycle detection).
   final List<String> componentStack;
 }
+
+/// An instance override patch and where it is authored.
+typedef _Override = ({String instanceId, String innerPath, Patch patch});
 
 /// Immutable per-subtree context.
 class _Scope {
@@ -185,7 +634,10 @@ class _TokenResult {
 
 /// One resolution of one document for one context.
 class _Pass {
-  _Pass(this.doc, this.ctx, this.registry, this.memo);
+  _Pass(this.doc, this.ctx, this.registry, this.memo, [this.trace]);
+
+  /// Set for `Resolver.explain`.
+  final _Tracer? trace;
 
   final StageDocument doc;
   final ResolveContext ctx;
@@ -198,6 +650,7 @@ class _Pass {
   final _MemoMap memoNext = LinkedHashMap<Node, List<_MemoEntry>>.identity();
 
   late final Breakpoint? breakpoint = _pickBreakpoint();
+
   /// The breakpoints whose patches apply, root first (§3.1).
   late final List<Breakpoint> cascade = _chain();
 
@@ -266,6 +719,24 @@ class _Pass {
       nodeIndex: index,
       diagnostics: List.unmodifiable(diagnostics),
     );
+  }
+
+  /// Resolves only the tree holding the traced node: scene [sceneIndex], or
+  /// the overlay when null.
+  void explainRun(int? sceneIndex) {
+    final baseModes = _baseModes();
+    if (sceneIndex == null) {
+      _resolveNode(doc.overlay!, _Scope(prefix: '', modes: baseModes));
+    } else {
+      _resolveScene(doc.scenes[sceneIndex], baseModes);
+    }
+  }
+
+  /// The active mode of [variableId]'s collection under [modes].
+  String? _modeOf(String variableId, Map<String, String> modes) {
+    final e = variables[variableId];
+    if (e == null) return null;
+    return modes[e.collection.id] ?? e.collection.defaultModeId;
   }
 
   Breakpoint? _pickBreakpoint() {
@@ -453,6 +924,13 @@ class _Pass {
         return;
       }
       out = next;
+      trace?.step(
+        id,
+        out,
+        ProvenanceSource.token(ref.variableId, _modeOf(ref.variableId, modes)),
+        nodeId: n.id,
+        keys: [path],
+      );
     });
     return out.copyWith(common: out.common.copyWith(bindings: const {}));
   }
@@ -578,24 +1056,6 @@ class _Pass {
     );
   }
 
-  static TextStyleOverride _fullOverride(TextStyle s) => TextStyleOverride(
-    fontFamilyId: s.fontFamilyId,
-    fontWeight: s.fontWeight,
-    italic: s.italic,
-    fontVariations: s.fontVariations,
-    fontSize: s.fontSize,
-    lineHeight: s.lineHeight,
-    letterSpacing: s.letterSpacing,
-    paragraphSpacing: s.paragraphSpacing,
-    paragraphIndent: s.paragraphIndent,
-    textCase: s.textCase,
-    decoration: s.decoration,
-    fills: s.fills,
-    openType: s.openType,
-    baselineShift: s.baselineShift,
-    listStyle: s.listStyle,
-  );
-
   // ---- Nodes -------------------------------------------------------------------
 
   /// Applies [patch] to [n], reporting against [id].
@@ -625,6 +1085,10 @@ class _Pass {
         forcedId: forcedId,
         placement: placement,
       );
+    }
+    final t = trace;
+    if (t != null && t.bypass.contains(node)) {
+      return _resolveNodeUncached(node, scope);
     }
     final hits = memo.previous[node];
     if (hits != null) {
@@ -662,15 +1126,61 @@ class _Pass {
     // by its own (component) id.
     final key = placement != null ? node.id : id.substring(scope.prefix.length);
     var n = node;
+    final t = trace;
+    t?.step(
+      id,
+      n,
+      inst == null
+          ? const ProvenanceSource.base()
+          : ProvenanceSource.componentDefault(inst.component.id),
+      nodeId: node.id,
+      always: true,
+    );
 
     // 1. Breakpoint patches (§3.1).
     for (final bp in cascade) {
       final patch = n.common.breakpointOverrides[bp.id];
-      if (patch != null) n = _patch(n, patch, id);
+      if (patch != null) {
+        n = _patch(n, patch, id);
+        t?.step(
+          id,
+          n,
+          ProvenanceSource.breakpointPatch(bp.id),
+          nodeId: node.id,
+          keys: patch.keys,
+        );
+      }
     }
 
     // 2. Component prop bindings (§9).
-    if (inst != null && n.common.componentBindings.isNotEmpty) {
+    if (inst != null &&
+        t != null &&
+        id == t.targetId &&
+        n.common.componentBindings.isNotEmpty) {
+      // Traced: one binding at a time, so each is attributed to its prop
+      // (the same writes, in the same order, as the whole patch below).
+      for (final MapEntry(key: path, value: propId)
+          in n.common.componentBindings.entries) {
+        final v = inst.props[propId];
+        if (v == null) {
+          _diag(
+            IrDiagnosticKind.missingComponentProp,
+            'Component "${inst.component.id}" has no prop "$propId".',
+            nodeId: id,
+            path: path,
+          );
+          continue;
+        }
+        n = _patch(n, {path: v}, id);
+        t.step(
+          id,
+          n,
+          ProvenanceSource.componentBinding(propId, inst.instanceId),
+          nodeId: node.id,
+          keys: [path],
+        );
+      }
+    } else if (inst != null && n.common.componentBindings.isNotEmpty) {
       final patch = <String, IrValue>{};
       n.common.componentBindings.forEach((path, propId) {
         final v = inst.props[propId];
@@ -689,10 +1199,20 @@ class _Pass {
     }
 
     // 3. Instance placement (component root only), then overrides.
-    if (placement != null && n is FrameNode) n = _place(n, placement);
+    if (placement != null && n is FrameNode) {
+      n = _place(n, placement);
+      t?.placed(id, n, id, node.id);
+    }
     if (inst != null) {
-      for (final patch in inst.overrides[key] ?? const <Patch>[]) {
-        n = _patch(n, patch, id);
+      for (final o in inst.overrides[key] ?? const <_Override>[]) {
+        n = _patch(n, o.patch, id);
+        t?.step(
+          id,
+          n,
+          ProvenanceSource.instanceOverride(o.instanceId, o.innerPath),
+          nodeId: o.instanceId.split('/').last,
+          keys: o.patch.keys,
+        );
       }
     }
 
@@ -711,11 +1231,26 @@ class _Pass {
     // 7. Styles.
     List<ResolvedParagraph>? paragraphs;
     List<Paint>? textFills;
+    TextStyle? textStyle;
+    final unstyled = n;
     n = _applyPaintAndEffectStyles(n, id);
+    t?.styles(id, unstyled, n, doc);
     if (n is TextNode) {
-      final merged = mergeTextStyle(_namedTextStyle(n, modes, id), n.style);
+      final named = _namedTextStyle(n, modes, id);
+      final merged = mergeTextStyle(named, n.style);
       paragraphs = _paragraphs(n, merged);
       textFills = merged.fills;
+      textStyle = merged;
+      t?.text(
+        id,
+        n,
+        doc.defaultTextStyle,
+        n.textStyleId == null ? null : doc.tokens.textStyles[n.textStyleId],
+        named,
+        merged,
+        paragraphs,
+        (v) => _modeOf(v, modes),
+      );
       // Consumers read the merged result from `paragraphs`.
       n = n.copyWith(style: const TextStyleOverride(), textStyleId: null);
     }
@@ -728,15 +1263,18 @@ class _Pass {
         ? [for (final c in n.children) _resolveNode(c, childScope)]
         : const <ResolvedNode>[];
 
-    return ResolvedNode(
+    final result = ResolvedNode(
       id: id,
       node: _concrete(n, id),
       children: children,
       sourceComponentId: inst?.component.id,
       instanceId: inst?.instanceId,
       paragraphs: paragraphs,
+      textStyle: textStyle,
       modes: modes,
     );
+    if (t != null && id == t.targetId) t.resolved = result;
+    return result;
   }
 
   /// The component root [root] placed by [inst]: the instance supplies its
@@ -804,8 +1342,12 @@ class _Pass {
     };
     // Own overrides first, then the enclosing instance's overrides that reach
     // into this one (`<thisKey>/<inner path>`), which win.
-    final overrides = <String, List<Patch>>{};
-    n.overrides.forEach((k, p) => (overrides[k] ??= []).add(p));
+    trace?.enterInstance(id, n);
+    final overrides = <String, List<_Override>>{};
+    n.overrides.forEach(
+      (k, p) =>
+          (overrides[k] ??= []).add((instanceId: id, innerPath: k, patch: p)),
+    );
     if (outer != null) {
       final prefix = '$key/';
       outer.overrides.forEach((k, ps) {
@@ -867,15 +1409,19 @@ class _Pass {
     }
   }
 
-  ResolvedNode _placeholder(InstanceNode n, String id, _Scope scope) =>
-      ResolvedNode(
-        id: id,
-        node: _concrete(FrameNode(common: n.common), id),
-        sourceComponentId: null,
-        instanceId: scope.instance?.instanceId,
-        modes: scope.modes,
-        isPlaceholder: true,
-      );
+  ResolvedNode _placeholder(InstanceNode n, String id, _Scope scope) {
+    final result = ResolvedNode(
+      id: id,
+      node: _concrete(FrameNode(common: n.common), id),
+      sourceComponentId: null,
+      instanceId: scope.instance?.instanceId,
+      modes: scope.modes,
+      isPlaceholder: true,
+    );
+    final t = trace;
+    if (t != null && id == t.targetId) t.resolved = result;
+    return result;
+  }
 
   // ---- Styles (§8) -------------------------------------------------------------
 

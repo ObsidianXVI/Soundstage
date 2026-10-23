@@ -40,10 +40,7 @@ typedef BreakpointChain = ({
 /// `inheritsFrom` or a cycle stops the walk at the last good breakpoint
 /// and is reported in `problem`; the breakpoints already walked still
 /// apply, so a broken chain degrades to fewer patches.
-BreakpointChain breakpointChain(
-  List<Breakpoint> breakpoints,
-  String activeId,
-) {
+BreakpointChain breakpointChain(List<Breakpoint> breakpoints, String activeId) {
   final byId = <String, Breakpoint>{};
   for (final b in breakpoints) {
     byId.putIfAbsent(b.id, () => b);

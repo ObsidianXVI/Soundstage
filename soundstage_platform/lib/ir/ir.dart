@@ -46,6 +46,7 @@ export 'src/registry/patch.dart';
 export 'src/registry/property_descriptor.dart';
 export 'src/registry/property_registry.dart';
 export 'src/resolve/breakpoints.dart';
+export 'src/resolve/provenance.dart';
 export 'src/resolve/resolved_tree.dart';
 export 'src/resolve/resolver.dart';
 export 'src/scene.dart';

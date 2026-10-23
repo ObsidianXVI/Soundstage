@@ -158,4 +158,23 @@ void main() {
       expect(e + rr, lessThan(_editBudgetMs));
     },
   );
+
+  test('explain with a warm memo stays under $_editBudgetMs ms', () {
+    final target = middleTextId(doc);
+    final resolver = Resolver()..resolve(doc);
+    final times = <double>[];
+    for (var i = 0; i < 120; i++) {
+      final w = Stopwatch()..start();
+      final p = resolver.explain(doc, target, const PropertyPath('opacity'));
+      if (i >= 20) times.add(_ms(w));
+      expect(p.finalValue, isNotNull);
+    }
+    final median = _median(times);
+    // ignore: avoid_print
+    print(
+      'explain ($nodeCount nodes, warm memo): median '
+      '${median.toStringAsFixed(3)} ms (budget $_editBudgetMs ms)',
+    );
+    expect(median, lessThan(_editBudgetMs));
+  });
 }

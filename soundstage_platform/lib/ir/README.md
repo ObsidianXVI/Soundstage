@@ -189,3 +189,23 @@ left dangling) don't stop an edit.
   path, and paths under it, from the listed breakpoints' patches; a whole-value patch above the
   path is rewritten with the new value inside it), `setBreakpointPatchValue` ("This
   breakpoint") and `clearBreakpointPatchValue` ("reset to shared").
+
+## Provenance (T1.0)
+
+`Resolver.explain(doc, nodeId, PropertyPath, [context])` returns a `Provenance`: the layers that
+produced a property's value, lowest priority first, each a `ProvenanceEntry` (`source`, the value
+after that layer, the authored `nodeId` holding the layer, and the overlapping patch/binding
+`keys`, which is what a reset removes), plus `finalValue`. Sources: `base`, `componentDefault`,
+`breakpointPatch` (one per patch along the `inheritsFrom` chain), `componentBinding`,
+`instancePlacement` (preceded by the instance's own chain when placement takes the value over),
+`instanceOverride`, `token(variableId, modeId)`, `paintStyle`/`effectStyle`, and for text style
+paths `documentDefault` → `textStyle` (+ its tokens) → node layers → `paragraphStyle` → span
+layers. `animated(trackId)` is reserved for the runtime (M2).
+
+It runs a traced pass over only the target's tree, bypassing the memo on the path to the node
+and reusing it elsewhere when `doc`/`context` match the last `resolve` (the memo is not changed):
+about 0.07 ms on the 2,000-node bench. `finalValue` equals `resolvedPropertyValue(resolvedNode,
+path)`, which reads through the registry except that text style paths read the merged styles
+(`ResolvedNode.textStyle`, new: the node-level merged style; span paths from the span's merged
+style). Style references (`textStyleId`, `fillStyleId`, …) report the reference in effect,
+since the resolved tree clears them. Both are checked across the fuzz corpus.
