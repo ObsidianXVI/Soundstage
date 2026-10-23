@@ -6,6 +6,7 @@ const blue = StageColor(r: 0, g: 0, b: 1);
 const green = StageColor(r: 0, g: 1, b: 0);
 
 const size = StageSize(width: 1000, height: 800);
+
 /// A chain: mobile inherits tablet, which inherits desktop.
 const breakpoints = [
   Breakpoint(

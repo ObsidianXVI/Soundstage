@@ -176,11 +176,18 @@ left dangling) don't stop an edit.
   edit only the edited scene is re-indexed, and a property edit (same ids and child paths) reuses
   the old index outright. Instance inner nodes and component definitions are not indexed: an id
   `<instanceId>/<innerId>` gets `editInsideInstance` (edit it through an instance override).
-- **Nodes:** `updateNode`, `insertNodes`, `removeNodes` (also removes the scene's tracks on
-  removed nodes; warns about pointer/behaviour clocks left dangling), `moveNodes` (index is a
-  drop-indicator insertion point counting the moved nodes; tree order kept; cycles refused;
-  geometry not converted; tracks follow nodes to another scene, rebinding the scene-scroll
-  clock), `wrapInFrame` (rotated bounds, positions, numeric `x`/`y` patches and `x`/`y` tracks
+- **Nodes:** `updateNode`, `insertNodes`, `removeNodes` (cascades: pointer/behaviour clocks
+  bound to removed nodes, tracks on removed nodes or clocks, lightbox/timeline actions and
+  clock-reach interactions that refer to them, and interactions left empty are removed in the
+  same edit and listed in `EditResult.cascade`), `moveNodes` (index is a drop-indicator
+  insertion point counting the moved nodes; tree order kept; cycles refused; with
+  `preservePosition` (default) a reparented, constraint-placed node keeps its visual position:
+  its box (`boxes`, or derived from stored geometry at `breakpointId`) is converted through the
+  inverse §4.3 constraint math (`constraint_math.dart`, mirroring the runtime's and
+  cross-checked by a test), shifting patches and x/y tracks by the same delta; in-flow
+  auto-layout children only reorder. Across scenes, tracks follow the nodes, the own scroll
+  clock is rebound and any other clock is copied once with a fresh id, with references in the
+  moved subtrees rebound; `cascade.clockIdMap`), `wrapInFrame` (rotated bounds, positions, numeric `x`/`y` patches and `x`/`y` tracks
   converted into the frame's space; optional actual `boxes` for auto-layout children) and
   `duplicateNodes` (fresh ids; remaps node ids, intra-copy lightbox targets and same-scene tracks;
   keeps interaction ids, override paths, component bindings, clocks and outside references).

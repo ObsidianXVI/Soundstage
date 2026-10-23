@@ -1,0 +1,120 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'package:soundstage_platform/ir/ir.dart' as ir;
+// Unprefixed for freezed's generated nested copyWith.
+import 'package:soundstage_platform/ir/ir.dart' show $StageDocumentCopyWith;
+
+part 'editor_state.freezed.dart';
+
+/// Where a `SetProperty` writes (architecture §15, DECISIONS 23/10/26).
+///
+/// - `both` (default): the shared base, clearing that path's patches on the
+///   primary breakpoints, so every primary artboard shows the value.
+/// - `thisBreakpoint`: a patch on the breakpoint of the edited artboard.
+enum EditScope {
+  both,
+  thisBreakpoint;
+
+  EditScope get flipped => this == both ? thisBreakpoint : both;
+}
+
+/// The active canvas tool. Insert tools land in T1.9.
+enum EditorTool { move, hand, frame, text, rectangle, ellipse, image }
+
+/// The undo/redo availability the toolbar shows.
+@freezed
+abstract class HistoryStatus with _$HistoryStatus {
+  const factory HistoryStatus({
+    @Default(false) bool canUndo,
+    @Default(false) bool canRedo,
+    String? undoLabel,
+    String? redoLabel,
+  }) = _HistoryStatus;
+}
+
+/// The editor's state (architecture §15): the document plus everything the
+/// panels, canvas and inspector share. Camera (zoom/pan per artboard) and
+/// panel layout are UI state and live with the canvas and shell.
+///
+/// - `selection`: selected node ids in selection order (a `LinkedHashSet`).
+///   Ids are authored ids, or resolved `<instanceId>/<innerId>` ids inside
+///   instances.
+/// - `selectionContext`: the frame whose children a plain click selects
+///   (Figma's selection level); null means the active scene's root.
+/// - `textEditId`: the text node being edited in place, if any.
+/// - `activeSceneId`, `editingBreakpointId`: the scene on the canvas and the
+///   artboard (breakpoint) being edited.
+/// - `editScope` plus `scopeFlipped` (Alt held): see [effectiveScope].
+/// - `autoKey`: write keyframes at the playhead (M2; ignored in M1).
+/// - `playheads`: clock time per scene id (0 in M1).
+/// - `revision`: a number identifying the document version (never reused,
+///   restored by undo/redo); `savedRevision` is the last saved one.
+/// - `history`: what undo/redo would do.
+@freezed
+abstract class EditorState with _$EditorState {
+  const factory EditorState({
+    required ir.StageDocument document,
+    @Default(<String>{}) Set<String> selection,
+    String? selectionContext,
+    String? textEditId,
+    String? hoverId,
+    String? activeSceneId,
+    String? editingBreakpointId,
+    @Default(EditScope.both) EditScope editScope,
+    @Default(false) bool scopeFlipped,
+    @Default(EditorTool.move) EditorTool tool,
+    @Default(false) bool autoKey,
+    @Default(<String, double>{}) Map<String, double> playheads,
+    @Default(0) int revision,
+    @Default(0) int savedRevision,
+    @Default(HistoryStatus()) HistoryStatus history,
+  }) = _EditorState;
+
+  const EditorState._();
+
+  /// A state for [document]: its first scene active and its first primary
+  /// breakpoint (else the first) edited.
+  factory EditorState.initial(ir.StageDocument document) => EditorState(
+    document: document,
+    activeSceneId: document.scenes.isEmpty ? null : document.scenes.first.id,
+    editingBreakpointId: defaultBreakpointId(document),
+  );
+
+  /// The scope the next edit uses: [editScope], flipped while Alt is held.
+  EditScope get effectiveScope => scopeFlipped ? editScope.flipped : editScope;
+
+  /// Whether the document differs from the last saved revision.
+  bool get isDirty => revision != savedRevision;
+
+  /// The active scene, or null.
+  ir.Scene? get activeScene {
+    for (final s in document.scenes) {
+      if (s.id == activeSceneId) return s;
+    }
+    return null;
+  }
+
+  /// The breakpoint edits go to: [editingBreakpointId] when it exists, else
+  /// the document's default.
+  String? get breakpointId {
+    final id = editingBreakpointId;
+    if (id != null && document.breakpoints.any((b) => b.id == id)) return id;
+    return defaultBreakpointId(document);
+  }
+
+  /// Ids of the primary breakpoints (the side-by-side artboards).
+  Set<String> get primaryBreakpointIds => {
+    for (final b in document.primaryBreakpoints) b.id,
+  };
+
+  /// The playhead of the active scene (0 when unset).
+  double get playhead => playheads[activeSceneId] ?? 0;
+}
+
+/// The first primary breakpoint of [doc], else its first breakpoint.
+String? defaultBreakpointId(ir.StageDocument doc) {
+  for (final b in doc.breakpoints) {
+    if (b.primary) return b.id;
+  }
+  return doc.breakpoints.isEmpty ? null : doc.breakpoints.first.id;
+}

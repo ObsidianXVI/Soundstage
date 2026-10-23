@@ -96,7 +96,10 @@ void collectIds(Node n, Set<String> out) {
 /// A path-copying rewrite of a document's trees.
 ///
 /// - `replace[id]`: the node with that id is replaced by the function's
-///   result (its subtree is not visited further).
+///   result. When the node is also on the path to another edit (an ancestor
+///   of a `replace`/`children` target), the function gets the node with
+///   that edit already applied below it; otherwise its subtree is not
+///   visited.
 /// - `children[id]`: the frame's (already rewritten) children are passed
 ///   through the function.
 ///
@@ -133,8 +136,7 @@ class TreeRewrite {
 
     Node visit(Node n, Set<String> down) {
       final r = replace[n.id];
-      if (r != null) return r(n);
-      if (n is! FrameNode || !down.contains(n.id)) return n;
+      if (n is! FrameNode || !down.contains(n.id)) return r == null ? n : r(n);
       final old = n.children;
       var kids = [
         for (final c in old)
@@ -142,7 +144,8 @@ class TreeRewrite {
       ];
       final edit = children[n.id];
       if (edit != null) kids = edit(kids);
-      return sameElements(kids, old) ? n : n.copyWith(children: kids);
+      final out = sameElements(kids, old) ? n : n.copyWith(children: kids);
+      return r == null ? out : r(out);
     }
 
     FrameNode root(FrameNode r, int key) {
