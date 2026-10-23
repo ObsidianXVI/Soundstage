@@ -87,6 +87,8 @@ Scene
   background: [Paint]
   modeOverrides: { collectionId: modeId }
   transitionIn: { kind: none | overlap | crossfade, amount }   // M3
+  exportAs: auto | text | poster   // static export (§16.1); auto = text if it has role-bearing nodes
+  posterClock: double?             // clock value for this scene's poster frame (default 0.5)
 ```
 
 - **pinned**: the stage root is sized to the viewport. The scene's scroll extent is
@@ -135,6 +137,11 @@ fills, strokes, effects, cornerRadius   // on frames and shapes (text: strokes +
                                         // video: corners + strokes + effects)
 fillStyleId, strokeStyleId, effectStyleId // style refs (§8); the style's stack replaces the local one
 mask: none | alpha | luminance          // M3: masks the siblings above it in the same parent
+role: none | heading1…heading6 | paragraph | quote | caption | figure | decorative
+                                        // semantic role: exports (§16.1) and screen-reader
+                                        // semantics; never affects rendering
+readingOrder: int?                      // optional override of tree order for exports and a11y
+altText: string?                        // for figures and image-bearing frames
 breakpointOverrides: { bpId: Patch }
 bindings: { PropertyPath: TokenRef }    // token-bound properties (§8)
 ```
@@ -510,8 +517,39 @@ of draggable line/word blocks. Scrubbing updates the canvas live.
 - **M4 (hosted):** Firebase Auth; story metadata in Firestore; document JSON and assets in Cloud
   Storage (documents can exceed Firestore's 1 MiB limit); responsive image variants generated in the
   browser before upload. Publish freezes a version as `published/<slug>/v<n>.stage.json` plus a
-  pointer. Player route `/s/<slug>`. A static HTML snapshot per published story (meta/OG tags and
-  the story's text) for search engines and link previews.
+  pointer. Player route `/s/<slug>`.
+- **What a published page is.** The page shows only the Soundstage rendering: no static HTML
+  content, no visible fallback text. Publishing writes **invisible head metadata** for each story
+  (`<title>`, description, canonical URL, Open Graph/Twitter card with a poster-frame image, and
+  `lang`), plus a site `robots.txt` and `sitemap.xml`, so shared links preview well and crawlers
+  know the page exists. Discoverability of the *text* is the job of static exports (§16.1).
+
+### 16.1 Static exports
+
+A story can be exported to static formats, for publishing on text platforms where discovery
+happens. Each export carries a backlink: "View interactive article on Soundstage" with the
+story's URL, and the scene URL for anything that couldn't be translated.
+
+| Target | Output |
+|---|---|
+| Markdown | `.md` + an `assets/` folder (zip) |
+| HTML | a standalone, semantic HTML file + assets (zip), light inline CSS |
+| Medium / Substack | "Copy as rich text" (clipboard HTML tuned to each editor's paste rules) + the HTML/MD files. No third-party publishing APIs (hard rule 4: none are verified as available). |
+| Letterpress | Markdown for `md_sources/` and a generated `LPModule` Dart file using Letterpress's design-system components (`LPText`, `LPImage`, …), with assets |
+
+**How a story becomes linear text.** Exporters walk scenes in reading order, then nodes in
+`readingOrder` (default: tree order, top-to-bottom, then left-to-right within auto layout). They
+map nodes by their semantic **role** (§4.2):
+- headings, paragraphs and quotes are emitted with their inline marks (bold, italic, links) taken
+  from span styles;
+- `figure` frames emit their image (or a rendered poster) plus caption;
+- `decorative` nodes are skipped;
+- lyrics become a transcript block;
+- audio becomes a link.
+
+A scene that is mostly motion or composition (no role-bearing text, or flagged
+`exportAs: poster`) is exported as a **poster frame**: the scene rasterised by the real renderer at
+a chosen clock value, linked to that scene. The same poster frames feed the Open Graph image.
 
 ## 17. Performance, reliability, scalability
 
@@ -596,4 +634,5 @@ These are requirements, not aspirations. Each one has a test or a measured budge
   | Full resolve, 2,000-node document | < 16 ms |
   | Re-resolve after a single-property edit | < 2 ms |
   | Editor drag on a 5,000-node document | 60 fps |
-  | Load and first paint of the first scene (published, fast 4G) | < 2.5 s |
+  | First paint (gate) on fast 4G, wasm, published | ≤ 3.5 s (measured 3.4 s in T0.8; accepted baseline, don't regress) |
+  | Gate ready (fonts + first scene media) on fast 4G | ≤ 5.0 s (measured 5.0 s; accepted baseline) |

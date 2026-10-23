@@ -34,7 +34,8 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
 - T1.6 Layers panel.
 - T1.7 Inspector: Frame, Position and Constraints, Auto layout, Layout child, Appearance, Fill,
   Stroke, Effects — registry-driven, with mixed values and value-source badges.
-- T1.8 Text: inline text editing on the canvas, text inspector, rich spans.
+- T1.8 Text: inline text editing on the canvas, text inspector, rich spans, semantic `role`
+  (heading/paragraph/quote/caption/figure/decorative), alt text and reading order.
 - T1.9 Insert tools (frame, text, shapes, image), Assets panel (upload, variants, placeholders),
   Fonts panel (upload families, variable axes).
 - T1.10 Scenes panel (add, reorder, pinned/flow, scroll length) and breakpoint editing (overrides).
@@ -47,6 +48,9 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
 - T2.4 Timeline clocks (time-based) and triggers; pointer clocks; smoothing controls.
 - T2.5 Audio lane (waveform peaks), lyrics lane, LRC import UI, `Lyrics` and `TextReveal` setup.
 - T2.6 Preview mode (real scroll) beside the editor.
+- T2.7 Player accessibility: semantics generated from roles and reading order (screen readers,
+  headings, links, lyric transcript), keyboard navigation between scenes. Invisible, so it adds
+  no static content.
 
 ## M3 — Systems
 - T3.1 Tokens: collections, modes, variables, breakpoint modes; styles (text/paint/effect); binding UI.
@@ -60,7 +64,11 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
 ## M4 — Publishing
 - T4.1 Firebase Auth, Firestore metadata, Storage documents and assets (Terraform-provisioned).
 - T4.2 Publish/version flow, `/s/<slug>` player route, asset CDN variants.
-- T4.3 Static HTML snapshots for SEO and link previews.
+- T4.3 Head metadata per story (title, description, canonical, OG/Twitter card with poster
+  frame), `robots.txt`, `sitemap.xml`. Nothing visible besides the rendering.
+- T4.5 Static exports (§16.1): Markdown, HTML, Medium/Substack rich-text copy, Letterpress
+  (Markdown + generated `LPModule`), poster frames, "View interactive article on Soundstage"
+  backlinks. Local export (no backlink URL yet) can ship earlier, from the M1 editor.
 - T4.4 Chunked published documents (manifest + per-scene chunks, lazy fetch), §17.3.
 
 ## M5 — Later
