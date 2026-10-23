@@ -38,7 +38,9 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
   (heading/paragraph/quote/caption/figure/decorative), alt text and reading order.
 - T1.9 Insert tools (frame, text, shapes, image), Assets panel (upload, variants, placeholders),
   Fonts panel (upload families, variable axes).
-- T1.10 Scenes panel (add, reorder, pinned/flow, scroll length) and breakpoint editing (overrides).
+- T1.10 Scenes panel (add, reorder, pinned/flow, scroll length) and breakpoint editing (shared base,
+  edit scope Both/This breakpoint, override indicators, reset).
+- T1.13 Content mode for < 1024 px: scene-by-scene text editing and media replacement.
 - T1.11 Persistence: IndexedDB autosave, `.stage.json` and zip import/export.
 
 ## M2 — Motion and timeline

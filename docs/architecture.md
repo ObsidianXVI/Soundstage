@@ -45,7 +45,6 @@ StageDocument
   schemaVersion: int                    // 1 at launch; see §13
   id, meta { title, slug, author, description, coverAssetId, language }
   breakpoints: [Breakpoint]             // §3.1
-  baseBreakpointId
   tokens: TokenSystem                   // §8
   assets: { id: Asset }                 // §12
   fonts:  { id: FontFamily }            // §12
@@ -61,16 +60,18 @@ Angles are degrees. Colours are `StageColor { r, g, b, a }` doubles in 0–1, sR
 
 ### 3.1 Breakpoints and overrides
 
-`Breakpoint { id, name, minWidth, designSize: {w, h} }`. The active breakpoint is the one with the
+`Breakpoint { id, name, minWidth, designSize: {w, h}, inheritsFrom?, primary: bool }`. The active breakpoint is the one with the
 largest `minWidth` ≤ viewport width. `designSize` is the reference viewport the author designs that
 breakpoint at (e.g. desktop 1440×900, mobile 390×844); it is the reference size for constraints on
 a scene's stage root (§4.3).
 
-Every node carries `breakpointOverrides: { breakpointId: Patch }`. **Cascade model (provisional,
-see DECISIONS.md):** the base breakpoint holds the node's own values. A breakpoint resolves by
-applying, in order, the patches of every breakpoint between the base and itself — so with
-base = desktop, `tablet` inherits desktop, and `mobile` inherits desktop + tablet. Breakpoints
-larger than the base cascade upward the same way.
+Every node carries `breakpointOverrides: { breakpointId: Patch }`. **Shared-base model (user
+decision: desktop and mobile are equally important):** a node's own values are the **shared base**
+that every breakpoint starts from. Each breakpoint may declare `inheritsFrom: breakpointId?`. A
+breakpoint resolves as: base → the patches along its `inheritsFrom` chain (root first) → its own
+patch. Defaults: `desktop` and `mobile` inherit from nothing, so they are peers over the shared base,
+and an optional `tablet` inherits from `desktop`. Cycles are a validation error. The editor shows
+the primary breakpoints side by side (§15).
 
 A **Patch** is `{ PropertyPath: IrValue }` (§11). Patches are also used for instance overrides.
 
@@ -480,14 +481,23 @@ current one. Every freezed model round-trips through JSON losslessly (tested).
   property:
   - if auto-key is on and the property is animatable, write a keyframe at the playhead;
   - else if inside an instance, write an instance override;
-  - else if the active breakpoint is not the base, write a breakpoint patch;
-  - else write the base value.
+  - else, by the **edit scope** (toolbar toggle; holding Alt flips it for one edit):
+    - **Both** (default): write the shared base, and clear that path's patches on the primary
+      breakpoints, so every primary artboard shows the new value. Undoable, and visible
+      immediately because the artboards sit side by side.
+    - **This breakpoint:** write a patch on the breakpoint of the artboard being edited.
 
   The inspector shows which layer a value comes from (base / breakpoint / override / animated /
   token) and offers reset.
-- **Canvas.** The active scene renders as an artboard at the active breakpoint's viewport size,
-  frozen at the playhead, inside a custom camera (zoom/pan). The width can be dragged freely to test
-  responsiveness between breakpoints. Preview mode is the real scrolling player.
+- **Canvas.** The active scene renders as **one artboard per primary breakpoint, side by side**
+  (desktop and mobile by default), each at its breakpoint's `designSize` and frozen at the
+  playhead, inside a custom camera (zoom/pan). Selection is mirrored across artboards: the same
+  node is outlined on each. Editing happens on whichever artboard is used. An artboard's width
+  can be dragged freely to test responsiveness. Preview mode is the real scrolling player.
+- **Where the editor runs.** The full editor needs a desktop-class window (≥ 1024 px). Below
+  that, Soundstage offers **content mode** only: browse a story scene by scene, edit text content
+  in place (wording, not styling), and replace the media in existing image/video/audio slots from
+  the device. No layout, positioning, styling or motion editing.
 - **Overlay** (above the canvas): hover outlines, selection bounds, resize/rotate handles,
   auto-layout padding/gap handles, snapping and smart-spacing guides, distance measurement
   (hold Alt), insertion indicators for reordering inside auto layout.
