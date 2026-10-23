@@ -256,7 +256,7 @@ class _Validator {
       _d(
         IrDiagnosticKind.noPrimaryBreakpoint,
         'No breakpoint is primary; the editor shows primary breakpoints as '
-            'artboards.',
+        'artboards.',
         'breakpoints',
         severity: IrSeverity.warning,
       );
