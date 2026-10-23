@@ -3,6 +3,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import 'command.dart';
 import 'commands/property_commands.dart';
+import 'editor_events.dart';
 import 'editor_state.dart';
 import 'history.dart';
 import 'selection.dart';
@@ -90,6 +91,9 @@ class Identity<T> {
 class EditorController extends Notifier<EditorState> {
   /// Undo/redo history (cap 200).
   final History history = History();
+
+  /// One-shot UI events (rename and text-edit requests).
+  final EditorEvents events = EditorEvents();
   int _revisionSerial = 0;
   final Map<String, ir.Resolver> _resolvers = {};
   final Map<String, ResolvedArtboard> _resolved = {};
@@ -177,7 +181,11 @@ class EditorController extends Notifier<EditorState> {
   /// same coalescing key until [endGesture] become one undo entry.
   void beginGesture() => history.beginGesture();
 
-  void endGesture() => history.endGesture();
+  /// Ends the current gesture. A gesture that ended where it started (a
+  /// drag dropped back in place) leaves no history entry.
+  void endGesture() {
+    if (history.endGesture()) state = state.copyWith(history: _status());
+  }
 
   /// Opens [document] fresh: history cleared, revision saved.
   void openDocument(ir.StageDocument document) {
@@ -203,12 +211,18 @@ class EditorController extends Notifier<EditorState> {
     );
   }
 
-  /// Applies a result of the selection rules (`selection.dart`).
-  void applySelection(SelectionState s) => state = state.copyWith(
-    selection: s.selection,
-    selectionContext: s.context,
-    textEditId: s.textEditId,
-  );
+  /// Applies a result of the selection rules (`selection.dart`). When it
+  /// starts editing a text node (double-click, Enter), a text-edit request
+  /// goes out on [events] for the edited artboard.
+  void applySelection(SelectionState s) {
+    final starts = s.textEditId != null && s.textEditId != state.textEditId;
+    state = state.copyWith(
+      selection: s.selection,
+      selectionContext: s.context,
+      textEditId: s.textEditId,
+    );
+    if (starts) events.requestTextEdit(s.textEditId!, state.breakpointId);
+  }
 
   /// The current selection as a [SelectionState].
   SelectionState get selectionState => SelectionState(
@@ -388,7 +402,9 @@ class EditorController extends Notifier<EditorState> {
         redo();
       case ApplySelection(:final selection):
         applySelection(selection);
-      case BeginRename() || NoAction():
+      case BeginRename(:final nodeId):
+        events.requestRename(nodeId);
+      case NoAction():
         break;
     }
     return action;

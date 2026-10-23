@@ -70,8 +70,21 @@ class History {
   /// Starts a continuous gesture. Nested calls continue the current one.
   void beginGesture() => _gesture ??= ++_gestureSerial;
 
-  /// Ends the current gesture; later commands start new entries.
-  void endGesture() => _gesture = null;
+  /// Ends the current gesture; later commands start new entries. When the
+  /// gesture's last entry ends where it began (the same document object),
+  /// it is dropped, and true is returned.
+  bool endGesture() {
+    final g = _gesture;
+    _gesture = null;
+    if (g == null || _undo.isEmpty) return false;
+    final last = _undo.last;
+    if (last.gesture == g &&
+        identical(last.before.document, last.after.document)) {
+      _undo.removeLast();
+      return true;
+    }
+    return false;
+  }
 
   /// Records a step from [before] to [after].
   void record({

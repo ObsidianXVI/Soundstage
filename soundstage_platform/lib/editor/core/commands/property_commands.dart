@@ -432,9 +432,12 @@ class RenameNode extends EditCommand {
 /// Moves nodes by ([dx], [dy]) (arrow keys; Shift ×10), as each node's
 /// position is seen at the edited breakpoint, routed like [SetProperty].
 ///
-/// In-flow children of an auto-layout or grid frame are skipped (stored
-/// x/y don't place them; reordering them with the arrows is a canvas
-/// gesture, T1.4). Instance inner nodes nudge through overrides.
+/// In-flow children of an auto-layout frame **reorder** instead (Figma):
+/// an arrow along the frame's direction moves them one place among their
+/// in-flow siblings (left/up earlier, right/down later; Shift does not
+/// change the step), and an arrow across it does nothing. Reorders are
+/// structural, so they ignore the edit scope. Grid children are skipped.
+/// Instance inner nodes are skipped with a warning.
 class NudgeNodes extends EditCommand {
   const NudgeNodes(this.nodeIds, this.dx, this.dy);
 
@@ -455,6 +458,8 @@ class NudgeNodes extends EditCommand {
         ? const <ir.Breakpoint>[]
         : ir.breakpointChain(doc.breakpoints, state.breakpointId!).chain;
     final writes = <String, Map<String, ir.IrValue>>{};
+    final reorders = <String, List<String>>{}; // parent → in-flow ids
+    final steps = <String, int>{}; // parent → -1 / +1
     final diags = <ir.IrDiagnostic>[];
     for (final id in nodeIds) {
       final head = id.split('/').first;
@@ -481,7 +486,15 @@ class NudgeNodes extends EditCommand {
           parent.grid != null ||
           (parent.autoLayout != null &&
               node.common.layoutChild.positioning == ir.Positioning.auto);
-      if (inFlow) continue;
+      if (inFlow) {
+        final al = parent.autoLayout;
+        if (parent.grid != null || al == null) continue;
+        final along = al.direction == ir.LayoutDirection.horizontal ? dx : dy;
+        if (along == 0) continue;
+        (reorders[parent.id] ??= []).add(id);
+        steps[parent.id] = along < 0 ? -1 : 1;
+        continue;
+      }
       var seen = node;
       for (final b in chain) {
         final p = node.common.breakpointOverrides[b.id];
@@ -492,14 +505,73 @@ class NudgeNodes extends EditCommand {
         if (dy != 0) 'y': ir.IrValue.number(seen.common.y + dy),
       };
     }
-    if (writes.isEmpty) {
+    if (writes.isEmpty && reorders.isEmpty) {
       return CommandResult(document: doc, label: label, diagnostics: diags);
     }
-    final r = SetProperty.values(writes).apply(state);
-    return r.copyWith(
-      label: label,
+    var r = writes.isEmpty
+        ? CommandResult(document: doc, label: label)
+        : SetProperty.values(writes).apply(state);
+    if (!r.ok) return r.copyWith(label: label);
+    var current = r.document;
+    for (final MapEntry(key: parentId, value: ids) in reorders.entries) {
+      final u = ir.updateNode(
+        current,
+        parentId,
+        (n) => reorderInFlow(n as ir.FrameNode, ids.toSet(), steps[parentId]!),
+      );
+      if (u.ok) current = u.document;
+    }
+    final outLabel = writes.isEmpty
+        ? 'Reorder ${layers(nodeIds.length)}'
+        : label;
+    r = r.copyWith(
+      document: current,
+      changed: !identical(current, doc),
+      label: outLabel,
+      selectionAfter: nodeIds.toSet(),
       coalesceKey: coalesceKey,
       diagnostics: [...diags, ...r.diagnostics],
     );
+    return r;
   }
+}
+
+/// [frame] with its in-flow children [ids] moved one place ([step] −1:
+/// earlier, +1: later) among the in-flow children; absolute children keep
+/// their slots. A moved block stops at either end. [frame] itself when
+/// nothing moves.
+ir.FrameNode reorderInFlow(ir.FrameNode frame, Set<String> ids, int step) {
+  bool flows(ir.Node c) =>
+      c.common.layoutChild.positioning == ir.Positioning.auto;
+  final flow = [
+    for (final c in frame.children)
+      if (flows(c)) c,
+  ];
+  final order = [...flow];
+  if (step > 0) {
+    for (var i = order.length - 2; i >= 0; i--) {
+      if (ids.contains(order[i].id) && !ids.contains(order[i + 1].id)) {
+        final t = order[i];
+        order[i] = order[i + 1];
+        order[i + 1] = t;
+      }
+    }
+  } else {
+    for (var i = 1; i < order.length; i++) {
+      if (ids.contains(order[i].id) && !ids.contains(order[i - 1].id)) {
+        final t = order[i];
+        order[i] = order[i - 1];
+        order[i - 1] = t;
+      }
+    }
+  }
+  var same = true;
+  for (var i = 0; i < order.length; i++) {
+    if (!identical(order[i], flow[i])) same = false;
+  }
+  if (same) return frame;
+  var k = 0;
+  return frame.copyWith(
+    children: [for (final c in frame.children) flows(c) ? order[k++] : c],
+  );
 }
