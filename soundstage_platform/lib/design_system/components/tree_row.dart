@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -120,10 +123,23 @@ class _SsTreeRowState extends State<SsTreeRow> {
 
   @override
   void dispose() {
+    _doubleTapWindow?.cancel();
     _text.dispose();
     _editFocus.dispose();
     _rowFocus.dispose();
     super.dispose();
+  }
+
+  Timer? _doubleTapWindow;
+
+  void _onTap() {
+    widget.onTap?.call();
+    if (_doubleTapWindow?.isActive ?? false) {
+      _doubleTapWindow!.cancel();
+      _startRename();
+    } else {
+      _doubleTapWindow = Timer(kDoubleTapTimeout, () {});
+    }
   }
 
   void _startRename() {
@@ -175,8 +191,10 @@ class _SsTreeRowState extends State<SsTreeRow> {
             ? (w.expanded ? 'Expanded' : 'Collapsed')
             : null,
         enabled: !_renaming,
-        onTap: w.onTap,
-        onDoubleTap: _startRename,
+        // A second tap inside the window renames. Not a double-tap
+        // recognizer: it would delay every single tap (selection) by its
+        // timeout.
+        onTap: _onTap,
         onSecondaryTapDown: w.onSecondaryTapDown,
         onKeyEvent: (node, event) {
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
