@@ -17,12 +17,14 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
       name: 'Desktop',
       minWidth: 1024,
       designSize: StageSize(width: 1440, height: 900),
+      primary: true,
     ),
     Breakpoint(
       id: 'mobile',
       name: 'Mobile',
       minWidth: 0,
       designSize: StageSize(width: 390, height: 844),
+      primary: true,
     ),
   ];
 

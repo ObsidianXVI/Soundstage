@@ -92,6 +92,7 @@ ir.ResolvedDocument slotTrackDocument() {
         name: 'D',
         minWidth: 0,
         designSize: ir.StageSize(width: 800, height: 600),
+        primary: true,
       ),
     ],
     scenes: [
@@ -228,6 +229,7 @@ ir.ResolvedDocument mixedTrackDocument() {
         name: 'D',
         minWidth: 0,
         designSize: ir.StageSize(width: 800, height: 600),
+        primary: true,
       ),
     ],
     scenes: [
