@@ -9,15 +9,19 @@ against. Changes to it are recorded in `DECISIONS.md`.
    runtime (`StagePlayer`) renders it; the editor edits it. Neither holds story state outside it.
 2. **The editor is the player in edit mode.** The canvas renders with the same render objects
    readers get. What you see while editing is exactly what ships.
-3. **Figma-grade primitives, our own implementation.** Layout, media sizing and typography follow
+3. **Writing, not a website builder.** A story is media, layout and text, with motion, sound and
+   a few narrative interactions (galleries, tap/hover reveals, lightbox, audio play/pause). Stories
+   never contain web-UI widgets (forms, dropdowns, dialogs, toasts, navbars). The editor's own
+   chrome is unrestricted.
+4. **Figma-grade primitives, our own implementation.** Layout, media sizing and typography follow
    Figma's semantics precisely (§4–§7), because those semantics are well understood and expressive.
    Soundstage then adds what Figma lacks: scroll/time/audio clocks, keyframed motion, behaviours.
-4. **Everything animatable is a property bound to a clock.** Scroll progress, time, audio position
+5. **Everything animatable is a property bound to a clock.** Scroll progress, time, audio position
    and pointer/gesture input are all clocks. Tracks map a clock to a property via keyframes.
-5. **One property addressing scheme everywhere.** Breakpoint overrides, component-instance
+6. **One property addressing scheme everywhere.** Breakpoint overrides, component-instance
    overrides, token bindings, keyframe tracks and the inspector all address properties by the same
    `PropertyPath` through one `PropertyRegistry` (§11).
-6. **Render objects, not widget rebuilds, for motion.** Per-frame animation writes directly into
+7. **Render objects, not widget rebuilds, for motion.** Per-frame animation writes directly into
    render objects. Scrolling a story never rebuilds widgets.
 
 ## 2. System overview
