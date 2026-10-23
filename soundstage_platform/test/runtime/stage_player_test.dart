@@ -66,7 +66,6 @@ ir.Scene _flow(String id, double height) => ir.Scene(
 ir.StageDocument _doc(List<ir.Scene> scenes) => ir.StageDocument(
   id: 'doc',
   breakpoints: const [_bp],
-  baseBreakpointId: 'only',
   scenes: scenes,
 );
 

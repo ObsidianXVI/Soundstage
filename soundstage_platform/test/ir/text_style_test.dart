@@ -12,7 +12,6 @@ StageDocument _doc(
     breakpoints: const [
       Breakpoint(id: 'bp', name: 'Base', minWidth: 0, designSize: _size),
     ],
-    baseBreakpointId: 'bp',
     defaultTextStyle: const TextStyle(
       fontSize: 10,
       fontWeight: 300,

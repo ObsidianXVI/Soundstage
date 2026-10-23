@@ -203,7 +203,6 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
   return StageDocument(
     id: 'bench',
     breakpoints: bp,
-    baseBreakpointId: 'desktop',
     assets: const {
       'aImg': Asset(id: 'aImg', kind: AssetKind.image, uri: 'asset://i.png'),
     },

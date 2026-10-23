@@ -43,7 +43,6 @@ abstract class StageDocument with _$StageDocument {
   const factory StageDocument({
     required String id,
     required List<Breakpoint> breakpoints,
-    required String baseBreakpointId,
     @Default(kStageSchemaVersion) int schemaVersion,
     @Default(StageMeta()) StageMeta meta,
     @Default(TokenSystem()) TokenSystem tokens,
@@ -59,9 +58,10 @@ abstract class StageDocument with _$StageDocument {
 
   const StageDocument._();
 
-  /// A valid empty document: desktop (min 1024, 1440×900), tablet (min 600,
-  /// 834×1112) and mobile (min 0, 390×844) breakpoints with desktop as the
-  /// base, no tokens and no scenes.
+  /// A valid empty document with the default shared-base breakpoints:
+  /// desktop (primary, min 1024, 1440×900) and mobile (primary, min 0,
+  /// 390×844) as peers over the shared base, and tablet (min 600, 834×1112)
+  /// inheriting from desktop. No tokens and no scenes.
   factory StageDocument.empty({
     required IdGenerator ids,
     StageMeta meta = const StageMeta(),
@@ -71,6 +71,7 @@ abstract class StageDocument with _$StageDocument {
       name: 'Desktop',
       minWidth: 1024,
       designSize: const StageSize(width: 1440, height: 900),
+      primary: true,
     );
     return StageDocument(
       id: ids.next(),
@@ -79,18 +80,19 @@ abstract class StageDocument with _$StageDocument {
         desktop,
         Breakpoint(
           id: ids.next(),
-          name: 'Tablet',
-          minWidth: 600,
-          designSize: const StageSize(width: 834, height: 1112),
-        ),
-        Breakpoint(
-          id: ids.next(),
           name: 'Mobile',
           minWidth: 0,
           designSize: const StageSize(width: 390, height: 844),
+          primary: true,
+        ),
+        Breakpoint(
+          id: ids.next(),
+          name: 'Tablet',
+          minWidth: 600,
+          designSize: const StageSize(width: 834, height: 1112),
+          inheritsFrom: desktop.id,
         ),
       ],
-      baseBreakpointId: desktop.id,
     );
   }
 
@@ -101,7 +103,7 @@ abstract class StageDocument with _$StageDocument {
   factory StageDocument.fromJsonMigrating(Map<String, Object?> json) =>
       StageDocument.fromJson(migrateDocumentJson(json));
 
-  /// The base breakpoint (throws [StateError] if the id is dangling).
-  Breakpoint get baseBreakpoint =>
-      breakpoints.firstWhere((b) => b.id == baseBreakpointId);
+  /// The primary breakpoints (one editor artboard each, §15), in order.
+  Iterable<Breakpoint> get primaryBreakpoints =>
+      breakpoints.where((b) => b.primary);
 }

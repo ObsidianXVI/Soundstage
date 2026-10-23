@@ -321,7 +321,6 @@ void main() {
         ir.resolveDocument(
           ir.StageDocument(
             id: 'd',
-            baseBreakpointId: 'b',
             breakpoints: const [
               ir.Breakpoint(
                 id: 'b',

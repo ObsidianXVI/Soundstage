@@ -86,7 +86,6 @@ ir.ResolvedDocument slotTrackDocument() {
   ];
   final doc = ir.StageDocument(
     id: 'bench',
-    baseBreakpointId: 'd',
     breakpoints: const [
       ir.Breakpoint(
         id: 'd',
@@ -223,7 +222,6 @@ ir.ResolvedDocument mixedTrackDocument() {
   ];
   final doc = ir.StageDocument(
     id: 'bench',
-    baseBreakpointId: 'd',
     breakpoints: const [
       ir.Breakpoint(
         id: 'd',

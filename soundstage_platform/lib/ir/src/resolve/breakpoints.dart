@@ -13,27 +13,72 @@ List<Breakpoint> breakpointsByWidth(List<Breakpoint> breakpoints) {
   return [for (final (_, b) in indexed) b];
 }
 
-/// The breakpoints whose patches apply, in application order, when
-/// [activeId] is active and [baseId] holds the node's own values
-/// (architecture §3.1).
+/// Why a breakpoint's `inheritsFrom` chain stopped early.
+enum BreakpointChainProblem {
+  /// An `inheritsFrom` names no breakpoint.
+  unknownParent,
+
+  /// The chain loops back on itself.
+  cycle,
+}
+
+/// The result of [breakpointChain]: the breakpoints whose patches apply, in
+/// application order (root first, the breakpoint itself last), and why the
+/// walk stopped early, if it did (`problemId` is the offending id).
+typedef BreakpointChain = ({
+  List<Breakpoint> chain,
+  BreakpointChainProblem? problem,
+  String? problemId,
+});
+
+/// The patches that apply when [activeId] is active (architecture §3.1,
+/// shared-base model): the breakpoints along its `inheritsFrom` chain, root
+/// first, ending with [activeId] itself. Peers (`inheritsFrom: null`) give
+/// just `[active]`.
 ///
-/// Walks outward from the base towards the active breakpoint, by
-/// `minWidth`: with desktop base, `mobile` applies `[tablet, mobile]`; with
-/// mobile base, `desktop` applies `[tablet, desktop]`. The base itself is
-/// never in the list (its values are the node's own), so `active == base`
-/// gives `[]`. Unknown ids give `[]`.
-List<Breakpoint> breakpointCascade(
+/// Never throws. An unknown [activeId] gives an empty chain. An unknown
+/// `inheritsFrom` or a cycle stops the walk at the last good breakpoint
+/// and is reported in `problem`; the breakpoints already walked still
+/// apply, so a broken chain degrades to fewer patches.
+BreakpointChain breakpointChain(
   List<Breakpoint> breakpoints,
-  String baseId,
   String activeId,
 ) {
-  final ordered = breakpointsByWidth(breakpoints);
-  final b = ordered.indexWhere((x) => x.id == baseId);
-  final a = ordered.indexWhere((x) => x.id == activeId);
-  if (a < 0 || b < 0 || a == b) return const [];
-  return a < b
-      ? [for (var i = b - 1; i >= a; i--) ordered[i]]
-      : [for (var i = b + 1; i <= a; i++) ordered[i]];
+  final byId = <String, Breakpoint>{};
+  for (final b in breakpoints) {
+    byId.putIfAbsent(b.id, () => b);
+  }
+  final active = byId[activeId];
+  if (active == null) return (chain: const [], problem: null, problemId: null);
+  final walked = <Breakpoint>[active];
+  final seen = <String>{active.id};
+  var current = active;
+  while (true) {
+    final parentId = current.inheritsFrom;
+    if (parentId == null) break;
+    final parent = byId[parentId];
+    if (parent == null) {
+      return (
+        chain: walked.reversed.toList(growable: false),
+        problem: BreakpointChainProblem.unknownParent,
+        problemId: parentId,
+      );
+    }
+    if (!seen.add(parent.id)) {
+      return (
+        chain: walked.reversed.toList(growable: false),
+        problem: BreakpointChainProblem.cycle,
+        problemId: parent.id,
+      );
+    }
+    walked.add(parent);
+    current = parent;
+  }
+  return (
+    chain: walked.reversed.toList(growable: false),
+    problem: null,
+    problemId: null,
+  );
 }
 
 /// The active breakpoint at viewport [width]: the one with the largest

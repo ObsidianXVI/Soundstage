@@ -143,7 +143,12 @@ void main() {
     });
 
     test('reports dangling references but still returns the document', () {
-      final broken = doc.copyWith(baseBreakpointId: 'zzz');
+      final broken = doc.copyWith(
+        breakpoints: [
+          doc.breakpoints.first.copyWith(inheritsFrom: 'zzz'),
+          ...doc.breakpoints.skip(1),
+        ],
+      );
       final r = loadDocument(broken.toJson());
       expect(r.loaded, isTrue);
       expect(r.clean, isFalse);

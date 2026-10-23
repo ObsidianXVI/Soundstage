@@ -65,7 +65,6 @@ ir.StageDocument _doc(
 }) => ir.StageDocument(
   id: 'doc',
   breakpoints: const [_bp],
-  baseBreakpointId: 'only',
   scenes: [
     ir.Scene(
       id: 's',

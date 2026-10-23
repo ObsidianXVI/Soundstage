@@ -11,6 +11,12 @@ enum IrDiagnosticKind {
   /// effect id, index out of range), or the value has the wrong type.
   inapplicablePath,
   missingBreakpoint,
+
+  /// A breakpoint's `inheritsFrom` chain loops back on itself.
+  breakpointCycle,
+
+  /// No breakpoint is `primary` (the editor has no artboard to show).
+  noPrimaryBreakpoint,
   missingComponent,
   missingVariant,
   missingComponentProp,

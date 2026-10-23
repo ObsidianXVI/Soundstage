@@ -24,12 +24,14 @@ const _desktop = Breakpoint(
   name: 'Desktop',
   minWidth: 768,
   designSize: StageSize(width: 1440, height: 900),
+  primary: true,
 );
 const _mobile = Breakpoint(
   id: 'mobile',
   name: 'Mobile',
   minWidth: 0,
   designSize: StageSize(width: 390, height: 844),
+  primary: true,
 );
 
 StageColor _hex(String h) => StageColor.fromHex(h);
@@ -705,7 +707,6 @@ Scene _tiles() {
 
 StageDocument buildMotionDemo() => StageDocument(
   id: 'demo-motion',
-  baseBreakpointId: 'desktop',
   breakpoints: const [_desktop, _mobile],
   meta: const StageMeta(
     title: 'Motion demo (T0.6)',

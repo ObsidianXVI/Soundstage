@@ -31,7 +31,6 @@ void main() {
           document: ir.StageDocument(
             id: 'doc',
             breakpoints: const [_bp],
-            baseBreakpointId: 'only',
             scenes: [_flow('a', 3000), _flow('b', 3000)],
           ),
           mode: StageRenderMode.play,

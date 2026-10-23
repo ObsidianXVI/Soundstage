@@ -102,7 +102,6 @@ class _Memo {
         d != null &&
         identical(d.tokens, doc.tokens) &&
         identical(d.defaultTextStyle, doc.defaultTextStyle) &&
-        d.baseBreakpointId == doc.baseBreakpointId &&
         d.breakpoints == doc.breakpoints &&
         d.assets == doc.assets &&
         d.variantSets == doc.variantSets &&
@@ -199,13 +198,33 @@ class _Pass {
   final _MemoMap memoNext = LinkedHashMap<Node, List<_MemoEntry>>.identity();
 
   late final Breakpoint? breakpoint = _pickBreakpoint();
-  late final List<Breakpoint> cascade = breakpoint == null
-      ? const []
-      : breakpointCascade(
-          doc.breakpoints,
-          doc.baseBreakpointId,
-          breakpoint!.id,
+  /// The breakpoints whose patches apply, root first (§3.1).
+  late final List<Breakpoint> cascade = _chain();
+
+  List<Breakpoint> _chain() {
+    final bp = breakpoint;
+    if (bp == null) return const [];
+    final r = breakpointChain(doc.breakpoints, bp.id);
+    switch (r.problem) {
+      case BreakpointChainProblem.unknownParent:
+        _diag(
+          IrDiagnosticKind.missingBreakpoint,
+          'Breakpoint "${bp.id}" inherits from "${r.problemId}", which does '
+          'not exist; its chain stops there.',
+          path: r.problemId,
         );
+      case BreakpointChainProblem.cycle:
+        _diag(
+          IrDiagnosticKind.breakpointCycle,
+          'The inheritsFrom chain of breakpoint "${bp.id}" loops at '
+          '"${r.problemId}"; its chain stops there.',
+          path: r.problemId,
+        );
+      case null:
+        break;
+    }
+    return r.chain;
+  }
 
   late final Map<String, VariableCollection> collections = {
     for (final c in doc.tokens.collections) c.id: c,
@@ -265,14 +284,10 @@ class _Pass {
     }
     final width = ctx.viewportWidth;
     if (width != null) return activeBreakpoint(bps, width);
+    // Neither given: the first primary breakpoint, else the first one.
     for (final b in bps) {
-      if (b.id == doc.baseBreakpointId) return b;
+      if (b.primary) return b;
     }
-    _diag(
-      IrDiagnosticKind.missingBreakpoint,
-      'Base breakpoint "${doc.baseBreakpointId}" does not exist.',
-      path: doc.baseBreakpointId,
-    );
     return bps.first;
   }
 

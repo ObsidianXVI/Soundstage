@@ -32,18 +32,21 @@ const _desktop = Breakpoint(
   name: 'Desktop',
   minWidth: 1024,
   designSize: StageSize(width: 1440, height: 900),
+  primary: true,
 );
 const _tablet = Breakpoint(
   id: 'tablet',
   name: 'Tablet',
   minWidth: 600,
   designSize: StageSize(width: 834, height: 1112),
+  inheritsFrom: 'desktop',
 );
 const _mobile = Breakpoint(
   id: 'mobile',
   name: 'Mobile',
   minWidth: 0,
   designSize: StageSize(width: 390, height: 844),
+  primary: true,
 );
 
 /// Desktop, tablet and mobile design sizes, indexed 0, 1, 2.
@@ -1403,7 +1406,6 @@ void main() {
   final doc = StageDocument(
     id: 'demo-spike',
     breakpoints: const [_desktop, _tablet, _mobile],
-    baseBreakpointId: 'desktop',
     meta: const StageMeta(
       title: 'The Hour Between',
       slug: 'spike',

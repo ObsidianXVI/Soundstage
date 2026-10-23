@@ -8,7 +8,8 @@
       "designSize": {
         "width": 1440.0,
         "height": 900.0
-      }
+      },
+      "primary": true
     },
     {
       "id": "tablet",
@@ -17,7 +18,9 @@
       "designSize": {
         "width": 834.0,
         "height": 1112.0
-      }
+      },
+      "inheritsFrom": "desktop",
+      "primary": false
     },
     {
       "id": "mobile",
@@ -26,10 +29,10 @@
       "designSize": {
         "width": 390.0,
         "height": 844.0
-      }
+      },
+      "primary": true
     }
   ],
-  "baseBreakpointId": "desktop",
   "schemaVersion": 1,
   "meta": {
     "title": "The Hour Between",
@@ -333,6 +336,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "tablet": {
               "width": {
@@ -436,6 +440,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -570,6 +575,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -704,6 +710,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -838,6 +845,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -972,6 +980,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -1127,6 +1136,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -1232,6 +1242,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "tablet": {
                       "width": {
@@ -1378,6 +1389,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -1528,6 +1540,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -2082,7 +2095,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "lyric",
@@ -2127,6 +2141,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "tablet": {
               "width": {
@@ -2230,6 +2245,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -2385,6 +2401,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -2539,6 +2556,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -2644,6 +2662,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "tablet": {
                       "width": {
@@ -2809,6 +2828,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -2932,6 +2952,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -3347,7 +3368,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "things",
@@ -3392,6 +3414,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "tablet": {
               "width": {
@@ -3513,6 +3536,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "style.fontSize": {
@@ -3636,6 +3660,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -3723,6 +3748,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "style.fontSize": {
@@ -3918,6 +3944,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -3988,6 +4015,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -4090,6 +4118,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -4187,6 +4216,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -4255,6 +4285,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -4368,6 +4399,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -4475,6 +4507,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -4640,6 +4673,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -4742,6 +4776,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -4839,6 +4874,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -4907,6 +4943,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5020,6 +5057,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5127,6 +5165,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5292,6 +5331,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5394,6 +5434,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -5491,6 +5532,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -5559,6 +5601,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5672,6 +5715,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5779,6 +5823,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -5944,6 +5989,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6046,6 +6092,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -6161,6 +6208,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -6229,6 +6277,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -6342,6 +6391,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -6449,6 +6499,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -6614,6 +6665,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6716,6 +6768,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -6831,6 +6884,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -6899,6 +6953,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -7012,6 +7067,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -7119,6 +7175,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -7284,6 +7341,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7386,6 +7444,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -7501,6 +7560,7 @@
                         }
                       },
                       "mask": "none",
+                      "role": "none",
                       "breakpointOverrides": {},
                       "bindings": {},
                       "componentBindings": {},
@@ -7569,6 +7629,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -7682,6 +7743,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -7789,6 +7851,7 @@
                             }
                           },
                           "mask": "none",
+                          "role": "none",
                           "breakpointOverrides": {},
                           "bindings": {},
                           "componentBindings": {},
@@ -8431,7 +8494,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "lamp",
@@ -8476,6 +8540,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "tablet": {
               "width": {
@@ -8579,6 +8644,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "width": {
@@ -8713,6 +8779,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -8865,6 +8932,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -8991,6 +9059,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -9141,6 +9210,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -9296,6 +9366,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "x": {
@@ -9751,7 +9822,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "fin",
@@ -9796,6 +9868,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "tablet": {
               "width": {
@@ -9916,6 +9989,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -10030,6 +10104,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "tablet": {
                   "style.fontSize": {
@@ -10183,6 +10258,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -10270,6 +10346,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "style.fontSize": {
@@ -10406,6 +10483,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -10644,7 +10722,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     }
   ],
   "audioTracks": [

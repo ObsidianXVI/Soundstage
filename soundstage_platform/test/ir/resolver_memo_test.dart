@@ -21,7 +21,6 @@ const _bps = [
 StageDocument _doc({double dark = 0.4}) => StageDocument(
   id: 'd',
   breakpoints: _bps,
-  baseBreakpointId: 'd',
   assets: const {},
   tokens: TokenSystem(
     collections: [

@@ -79,6 +79,11 @@ in `DECISIONS_NEEDED.md`.
   in `layoutChild`; `hug` means hug the auto-layout content and is treated as fixed without it),
   grid placement indices 0-based, `Stroke.align`
   `inside`, `miterLimit` 4.
+- **Semantics.** `NodeCommon.role` (`NodeRole`), `readingOrder` and `altText`, and
+  `Scene.exportAs` / `posterClock` (null = `kDefaultPosterClock`, 0.5), never affect rendering:
+  their descriptors are non-animatable with `Invalidation.none` (as are `name` and `locked`).
+  An instance places its own role, reading order and alt text on its component root when set.
+  The validator warns on a `posterClock` outside 0–1.
 - **Migrations** reject a missing or non-integer `schemaVersion` instead of guessing.
 
 ## Operations (T0.3)
@@ -99,9 +104,16 @@ in `DECISIONS_NEEDED.md`.
 - **Patches.** `applyPatch` writes through the registry. `none` clears, a `tokenRef` binds, a
   concrete value detaches a binding on the same path, and unknown or inapplicable paths become
   `IrDiagnostic`s.
-- **Breakpoints.** `breakpointCascade` walks from the base towards the active breakpoint by
-  `minWidth`, never including the base, in either direction. `activeBreakpoint` falls back to the
-  narrowest breakpoint below every `minWidth`.
+- **Breakpoints (shared base).** A node's own values are the shared base of every breakpoint.
+  `breakpointChain(breakpoints, id)` follows `inheritsFrom` and returns the breakpoints whose
+  patches apply, root first and the breakpoint itself last; peers (`inheritsFrom: null`) apply
+  only their own patch. An unknown parent or a cycle stops the walk (the walked part still
+  applies) and is reported. With no `breakpointId`/`viewportWidth` in the `ResolveContext`, the
+  first `primary` breakpoint resolves (else the first). `activeBreakpoint` falls back to the
+  narrowest breakpoint below every `minWidth`. The validator reports unknown `inheritsFrom`
+  (`missingBreakpoint`), cycles (`breakpointCycle`) and, as a warning, no primary breakpoint
+  (`noPrimaryBreakpoint`). `StageDocument.empty` has primary desktop and mobile peers and a
+  tablet inheriting desktop.
 - **Interpolation.** Colours lerp in OKLab with straight alpha; endpoints are returned exactly
   and results are clamped to sRGB. Paint stacks lerp only when kinds, ids, gradient kind/stop
   count and image asset/scale mode/rotation match, otherwise they step. Discrete sub-fields

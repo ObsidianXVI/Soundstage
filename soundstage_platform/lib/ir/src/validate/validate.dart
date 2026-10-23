@@ -12,6 +12,7 @@ import '../nodes/node.dart';
 import '../nodes/paint.dart';
 import '../nodes/text.dart';
 import '../registry/property_registry.dart';
+import '../resolve/breakpoints.dart';
 import '../scene.dart';
 import '../tokens.dart';
 import '../values/ir_value.dart';
@@ -243,19 +244,53 @@ class _Validator {
 
   void _breakpoints() {
     _unique(doc.breakpoints.map((b) => b.id), 'breakpoints', 'breakpoint');
-    if (!_breakpointIds.contains(doc.baseBreakpointId)) {
-      _d(
-        IrDiagnosticKind.missingBreakpoint,
-        'baseBreakpointId "${doc.baseBreakpointId}" does not exist.',
-        'baseBreakpointId',
-      );
-    }
     if (doc.breakpoints.isEmpty) {
       _d(
         IrDiagnosticKind.missingBreakpoint,
         'A document needs at least one breakpoint.',
         'breakpoints',
       );
+      return;
+    }
+    if (!doc.breakpoints.any((b) => b.primary)) {
+      _d(
+        IrDiagnosticKind.noPrimaryBreakpoint,
+        'No breakpoint is primary; the editor shows primary breakpoints as '
+        'artboards.',
+        'breakpoints',
+        severity: IrSeverity.warning,
+      );
+    }
+    final reported = <String>{};
+    for (final (i, b) in doc.breakpoints.indexed) {
+      final parent = b.inheritsFrom;
+      if (parent == null) continue;
+      final loc = 'breakpoints[$i].inheritsFrom';
+      if (!_breakpointIds.contains(parent)) {
+        _d(
+          IrDiagnosticKind.missingBreakpoint,
+          'Breakpoint "${b.id}" inherits from "$parent", which does not '
+          'exist.',
+          loc,
+        );
+        continue;
+      }
+      final r = breakpointChain(doc.breakpoints, b.id);
+      // Report each cycle once, at the first member found.
+      if (r.problem == BreakpointChainProblem.cycle &&
+          reported.add(r.problemId!)) {
+        final members = <String>{};
+        for (final x in r.chain) {
+          members.add(x.id);
+        }
+        reported.addAll(members);
+        _d(
+          IrDiagnosticKind.breakpointCycle,
+          'Breakpoint inheritsFrom cycle through "${r.problemId}" '
+          '(${[...members].join(' → ')}).',
+          loc,
+        );
+      }
     }
   }
 

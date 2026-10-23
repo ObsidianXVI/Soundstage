@@ -30,7 +30,6 @@ class DocGen {
 
   static const _bpIds = ['bpA', 'bpB', 'bpC', 'bpD'];
   late final List<String> _bps;
-  late final String _baseBp;
   late final List<String> _sceneIds;
 
   final List<ComponentDef> _comps = [];
@@ -49,7 +48,6 @@ class DocGen {
   StageDocument build() {
     final bpCount = 2 + r.nextInt(3);
     _bps = _bpIds.sublist(0, bpCount);
-    _baseBp = _pick(_bps);
     final sceneCount = 1 + r.nextInt(3);
     _sceneIds = [for (var i = 0; i < sceneCount; i++) 'sc$i'];
 
@@ -204,9 +202,11 @@ class DocGen {
             name: 'bp$i',
             minWidth: (_bps.length - 1 - i) * 400.0,
             designSize: StageSize(width: 1440 - i * 300, height: 900),
+            // Acyclic: a breakpoint inherits from an earlier one or none.
+            inheritsFrom: i > 0 && _p(0.5) ? _bps[r.nextInt(i)] : null,
+            primary: i == 0 || _p(0.4),
           ),
       ],
-      baseBreakpointId: _baseBp,
       defaultTextStyle: TextStyle(
         fontFamilyId: _p(0.5) ? 'fA' : null,
         fontSize: _num(10, 30),
@@ -547,7 +547,7 @@ class DocGen {
   NodeCommon _common(String id, {bool fills = false}) {
     final bpPatches = <String, Patch>{};
     for (final bp in _bps) {
-      if (bp == _baseBp || !_p(0.5)) continue;
+      if (!_p(0.5)) continue;
       bpPatches[bp] = {
         'x': IrValue.number(_num()),
         'opacity': IrValue.number(_frac()),

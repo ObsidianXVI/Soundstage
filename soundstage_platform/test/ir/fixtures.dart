@@ -800,7 +800,6 @@ StageDocument compositeDocument() {
       language: 'en-GB',
     ),
     breakpoints: breakpoints,
-    baseBreakpointId: 'bpDesktop',
     tokens: tokenSystem,
     defaultTextStyle: textStyle,
     assets: {
