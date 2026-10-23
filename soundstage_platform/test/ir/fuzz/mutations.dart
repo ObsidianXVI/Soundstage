@@ -87,8 +87,13 @@ NodeCommon _withInteraction(NodeCommon c, Action a) => c.copyWith(
 /// document has nothing of the needed kind.
 final List<Mutation> mutations = [
   (
-    name: 'baseBreakpointId',
-    apply: (d, r) => d.copyWith(baseBreakpointId: 'zzz'),
+    name: 'breakpoint inheritsFrom',
+    apply: (d, r) => d.copyWith(
+      breakpoints: [
+        d.breakpoints.first.copyWith(inheritsFrom: 'zzz'),
+        ...d.breakpoints.skip(1),
+      ],
+    ),
   ),
   (
     name: 'track clock',

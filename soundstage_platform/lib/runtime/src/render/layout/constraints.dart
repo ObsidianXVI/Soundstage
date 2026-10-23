@@ -117,6 +117,129 @@ Rect resolveConstraints({
   return Rect.fromLTWH(h.offset, v.offset, h.size, v.size);
 }
 
+/// The result of [inverseResolveAxisConstraint]: stored geometry along one
+/// axis, and whether it reproduces the desired placement exactly.
+typedef InverseAxisPlacement = ({double position, double size, bool exact});
+
+/// The inverse of [resolveAxisConstraint] (architecture §4.3): the stored
+/// [position]/size that resolve to the desired actual [offset] and [size]
+/// when the parent is [parent] and the reference size is [reference].
+///
+/// Used by the editor to turn an edit made at a free artboard width back
+/// into stored geometry that means the same thing at the design size.
+/// `resolveAxisConstraint(inverse…)` gives back `(offset, size)` up to
+/// floating-point rounding, except where the forward map is not
+/// invertible; then `exact` is false and the result is the closest
+/// achievable placement:
+///
+/// - **Clamping.** The forward size is `clampSize(raw, min, max)`, so a
+///   desired [size] outside `[min, max]` (or negative) cannot be reached.
+///   The inverse targets the clamped size at the requested [offset].
+///   A size *on* a clamp bound is reachable (the raw size is chosen equal
+///   to it), so `exact` stays true.
+/// - **Hugging.** With [contentSize] (a hug-sized frame, auto-width text),
+///   `start`/`end`/`center` take their size from the content, not the
+///   stored size. Only `clampSize(contentSize)` is reachable; the stored
+///   size is set to it so the stored box matches the content.
+/// - **Scale with a zero parent.** When `parent == 0` (and `reference !=
+///   0`) every stored geometry resolves to offset 0 and size
+///   `clampSize(0)`; the stored geometry is then the desired one unchanged.
+///
+/// Stretch can return a negative stored size: a desired size below
+/// `parent − reference` needs margins wider than the reference. The round
+/// trip still holds; the caller decides whether to accept it.
+InverseAxisPlacement inverseResolveAxisConstraint({
+  required AxisConstraint constraint,
+  required double offset,
+  required double size,
+  required double reference,
+  required double parent,
+  double? min,
+  double? max,
+  double? contentSize,
+}) {
+  final hugs =
+      contentSize != null &&
+      (constraint == AxisConstraint.start ||
+          constraint == AxisConstraint.end ||
+          constraint == AxisConstraint.center);
+  // The size the forward map will produce.
+  final s = clampSize(hugs ? contentSize : size, min, max);
+  var exact = s == size;
+  switch (constraint) {
+    case AxisConstraint.start:
+      return (position: offset, size: s, exact: exact);
+    case AxisConstraint.end:
+      // Keep the right margin: P − o − s = R − x − w with w = s.
+      return (position: reference - parent + offset, size: s, exact: exact);
+    case AxisConstraint.center:
+      // Keep the centre offset: o + s/2 − P/2 = x + w/2 − R/2 with w = s.
+      return (
+        position: offset + (reference - parent) / 2,
+        size: s,
+        exact: exact,
+      );
+    case AxisConstraint.stretch:
+      // Raw size P − R + w must equal s.
+      return (position: offset, size: s + reference - parent, exact: exact);
+    case AxisConstraint.scale:
+      final double k = reference == 0 ? 1.0 : parent / reference;
+      if (k == 0) {
+        exact = offset == 0 && clampSize(0, min, max) == size;
+        return (position: offset, size: size, exact: exact);
+      }
+      return (position: offset / k, size: s / k, exact: exact);
+  }
+}
+
+/// The result of [inverseResolveConstraints]: the stored box (relative to
+/// the parent, at its reference size), and whether both axes are exact.
+typedef InverseConstraintsResult = ({Rect stored, bool exact});
+
+/// The inverse of [resolveConstraints]: the stored box that resolves to
+/// [desired] (the actual box in the parent's frame box) for both axes. See
+/// [inverseResolveAxisConstraint] for the parameters and the cases that are
+/// not invertible.
+InverseConstraintsResult inverseResolveConstraints({
+  required ir.Constraints constraints,
+  required Rect desired,
+  required double referenceWidth,
+  required double referenceHeight,
+  required double parentWidth,
+  required double parentHeight,
+  double? minWidth,
+  double? maxWidth,
+  double? minHeight,
+  double? maxHeight,
+  double? contentWidth,
+  double? contentHeight,
+}) {
+  final h = inverseResolveAxisConstraint(
+    constraint: horizontalAxisConstraint(constraints.horizontal),
+    offset: desired.left,
+    size: desired.width,
+    reference: referenceWidth,
+    parent: parentWidth,
+    min: minWidth,
+    max: maxWidth,
+    contentSize: contentWidth,
+  );
+  final v = inverseResolveAxisConstraint(
+    constraint: verticalAxisConstraint(constraints.vertical),
+    offset: desired.top,
+    size: desired.height,
+    reference: referenceHeight,
+    parent: parentHeight,
+    min: minHeight,
+    max: maxHeight,
+    contentSize: contentHeight,
+  );
+  return (
+    stored: Rect.fromLTWH(h.position, v.position, h.size, v.size),
+    exact: h.exact && v.exact,
+  );
+}
+
 /// [v] clamped by nullable [min]/[max] and never negative. `min` wins over
 /// `max` when they conflict (CSS).
 double clampSize(double v, double? min, double? max) {

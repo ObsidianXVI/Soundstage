@@ -79,6 +79,11 @@ in `DECISIONS_NEEDED.md`.
   in `layoutChild`; `hug` means hug the auto-layout content and is treated as fixed without it),
   grid placement indices 0-based, `Stroke.align`
   `inside`, `miterLimit` 4.
+- **Semantics.** `NodeCommon.role` (`NodeRole`), `readingOrder` and `altText`, and
+  `Scene.exportAs` / `posterClock` (null = `kDefaultPosterClock`, 0.5), never affect rendering:
+  their descriptors are non-animatable with `Invalidation.none` (as are `name` and `locked`).
+  An instance places its own role, reading order and alt text on its component root when set.
+  The validator warns on a `posterClock` outside 0–1.
 - **Migrations** reject a missing or non-integer `schemaVersion` instead of guessing.
 
 ## Operations (T0.3)
@@ -99,9 +104,16 @@ in `DECISIONS_NEEDED.md`.
 - **Patches.** `applyPatch` writes through the registry. `none` clears, a `tokenRef` binds, a
   concrete value detaches a binding on the same path, and unknown or inapplicable paths become
   `IrDiagnostic`s.
-- **Breakpoints.** `breakpointCascade` walks from the base towards the active breakpoint by
-  `minWidth`, never including the base, in either direction. `activeBreakpoint` falls back to the
-  narrowest breakpoint below every `minWidth`.
+- **Breakpoints (shared base).** A node's own values are the shared base of every breakpoint.
+  `breakpointChain(breakpoints, id)` follows `inheritsFrom` and returns the breakpoints whose
+  patches apply, root first and the breakpoint itself last; peers (`inheritsFrom: null`) apply
+  only their own patch. An unknown parent or a cycle stops the walk (the walked part still
+  applies) and is reported. With no `breakpointId`/`viewportWidth` in the `ResolveContext`, the
+  first `primary` breakpoint resolves (else the first). `activeBreakpoint` falls back to the
+  narrowest breakpoint below every `minWidth`. The validator reports unknown `inheritsFrom`
+  (`missingBreakpoint`), cycles (`breakpointCycle`) and, as a warning, no primary breakpoint
+  (`noPrimaryBreakpoint`). `StageDocument.empty` has primary desktop and mobile peers and a
+  tablet inheriting desktop.
 - **Interpolation.** Colours lerp in OKLab with straight alpha; endpoints are returned exactly
   and results are clamped to sRGB. Paint stacks lerp only when kinds, ids, gradient kind/stop
   count and image asset/scale mode/rotation match, otherwise they step. Discrete sub-fields
@@ -149,3 +161,51 @@ below). Output is a
   variant sets, the default text style, breakpoints or the `ResolveContext` drops the memo (the
   per-dependency invalidation of §17.1 is not built yet). Only the previous pass is retained.
   Note that freezed collection getters return fresh views, so shared inputs are compared with `==`.
+
+## Edit helpers (T1.0)
+
+`src/edit/`, pure `doc → EditResult` functions for the editor's commands (architecture §15,
+§17.1). Each copies only the path from the root to what it changes: untouched scenes, siblings
+and subtrees keep `identical()` identity, so the resolver memo hits (a single-property edit on
+the 2,000-node bench re-resolves 4 nodes). Nothing throws: problems are `IrDiagnostic`s, and an
+error leaves the input document unchanged (`identical`). Warnings (a clamped index, a reference
+left dangling) don't stop an edit.
+
+- **`DocumentIndex.of(doc)`** maps authored node ids to a `NodeLocation` (scene or overlay,
+  child path, ancestors). Each root tree's index is cached by the root's identity, so after an
+  edit only the edited scene is re-indexed, and a property edit (same ids and child paths) reuses
+  the old index outright. Instance inner nodes and component definitions are not indexed: an id
+  `<instanceId>/<innerId>` gets `editInsideInstance` (edit it through an instance override).
+- **Nodes:** `updateNode`, `insertNodes`, `removeNodes` (also removes the scene's tracks on
+  removed nodes; warns about pointer/behaviour clocks left dangling), `moveNodes` (index is a
+  drop-indicator insertion point counting the moved nodes; tree order kept; cycles refused;
+  geometry not converted; tracks follow nodes to another scene, rebinding the scene-scroll
+  clock), `wrapInFrame` (rotated bounds, positions, numeric `x`/`y` patches and `x`/`y` tracks
+  converted into the frame's space; optional actual `boxes` for auto-layout children) and
+  `duplicateNodes` (fresh ids; remaps node ids, intra-copy lightbox targets and same-scene tracks;
+  keeps interaction ids, override paths, component bindings, clocks and outside references).
+- **Scenes:** `updateScene`, `insertScene`, `removeScene`, `moveScene`.
+- **Edit scope:** `setPropertyAcrossBreakpoints` ("Both": writes the shared base and clears the
+  path, and paths under it, from the listed breakpoints' patches; a whole-value patch above the
+  path is rewritten with the new value inside it), `setBreakpointPatchValue` ("This
+  breakpoint") and `clearBreakpointPatchValue` ("reset to shared").
+
+## Provenance (T1.0)
+
+`Resolver.explain(doc, nodeId, PropertyPath, [context])` returns a `Provenance`: the layers that
+produced a property's value, lowest priority first, each a `ProvenanceEntry` (`source`, the value
+after that layer, the authored `nodeId` holding the layer, and the overlapping patch/binding
+`keys`, which is what a reset removes), plus `finalValue`. Sources: `base`, `componentDefault`,
+`breakpointPatch` (one per patch along the `inheritsFrom` chain), `componentBinding`,
+`instancePlacement` (preceded by the instance's own chain when placement takes the value over),
+`instanceOverride`, `token(variableId, modeId)`, `paintStyle`/`effectStyle`, and for text style
+paths `documentDefault` → `textStyle` (+ its tokens) → node layers → `paragraphStyle` → span
+layers. `animated(trackId)` is reserved for the runtime (M2).
+
+It runs a traced pass over only the target's tree, bypassing the memo on the path to the node
+and reusing it elsewhere when `doc`/`context` match the last `resolve` (the memo is not changed):
+about 0.07 ms on the 2,000-node bench. `finalValue` equals `resolvedPropertyValue(resolvedNode,
+path)`, which reads through the registry except that text style paths read the merged styles
+(`ResolvedNode.textStyle`, new: the node-level merged style; span paths from the span's merged
+style). Style references (`textStyleId`, `fillStyleId`, …) report the reference in effect,
+since the resolved tree clears them. Both are checked across the fuzz corpus.

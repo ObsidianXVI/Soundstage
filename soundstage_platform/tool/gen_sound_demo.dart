@@ -21,12 +21,14 @@ const _desktop = Breakpoint(
   name: 'Desktop',
   minWidth: 768,
   designSize: StageSize(width: 1440, height: 900),
+  primary: true,
 );
 const _mobile = Breakpoint(
   id: 'mobile',
   name: 'Mobile',
   minWidth: 0,
   designSize: StageSize(width: 390, height: 844),
+  primary: true,
 );
 
 StageColor _hex(String h) => StageColor.fromHex(h);
@@ -418,7 +420,6 @@ void main() {
   final doc = StageDocument(
     id: 'demo-sound',
     breakpoints: const [_desktop, _mobile],
-    baseBreakpointId: 'desktop',
     meta: const StageMeta(
       title: 'Lights Go Low',
       slug: 'sound-demo',

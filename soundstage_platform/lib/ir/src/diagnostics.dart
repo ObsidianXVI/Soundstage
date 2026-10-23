@@ -11,6 +11,12 @@ enum IrDiagnosticKind {
   /// effect id, index out of range), or the value has the wrong type.
   inapplicablePath,
   missingBreakpoint,
+
+  /// A breakpoint's `inheritsFrom` chain loops back on itself.
+  breakpointCycle,
+
+  /// No breakpoint is `primary` (the editor has no artboard to show).
+  noPrimaryBreakpoint,
   missingComponent,
   missingVariant,
   missingComponentProp,
@@ -41,6 +47,23 @@ enum IrDiagnosticKind {
 
   /// A referenced asset exists but has the wrong kind.
   wrongAssetKind,
+
+  /// A value is outside its meaningful range (e.g. a scene's `posterClock`
+  /// outside 0–1).
+  invalidValue,
+
+  // Edit helper (`lib/ir/src/edit/`) kinds.
+  /// An edit is malformed: a scene root where a child is required, a
+  /// non-frame parent, an id that would be duplicated, an index out of
+  /// range (clamped, as a warning), and similar.
+  invalidEdit,
+
+  /// A move would put a node inside itself or one of its descendants.
+  editCycle,
+
+  /// The edit addresses a node inside an instance. Instance inner nodes are
+  /// edited through instance overrides, never in place.
+  editInsideInstance,
 
   /// The document could not be parsed at all (`loadDocument`).
   invalidDocument,

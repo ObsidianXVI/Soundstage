@@ -98,7 +98,6 @@ ir.StageDocument docWithRoot(
 }) => ir.StageDocument(
   id: 'doc',
   breakpoints: breakpoints,
-  baseBreakpointId: breakpoints.first.id,
   scenes: [ir.Scene(id: 's', root: root, kind: kind)],
 );
 

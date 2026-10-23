@@ -245,7 +245,6 @@ void main() {
     const doc = ir.StageDocument(
       id: 'd',
       breakpoints: [],
-      baseBreakpointId: '',
       meta: ir.StageMeta(title: 'Night Songs', description: 'A test'),
       audioTracks: [ir.AudioTrack(id: 'a', assetId: 'clip', autoplay: true)],
       assets: {'clip': _clip},

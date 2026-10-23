@@ -8,7 +8,8 @@
       "designSize": {
         "width": 1440.0,
         "height": 900.0
-      }
+      },
+      "primary": true
     },
     {
       "id": "mobile",
@@ -17,10 +18,10 @@
       "designSize": {
         "width": 390.0,
         "height": 844.0
-      }
+      },
+      "primary": true
     }
   ],
-  "baseBreakpointId": "desktop",
   "schemaVersion": 1,
   "meta": {
     "title": "Motion demo (T0.6)",
@@ -157,6 +158,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "mobile": {
               "width": {
@@ -250,6 +252,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -366,6 +369,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -481,6 +485,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -570,6 +575,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -659,6 +665,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -748,6 +755,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -837,6 +845,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -923,6 +932,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -1044,6 +1054,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -1692,7 +1703,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "interlude",
@@ -1737,6 +1749,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {},
           "bindings": {},
           "componentBindings": {},
@@ -1820,6 +1833,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -1922,6 +1936,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -2009,6 +2024,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -2185,7 +2201,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "pulse",
@@ -2230,6 +2247,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "mobile": {
               "width": {
@@ -2323,6 +2341,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -2428,6 +2447,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -2533,6 +2553,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -2638,6 +2659,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -2755,6 +2777,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "width": {
@@ -2842,6 +2865,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -2950,6 +2974,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -3058,6 +3083,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -3166,6 +3192,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -3274,6 +3301,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -3382,6 +3410,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {
                     "mobile": {
                       "x": {
@@ -4330,7 +4359,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "bridge",
@@ -4375,6 +4405,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {},
           "bindings": {},
           "componentBindings": {},
@@ -4458,6 +4489,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -4560,6 +4592,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -4647,6 +4680,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -4815,7 +4849,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "tiles",
@@ -4860,6 +4895,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {
             "mobile": {
               "width": {
@@ -4953,6 +4989,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {
                 "mobile": {
                   "x": {
@@ -5040,6 +5077,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5126,6 +5164,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5212,6 +5251,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5298,6 +5338,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5384,6 +5425,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5470,6 +5512,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5556,6 +5599,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5642,6 +5686,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5728,6 +5773,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5814,6 +5860,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5900,6 +5947,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -5986,6 +6034,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6072,6 +6121,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6158,6 +6208,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6244,6 +6295,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6330,6 +6382,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6416,6 +6469,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6502,6 +6556,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6588,6 +6643,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6674,6 +6730,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6760,6 +6817,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6846,6 +6904,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -6932,6 +6991,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7018,6 +7078,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7104,6 +7165,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7190,6 +7252,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7276,6 +7339,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7362,6 +7426,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7448,6 +7513,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7534,6 +7600,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7620,6 +7687,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7706,6 +7774,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7792,6 +7861,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7878,6 +7948,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -7964,6 +8035,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8050,6 +8122,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8136,6 +8209,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8222,6 +8296,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8308,6 +8383,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8394,6 +8470,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8480,6 +8557,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8566,6 +8644,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8652,6 +8731,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8738,6 +8818,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8824,6 +8905,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8910,6 +8992,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -8996,6 +9079,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9082,6 +9166,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9168,6 +9253,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9254,6 +9340,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9340,6 +9427,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9426,6 +9514,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9512,6 +9601,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9598,6 +9688,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9684,6 +9775,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -9770,6 +9862,7 @@
                     }
                   },
                   "mask": "none",
+                  "role": "none",
                   "breakpointOverrides": {},
                   "bindings": {},
                   "componentBindings": {},
@@ -23451,7 +23544,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     },
     {
       "id": "coda",
@@ -23496,6 +23590,7 @@
             }
           },
           "mask": "none",
+          "role": "none",
           "breakpointOverrides": {},
           "bindings": {},
           "componentBindings": {},
@@ -23579,6 +23674,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -23681,6 +23777,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -23768,6 +23865,7 @@
                 }
               },
               "mask": "none",
+              "role": "none",
               "breakpointOverrides": {},
               "bindings": {},
               "componentBindings": {},
@@ -23936,7 +24034,8 @@
       "transitionIn": {
         "kind": "none",
         "amount": 0.0
-      }
+      },
+      "exportAs": "auto"
     }
   ],
   "audioTracks": []

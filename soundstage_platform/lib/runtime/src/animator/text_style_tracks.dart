@@ -137,6 +137,7 @@ class TextStyleChannel {
       }
     }
     final inv = switch (match.descriptor.invalidation) {
+      ir.Invalidation.none => StageInvalidation.none,
       ir.Invalidation.layout => StageInvalidation.layout,
       ir.Invalidation.paint ||
       ir.Invalidation.compositing => StageInvalidation.paint,

@@ -86,13 +86,13 @@ ir.ResolvedDocument slotTrackDocument() {
   ];
   final doc = ir.StageDocument(
     id: 'bench',
-    baseBreakpointId: 'd',
     breakpoints: const [
       ir.Breakpoint(
         id: 'd',
         name: 'D',
         minWidth: 0,
         designSize: ir.StageSize(width: 800, height: 600),
+        primary: true,
       ),
     ],
     scenes: [
@@ -223,13 +223,13 @@ ir.ResolvedDocument mixedTrackDocument() {
   ];
   final doc = ir.StageDocument(
     id: 'bench',
-    baseBreakpointId: 'd',
     breakpoints: const [
       ir.Breakpoint(
         id: 'd',
         name: 'D',
         minWidth: 0,
         designSize: ir.StageSize(width: 800, height: 600),
+        primary: true,
       ),
     ],
     scenes: [

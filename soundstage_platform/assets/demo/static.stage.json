@@ -1,7 +1,6 @@
 {
   "schemaVersion": 1,
   "id": "demo-static",
-  "baseBreakpointId": "desktop",
   "meta": {
     "title": "Static demo (T0.4)",
     "slug": "static-demo",
@@ -17,7 +16,8 @@
       "designSize": {
         "width": 1440,
         "height": 900
-      }
+      },
+      "primary": true
     },
     {
       "id": "tablet",
@@ -26,7 +26,9 @@
       "designSize": {
         "width": 834,
         "height": 1112
-      }
+      },
+      "primary": false,
+      "inheritsFrom": "desktop"
     },
     {
       "id": "mobile",
@@ -35,7 +37,8 @@
       "designSize": {
         "width": 390,
         "height": 844
-      }
+      },
+      "primary": true
     }
   ],
   "fonts": {
@@ -2956,6 +2959,13 @@
                       }
                     },
                     "mobile": {
+                      "autoLayout.gap": {
+                        "type": "gap",
+                        "value": {
+                          "type": "fixed",
+                          "value": 16
+                        }
+                      },
                       "autoLayout.direction": {
                         "type": "enum",
                         "value": "vertical"

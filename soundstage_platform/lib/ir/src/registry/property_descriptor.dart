@@ -44,6 +44,10 @@ enum IrValueType {
 /// What a runtime must redo when a property changes (architecture §11.2,
 /// §14).
 enum Invalidation {
+  /// Nothing: the property never affects rendering (names, the editor-only
+  /// lock, semantic roles, reading order, alt text).
+  none,
+
   /// Repaint only (colours, blur radii, shadows, blend, corners).
   paint,
 

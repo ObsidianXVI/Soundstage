@@ -19,6 +19,15 @@ enum SceneKind { pinned, flow }
 @JsonEnum()
 enum SceneTransitionKind { none, overlap, crossfade }
 
+/// How a scene is exported to static formats (architecture §16.1): `auto`
+/// is `text` when the scene has role-bearing nodes and `poster` otherwise.
+@JsonEnum()
+enum SceneExportMode { auto, text, poster }
+
+/// The clock value a scene's poster frame is rendered at when
+/// `Scene.posterClock` is null.
+const double kDefaultPosterClock = 0.5;
+
 /// How a scene enters over the previous one (runtime: M3). `amount` is in
 /// viewport heights.
 @freezed
@@ -41,6 +50,9 @@ abstract class SceneTransition with _$SceneTransition {
 ///   `TimelineClock` entries of this list (see `lib/ir/README.md`).
 /// - `background`: paint stack behind the stage.
 /// - `modeOverrides`: `{ collectionId: modeId }`.
+/// - `exportAs`: static export mode (§16.1).
+/// - `posterClock`: the clock value (0–1) of the scene's poster frame; null
+///   means [kDefaultPosterClock]. See [effectivePosterClock].
 @freezed
 abstract class Scene with _$Scene {
   const factory Scene({
@@ -54,6 +66,8 @@ abstract class Scene with _$Scene {
     @Default(<Paint>[]) List<Paint> background,
     @Default(<String, String>{}) Map<String, String> modeOverrides,
     @Default(SceneTransition()) SceneTransition transitionIn,
+    @Default(SceneExportMode.auto) SceneExportMode exportAs,
+    double? posterClock,
   }) = _Scene;
 
   const Scene._();
@@ -86,6 +100,9 @@ abstract class Scene with _$Scene {
   }
 
   factory Scene.fromJson(Map<String, dynamic> json) => _$SceneFromJson(json);
+
+  /// [posterClock], or [kDefaultPosterClock] when unset.
+  double get effectivePosterClock => posterClock ?? kDefaultPosterClock;
 
   /// The timeline clocks of this scene.
   Iterable<TimelineClock> get timelines => clocks.whereType<TimelineClock>();

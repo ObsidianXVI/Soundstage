@@ -31,7 +31,6 @@ ir.Track _track(String property, String clock, ir.IrValue a, ir.IrValue b) =>
 ir.StageDocument _doc(List<ir.Track> tracks) => ir.StageDocument(
   id: 'doc',
   breakpoints: const [_bp],
-  baseBreakpointId: 'only',
   scenes: [
     ir.Scene(
       id: 's',

@@ -6,10 +6,29 @@ const blue = StageColor(r: 0, g: 0, b: 1);
 const green = StageColor(r: 0, g: 1, b: 0);
 
 const size = StageSize(width: 1000, height: 800);
+/// A chain: mobile inherits tablet, which inherits desktop.
 const breakpoints = [
-  Breakpoint(id: 'desktop', name: 'Desktop', minWidth: 1024, designSize: size),
-  Breakpoint(id: 'tablet', name: 'Tablet', minWidth: 600, designSize: size),
-  Breakpoint(id: 'mobile', name: 'Mobile', minWidth: 0, designSize: size),
+  Breakpoint(
+    id: 'desktop',
+    name: 'Desktop',
+    minWidth: 1024,
+    designSize: size,
+    primary: true,
+  ),
+  Breakpoint(
+    id: 'tablet',
+    name: 'Tablet',
+    minWidth: 600,
+    designSize: size,
+    inheritsFrom: 'desktop',
+  ),
+  Breakpoint(
+    id: 'mobile',
+    name: 'Mobile',
+    minWidth: 0,
+    designSize: size,
+    inheritsFrom: 'tablet',
+  ),
 ];
 
 TokenRef ref(String id) => TokenRef(variableId: id);
@@ -247,7 +266,6 @@ ShapeNode shape(
 StageDocument buildDoc() => StageDocument(
   id: 'doc',
   breakpoints: breakpoints,
-  baseBreakpointId: 'desktop',
   tokens: tokens,
   components: components,
   variantSets: variantSets,
@@ -356,7 +374,9 @@ StageDocument buildDoc() => StageDocument(
           bp: const {
             'tablet': {'x': IrValue.number(10), 'y': IrValue.number(5)},
             'mobile': {'x': IrValue.number(20), 'nope.path': IrValue.number(1)},
-            'desktop': {'x': IrValue.number(999)}, // base patch: never applied
+            // Shared base: desktop's own patch applies to desktop (and to its
+            // descendants in the chain, which override x again).
+            'desktop': {'x': IrValue.number(999)},
           },
         ),
         shape(
@@ -498,9 +518,9 @@ void main() {
   });
 
   group('breakpoints', () {
-    test('patches cascade from the base in order', () {
+    test('patches apply along the inheritsFrom chain, root first', () {
       expect(desktop.breakpoint!.id, 'desktop');
-      expect(nodeOf<ShapeNode>(desktop, 'bpNode').common.x, 0);
+      expect(nodeOf<ShapeNode>(desktop, 'bpNode').common.x, 999);
       final tablet = resolveAt('tablet');
       expect(
         (
@@ -708,12 +728,15 @@ void main() {
 
     test('broken documents never throw', () {
       final empty = resolveDocument(
-        const StageDocument(id: 'x', breakpoints: [], baseBreakpointId: 'gone'),
+        const StageDocument(id: 'x', breakpoints: []),
       );
       expect(empty.breakpoint, isNull);
       final dangling = resolveDocument(
         buildDoc().copyWith(
-          baseBreakpointId: 'gone',
+          breakpoints: [
+            buildDoc().breakpoints.first.copyWith(inheritsFrom: 'gone'),
+            ...buildDoc().breakpoints.skip(1),
+          ],
           components: const {},
           tokens: const TokenSystem(),
         ),

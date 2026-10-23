@@ -71,7 +71,9 @@ abstract class ResolvedParagraph with _$ResolvedParagraph {
 /// - `instanceId`: the namespaced id of the innermost instance the node
 ///   belongs to (its own id for an instance root); null outside instances.
 /// - `paragraphs`: text nodes only — every span with its merged style.
-///   `(node as TextNode).style` is the merged base style.
+/// - `textStyle`: text nodes only — the node-level merged style (document
+///   default ⊕ named style ⊕ node override), before paragraph and span
+///   styles. `(node as TextNode).style` itself is emptied.
 /// - `modes`: the active mode per variable collection at this node.
 /// - `isPlaceholder`: the node stands in for something that failed to
 ///   resolve (missing component, component cycle); there is a diagnostic.
@@ -85,6 +87,7 @@ abstract class ResolvedNode with _$ResolvedNode {
     String? sourceComponentId,
     String? instanceId,
     List<ResolvedParagraph>? paragraphs,
+    TextStyle? textStyle,
     @Default(<String, String>{}) Map<String, String> modes,
     @Default(false) bool isPlaceholder,
   }) = _ResolvedNode;
@@ -110,6 +113,8 @@ abstract class ResolvedScene with _$ResolvedScene {
 
     /// Active modes at the scene level.
     required Map<String, String> modes,
+    @Default(SceneExportMode.auto) SceneExportMode exportAs,
+    double? posterClock,
   }) = _ResolvedScene;
 }
 

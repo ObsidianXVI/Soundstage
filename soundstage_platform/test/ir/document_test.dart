@@ -12,19 +12,23 @@ void main() {
   group('StageDocument.empty', () {
     final doc = StageDocument.empty(ids: IdGenerator.seeded(7));
 
-    test('has desktop/tablet/mobile breakpoints with desktop as base', () {
+    test('has primary desktop and mobile peers and a tablet under desktop', () {
       expect(doc.breakpoints.map((b) => b.name), [
         'Desktop',
-        'Tablet',
         'Mobile',
+        'Tablet',
       ]);
-      expect(doc.breakpoints.map((b) => b.minWidth), [1024, 600, 0]);
+      expect(doc.breakpoints.map((b) => b.minWidth), [1024, 0, 600]);
       expect(doc.breakpoints.map((b) => b.designSize), const [
         StageSize(width: 1440, height: 900),
-        StageSize(width: 834, height: 1112),
         StageSize(width: 390, height: 844),
+        StageSize(width: 834, height: 1112),
       ]);
-      expect(doc.baseBreakpoint.name, 'Desktop');
+      expect(doc.primaryBreakpoints.map((b) => b.name), ['Desktop', 'Mobile']);
+      expect(doc.breakpoints[0].inheritsFrom, isNull);
+      expect(doc.breakpoints[1].inheritsFrom, isNull);
+      expect(doc.breakpoints[2].inheritsFrom, doc.breakpoints[0].id);
+      expect(validateDocument(doc), isEmpty);
       expect(doc.schemaVersion, kStageSchemaVersion);
       expect(doc.scenes, isEmpty);
       expect(doc.tokens, const TokenSystem());
@@ -48,7 +52,7 @@ void main() {
   test('Scene.blankPinned sizes its root to the breakpoint viewport', () {
     final ids = IdGenerator.seeded(3);
     final doc = StageDocument.empty(ids: ids);
-    final mobile = doc.breakpoints.last;
+    final mobile = doc.breakpoints.firstWhere((b) => b.name == 'Mobile');
     final scene = Scene.blankPinned(
       ids: ids,
       breakpoint: mobile,
@@ -83,7 +87,6 @@ void main() {
       final doc = StageDocument.fromJson({
         'schemaVersion': 1,
         'id': 'd',
-        'baseBreakpointId': 'bp',
         'breakpoints': [
           {
             'id': 'bp',

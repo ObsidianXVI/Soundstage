@@ -30,7 +30,6 @@ ir.StageDocument _doc(
 }) => ir.StageDocument(
   id: 'doc',
   breakpoints: const [_bp],
-  baseBreakpointId: 'only',
   audioTracks: audio,
   scenes: [
     ir.Scene(
