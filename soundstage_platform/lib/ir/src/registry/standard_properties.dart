@@ -36,6 +36,7 @@ const Set<NodeKind> _strokeKinds = {..._appearanceKinds, NodeKind.text};
 const Invalidation _paint = Invalidation.paint;
 const Invalidation _layout = Invalidation.layout;
 const Invalidation _compositing = Invalidation.compositing;
+const Invalidation _none = Invalidation.none;
 
 final Codec<BlendMode> _blendC = enumC(BlendMode.values);
 
@@ -152,6 +153,7 @@ void _commonProps(_Builder b) {
     _all,
     c(strC, (c) => c.name, (c, v) => c.copyWith(name: v)),
     animatable: false,
+    inv: _none,
   );
   b.add(
     'visible',
@@ -164,6 +166,7 @@ void _commonProps(_Builder b) {
     _all,
     c(boolC, (c) => c.locked, (c, v) => c.copyWith(locked: v)),
     animatable: false,
+    inv: _none,
   );
   b.add(
     'opacity',
@@ -211,6 +214,37 @@ void _commonProps(_Builder b) {
     _all,
     c(enumC(MaskMode.values), (c) => c.mask, (c, v) => c.copyWith(mask: v)),
     animatable: false,
+  );
+
+  // Semantics (§4.2, §16.1): never affect rendering.
+  b.add(
+    'role',
+    _all,
+    c(enumC(NodeRole.values), (c) => c.role, (c, v) => c.copyWith(role: v)),
+    animatable: false,
+    inv: _none,
+  );
+  b.add(
+    'readingOrder',
+    _all,
+    _common.leaf(
+      optField(
+        intC(),
+        (c) => c.readingOrder,
+        (c, v) => c.copyWith(readingOrder: v),
+      ),
+    ),
+    animatable: false,
+    inv: _none,
+  );
+  b.add(
+    'altText',
+    _all,
+    _common.leaf(
+      optField(strC, (c) => c.altText, (c, v) => c.copyWith(altText: v)),
+    ),
+    animatable: false,
+    inv: _none,
   );
 
   // motion.* — paint-only transform.

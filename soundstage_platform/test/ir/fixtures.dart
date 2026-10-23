@@ -242,6 +242,9 @@ NodeCommon common(String id, {String name = ''}) => NodeCommon(
   motion: motionTransform,
   layoutChild: layoutChild,
   mask: MaskMode.luminance,
+  role: NodeRole.figure,
+  readingOrder: 3,
+  altText: 'A lighthouse at dusk',
   breakpointOverrides: const {
     'bpMobile': {
       'opacity': IrValue.number(1),
@@ -704,6 +707,8 @@ StageDocument compositeDocument() {
     name: 'Hero',
     kind: SceneKind.pinned,
     scrollLength: 2.5,
+    exportAs: SceneExportMode.poster,
+    posterClock: 0.25,
     root: fullFrame(
       'nStage1',
       children: [

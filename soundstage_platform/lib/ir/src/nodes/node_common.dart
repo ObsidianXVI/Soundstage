@@ -35,6 +35,26 @@ enum GridAlign { start, center, end, stretch }
 @JsonEnum()
 enum MaskMode { none, alpha, luminance }
 
+/// The semantic role of a node (architecture §4.2). Roles never affect
+/// rendering: they drive static exports (§16.1) and screen-reader semantics.
+@JsonEnum()
+enum NodeRole {
+  none,
+  heading1,
+  heading2,
+  heading3,
+  heading4,
+  heading5,
+  heading6,
+  paragraph,
+  quote,
+  caption,
+  figure,
+
+  /// Skipped by exports and hidden from assistive technology.
+  decorative,
+}
+
 /// Paint-only transform, like CSS `transform`; never affects layout
 /// (architecture §4.2). Origin is normalised in the node box.
 @freezed
@@ -115,6 +135,10 @@ abstract class LayoutChild with _$LayoutChild {
 /// - `componentBindings`: `{ PropertyPath: componentPropId }` for nodes
 ///   inside a component's root (§9).
 /// - `interactions`: triggers and actions (§10.3, runtime M3).
+/// - `role`, `readingOrder`, `altText`: semantics for exports and
+///   accessibility (§4.2, §16.1). They never affect rendering. A null
+///   `readingOrder` means tree order; `altText` is meant for figures and
+///   image-bearing frames.
 @freezed
 abstract class NodeCommon with _$NodeCommon {
   const factory NodeCommon({
@@ -136,6 +160,9 @@ abstract class NodeCommon with _$NodeCommon {
     @Default(MotionTransform()) MotionTransform motion,
     @Default(LayoutChild()) LayoutChild layoutChild,
     @Default(MaskMode.none) MaskMode mask,
+    @Default(NodeRole.none) NodeRole role,
+    int? readingOrder,
+    String? altText,
     @Default(<String, Patch>{}) Map<String, Patch> breakpointOverrides,
     @Default(<String, TokenRef>{}) Map<String, TokenRef> bindings,
     @Default(<String, String>{}) Map<String, String> componentBindings,

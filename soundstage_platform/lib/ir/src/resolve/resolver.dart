@@ -465,6 +465,8 @@ class _Pass {
       background: scene.background,
       transitionIn: scene.transitionIn,
       modes: modes,
+      exportAs: scene.exportAs,
+      posterClock: scene.posterClock,
     );
   }
 
@@ -724,8 +726,8 @@ class _Pass {
 
   /// The component root [root] placed by [inst]: the instance supplies its
   /// name (when set), visibility, geometry, transforms, layout-child settings,
-  /// mask and blend mode (when set); opacities multiply; interactions of
-  /// both apply. Everything else comes from the component.
+  /// mask, blend mode, role, reading order and alt text (each when set);
+  /// opacities multiply; interactions of both apply. Everything else comes from the component.
   FrameNode _place(FrameNode root, InstanceNode inst) {
     final r = root.common, i = inst.common;
     return root.copyWith(
@@ -745,6 +747,9 @@ class _Pass {
         motion: i.motion,
         layoutChild: i.layoutChild,
         mask: i.mask,
+        role: i.role == NodeRole.none ? r.role : i.role,
+        readingOrder: i.readingOrder ?? r.readingOrder,
+        altText: i.altText ?? r.altText,
         interactions: [...r.interactions, ...i.interactions],
       ),
     );

@@ -520,6 +520,8 @@ class DocGen {
         kind: _pick(SceneTransitionKind.values),
         amount: _frac(),
       ),
+      exportAs: _pick(SceneExportMode.values),
+      posterClock: _p(0.5) ? _frac() : null,
     );
   }
 
@@ -580,6 +582,9 @@ class DocGen {
             )
           : const LayoutChild(),
       mask: _p(0.1) ? MaskMode.alpha : MaskMode.none,
+      role: _p(0.5) ? _pick(NodeRole.values) : NodeRole.none,
+      readingOrder: _p(0.2) ? r.nextInt(20) : null,
+      altText: _p(0.2) ? 'alt $id' : null,
       breakpointOverrides: bpPatches,
       bindings: _p(0.2)
           ? const {'opacity': TokenRef(variableId: 'vOp')}

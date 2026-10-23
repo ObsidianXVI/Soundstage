@@ -110,6 +110,8 @@ abstract class ResolvedScene with _$ResolvedScene {
 
     /// Active modes at the scene level.
     required Map<String, String> modes,
+    @Default(SceneExportMode.auto) SceneExportMode exportAs,
+    double? posterClock,
   }) = _ResolvedScene;
 }
 

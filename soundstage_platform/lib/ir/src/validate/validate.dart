@@ -520,6 +520,15 @@ class _Validator {
 
   void _scene(Scene s, String loc, Set<String> seen) {
     _modeMap(s.modeOverrides, '$loc.modeOverrides');
+    final poster = s.posterClock;
+    if (poster != null && !(poster >= 0 && poster <= 1)) {
+      _d(
+        IrDiagnosticKind.invalidValue,
+        'Poster clock $poster of scene "${s.id}" is outside 0–1.',
+        '$loc.posterClock',
+        severity: IrSeverity.warning,
+      );
+    }
     _paints(s.background, '$loc.background');
     for (final (i, c) in s.clocks.indexed) {
       final cl = '$loc.clocks[$i]';

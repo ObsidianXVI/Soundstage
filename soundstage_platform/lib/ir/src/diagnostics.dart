@@ -42,6 +42,10 @@ enum IrDiagnosticKind {
   /// A referenced asset exists but has the wrong kind.
   wrongAssetKind,
 
+  /// A value is outside its meaningful range (e.g. a scene's `posterClock`
+  /// outside 0–1).
+  invalidValue,
+
   /// The document could not be parsed at all (`loadDocument`).
   invalidDocument,
 
