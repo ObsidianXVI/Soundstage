@@ -4,6 +4,15 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../persistence/records.dart' show RevisionInfo, StoryNotFoundException;
+
+export '../persistence/records.dart'
+    show
+        ReadOnlyStoryException,
+        RevisionInfo,
+        StorageFullException,
+        StoryNotFoundException;
+
 /// A story as listed on the home page.
 class StorySummary {
   const StorySummary({
@@ -25,11 +34,42 @@ class StorySummary {
   final bool bundled;
 }
 
-/// Where stories live. T1.1 ships the in-memory implementation; T1.11
-/// replaces it with IndexedDB persistence behind this same interface.
+/// The outcome of opening a story: the document plus what the load found
+/// (architecture §17.2: documents never fail to open).
+class StoryLoad {
+  const StoryLoad({
+    this.document,
+    this.diagnostics = const [],
+    this.headRevision,
+    this.recoveredFromRevision,
+    this.readOnly = false,
+  });
+
+  /// Null only when neither the head nor any older revision could be read.
+  final ir.StageDocument? document;
+
+  /// Findings of `loadDocument` for the revision that was opened.
+  final List<ir.IrDiagnostic> diagnostics;
+
+  /// The revision that was opened (null for bundled demos).
+  final int? headRevision;
+
+  /// Set when the stored head could not be read and this older revision was
+  /// opened instead. The caller should tell the author.
+  final int? recoveredFromRevision;
+
+  /// Bundled demos open read-only.
+  final bool readOnly;
+
+  bool get recovered => recoveredFromRevision != null;
+}
+
+/// Where stories live: [InMemoryStoryRepository] for tests and as the
+/// fallback when browser storage is unavailable, `IndexedDbStoryRepository`
+/// (T1.11) in the app.
 ///
-/// Implementations never throw from [load] for a missing story (they return
-/// null).
+/// Implementations never throw from [load] or [open] for a missing or
+/// corrupt story (they return null or a [StoryLoad] without a document).
 abstract interface class StoryRepository {
   /// All stories, most recently updated first.
   Future<List<StorySummary>> list();
@@ -46,6 +86,28 @@ abstract interface class StoryRepository {
   Future<void> rename(String id, String title);
 
   Future<void> delete(String id);
+
+  /// Opens [id] with diagnostics and recovery information, or null if there
+  /// is no such story. Never throws.
+  Future<StoryLoad?> open(String id);
+
+  /// Whether [id] cannot be saved to (bundled demos).
+  bool isReadOnly(String id);
+
+  /// The stored revisions of [id], newest first. Empty where the repository
+  /// keeps no history.
+  Future<List<RevisionInfo>> revisions(String id);
+
+  /// Makes revision [rev] the current one by saving its content as a new
+  /// revision (history is never rewritten).
+  Future<void> restore(String id, int rev);
+
+  /// Copies [id] (a demo or one of the author's stories) into a new story
+  /// with its own id, including its assets.
+  Future<StorySummary> duplicate(String id);
+
+  /// Stores [document] as a new story with a fresh id and returns it.
+  Future<StorySummary> createFrom(ir.StageDocument document);
 }
 
 /// A bundled demo story: route id, title and asset path.
@@ -186,6 +248,45 @@ class InMemoryStoryRepository implements StoryRepository {
     _own.remove(id);
     _docs.remove(id);
     if (_bundled(id) != null) _deletedBundled.add(id);
+  }
+
+  @override
+  Future<StoryLoad?> open(String id) async {
+    final doc = await load(id);
+    if (doc == null) return null;
+    return StoryLoad(document: doc, diagnostics: ir.validateDocument(doc));
+  }
+
+  @override
+  bool isReadOnly(String id) => false;
+
+  @override
+  Future<List<RevisionInfo>> revisions(String id) async => const [];
+
+  @override
+  Future<void> restore(String id, int rev) async {}
+
+  @override
+  Future<StorySummary> duplicate(String id) async {
+    final doc = await load(id);
+    if (doc == null) throw StoryNotFoundException(id);
+    final title = _own[id]?.title ?? _renamed[id] ?? doc.meta.title;
+    return createFrom(doc.copyWith(meta: doc.meta.copyWith(title: title)));
+  }
+
+  @override
+  Future<StorySummary> createFrom(ir.StageDocument document) async {
+    final id = ir.IdGenerator().next();
+    final doc = document.copyWith(id: id);
+    final summary = StorySummary(
+      id: id,
+      title: doc.meta.title.isEmpty ? 'Untitled story' : doc.meta.title,
+      updatedAt: _now(),
+      sceneCount: doc.scenes.length,
+    );
+    _docs[id] = doc;
+    _own[id] = summary;
+    return summary;
   }
 }
 

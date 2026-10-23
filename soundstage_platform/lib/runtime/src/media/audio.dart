@@ -39,11 +39,34 @@ abstract class StageAudioBackend {
 class JustAudioBackend implements StageAudioBackend {
   final ja.AudioPlayer _player = ja.AudioPlayer();
 
+  String? _heldLocalId;
+  LocalAssetLoader? _heldFrom;
+
+  void _releaseLocal() {
+    final id = _heldLocalId;
+    if (id != null) _heldFrom?.releaseObjectUrl(id);
+    _heldLocalId = null;
+    _heldFrom = null;
+  }
+
   @override
   Future<void> load(String uri) async {
     final path = bundledAssetPath(uri);
+    final localId = localAssetId(uri);
     if (path != null) {
       await _player.setAsset(path);
+    } else if (localId != null) {
+      // A media element needs a URL: hold an object URL while this source
+      // is loaded and revoke it when the backend moves on or is disposed.
+      final loader = StageAssetResolver.defaultLocal;
+      final url = await loader?.acquireObjectUrl(localId);
+      if (loader == null || url == null) {
+        throw StateError('Local audio "$localId" is missing.');
+      }
+      _releaseLocal();
+      _heldLocalId = localId;
+      _heldFrom = loader;
+      await _player.setUrl(url);
     } else {
       await _player.setUrl(uri);
     }
@@ -85,7 +108,10 @@ class JustAudioBackend implements StageAudioBackend {
   }
 
   @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> dispose() async {
+    await _player.dispose();
+    _releaseLocal();
+  }
 }
 
 /// How far the interpolated audio clock may drift from the player before it
