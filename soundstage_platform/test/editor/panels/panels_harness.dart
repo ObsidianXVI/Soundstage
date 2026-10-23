@@ -187,3 +187,27 @@ SsTreeRow rowWidget(WidgetTester tester, String label) =>
     tester.widget<SsTreeRow>(rowOf(label));
 
 Finder glyph(IconData i) => find.text(String.fromCharCode(i.codePoint));
+
+/// [panelsDoc] plus a third scene "Three" (flow, root3 [D]).
+ir.StageDocument threeScenesDoc() {
+  final d = panelsDoc();
+  return d.copyWith(
+    scenes: [
+      ...d.scenes,
+      ir.Scene(
+        id: 's3',
+        name: 'Three',
+        kind: ir.SceneKind.flow,
+        root: ir.FrameNode(
+          common: const ir.NodeCommon(id: 'root3', width: 1000, height: 800),
+          children: [shape('D')],
+        ),
+        clocks: const [ir.Clock.sceneScroll(id: 'clk3', sceneId: 's3')],
+      ),
+    ],
+  );
+}
+
+List<String> sceneIds(ir.StageDocument doc) => [
+  for (final s in doc.scenes) s.id,
+];

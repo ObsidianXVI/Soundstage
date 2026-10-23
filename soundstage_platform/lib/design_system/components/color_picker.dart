@@ -731,6 +731,7 @@ class SsColorField extends StatefulWidget {
     required this.color,
     required this.onChanged,
     this.mixed = false,
+    this.placeholder = 'Mixed',
     this.semanticLabel = 'Colour',
     this.onChangeStart,
     this.onChangeEnd,
@@ -740,6 +741,9 @@ class SsColorField extends StatefulWidget {
   final Color color;
   final ValueChanged<Color> onChanged;
   final bool mixed;
+
+  /// The hint shown while [mixed] ("None" for an absent colour).
+  final String placeholder;
   final String semanticLabel;
   final VoidCallback? onChangeStart;
   final VoidCallback? onChangeEnd;
@@ -821,7 +825,7 @@ class _SsColorFieldState extends State<SsColorField> {
               bare: true,
               controller: _text,
               focusNode: _focus,
-              placeholder: widget.mixed ? 'Mixed' : null,
+              placeholder: widget.mixed ? widget.placeholder : null,
               semanticLabel: '${widget.semanticLabel} hex',
               revertOnEscape: true,
               selectAllOnFocus: true,

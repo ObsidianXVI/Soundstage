@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/editor/core/editor_controller.dart';
 import 'package:soundstage_platform/editor/shell/content_mode_screen.dart';
 import 'package:soundstage_platform/editor/shell/editor_layout.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
@@ -41,7 +42,9 @@ Future<ProviderContainer> _pump(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final container = ProviderContainer();
+  final container = ProviderContainer(
+    overrides: [initialDocumentProvider.overrideWithValue(_doc())],
+  );
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(

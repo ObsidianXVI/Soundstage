@@ -1,4 +1,3 @@
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -197,7 +196,13 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -20000));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byType(SsTreeRow).evaluate().length, lessThan(40));
-      debugPrint('layers: built $built of ${all.length} rows');
+      final sw = Stopwatch()..start();
+      final scene = c.read(resolvedForProvider('desktop')).scene('s1')!;
+      flattenLayers(scene.root, c.read(layersExpansionProvider));
+      debugPrint(
+        'layers: built $built of ${all.length} rows; flatten '
+        '${sw.elapsedMicroseconds / 1000} ms',
+      );
     });
   });
 
