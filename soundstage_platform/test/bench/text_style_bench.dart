@@ -43,10 +43,7 @@ void main() {
         ir.Paragraph(
           spans: [
             ir.Span(text: 'Lights go '),
-            ir.Span(
-              text: 'low',
-              style: ir.TextStyleOverride(italic: true),
-            ),
+            ir.Span(text: 'low', style: ir.TextStyleOverride(italic: true)),
           ],
         ),
         ir.Paragraph(spans: [ir.Span(text: 'across the stage')]),
@@ -56,7 +53,9 @@ void main() {
     final paras = [
       for (final p in node.content)
         ir.ResolvedParagraph(
-          spans: [for (final s in p.spans) ir.ResolvedSpan(text: s.text, style: base)],
+          spans: [
+            for (final s in p.spans) ir.ResolvedSpan(text: s.text, style: base),
+          ],
           alignHorizontal: ir.TextAlignHorizontal.left,
           paragraphSpacing: 0,
           paragraphIndent: 0,
@@ -133,11 +132,11 @@ void main() {
           e.key: (e.value - (a[e.key] ?? 0)) / _changes,
     };
     final total = rates.values.fold(0.0, (x, y) => x + y);
-    final top = (rates.entries.toList()
-          ..sort((x, y) => y.value.compareTo(x.value)))
-        .take(12)
-        .map((e) => '${e.key} ${e.value.toStringAsFixed(2)}')
-        .join(', ');
+    final top =
+        (rates.entries.toList()..sort((x, y) => y.value.compareTo(x.value)))
+            .take(12)
+            .map((e) => '${e.key} ${e.value.toStringAsFixed(2)}')
+            .join(', ');
     // ignore: avoid_print
     print(
       'animated text style: ${total.toStringAsFixed(1)} Dart allocations '

@@ -6,8 +6,15 @@ import 'package:soundstage_platform/ir/ir.dart';
 /// bindings, a named text style and breakpoint patches.
 ///
 /// [cards] controls the size; [documentOfNodes] searches for a card count
-/// whose *resolved* tree has about the wanted number of nodes.
-StageDocument benchDocument({required int cards, int scenes = 8}) {
+/// whose *resolved* tree has about the wanted number of nodes. With
+/// [freeLayer], each scene also gets a free frame (no auto layout) of
+/// absolutely placed shapes with mixed constraints, the kind of node a
+/// canvas drag moves.
+StageDocument benchDocument({
+  required int cards,
+  int scenes = 8,
+  bool freeLayer = false,
+}) {
   var n = 0;
   String id(String p) => '$p${n++}';
 
@@ -195,6 +202,34 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
             ],
           ),
           ...sections,
+          if (freeLayer)
+            FrameNode(
+              common: NodeCommon(id: 'free$s', width: 1440, height: 600),
+              children: [
+                for (var k = 0; k < 8; k++)
+                  ShapeNode(
+                    common: NodeCommon(
+                      id: 'free${s}_$k',
+                      x: 40.0 + 160 * k,
+                      y: 30.0 + 50 * (k % 4),
+                      width: 120,
+                      height: 80,
+                      layoutChild: LayoutChild(
+                        positioning: Positioning.absolute,
+                        constraints: Constraints(
+                          horizontal: HorizontalConstraint.values[k % 5],
+                        ),
+                      ),
+                      breakpointOverrides: {
+                        'mobile': {'x': IrValue.number(10.0 + 20 * k)},
+                      },
+                    ),
+                    appearance: const Appearance(
+                      fills: [Paint.solid(id: 'f0', color: StageColor.black)],
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
       clocks: [Clock.sceneScroll(id: 'cl$s', sceneId: sid)],
@@ -245,7 +280,10 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
         ),
         'tsBody': TextStyleDef(
           name: 'Body',
-          style: TextStyleOverride(fontSize: 16, lineHeight: LineHeight.percent(150)),
+          style: TextStyleOverride(
+            fontSize: 16,
+            lineHeight: LineHeight.percent(150),
+          ),
         ),
       },
     ),
@@ -261,15 +299,23 @@ StageDocument benchDocument({required int cards, int scenes = 8}) {
 }
 
 /// A bench document whose resolved tree has about [target] nodes.
-StageDocument documentOfNodes(int target, {int scenes = 8}) {
+StageDocument documentOfNodes(
+  int target, {
+  int scenes = 8,
+  bool freeLayer = false,
+}) {
   var cards = target ~/ 7;
   for (var i = 0; i < 8; i++) {
-    final doc = benchDocument(cards: cards, scenes: scenes);
+    final doc = benchDocument(
+      cards: cards,
+      scenes: scenes,
+      freeLayer: freeLayer,
+    );
     final count = resolveDocument(doc).nodeIndex.length;
     if ((count - target).abs() <= target * 0.01) return doc;
     cards = (cards * target / count).round();
   }
-  return benchDocument(cards: cards, scenes: scenes);
+  return benchDocument(cards: cards, scenes: scenes, freeLayer: freeLayer);
 }
 
 /// [doc] with the opacity of node [nodeId] (a scene-level node) set to

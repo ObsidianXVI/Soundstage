@@ -98,66 +98,63 @@ void main() {
     },
   );
 
-  test(
-    'updateNode (path copy) + re-resolve stays under $_editBudgetMs ms',
-    () {
-      const warmup = 20;
-      const runs = 101;
-      final target = middleTextId(doc);
-      final resolver = Resolver()..resolve(doc);
-      var current = doc;
-      DocumentIndex.of(current); // the editor holds an index for its document
-      final editTimes = <double>[];
-      final resolveTimes = <double>[];
-      late ResolvedDocument previous;
-      late ResolvedDocument last;
-      for (var i = 0; i < warmup + runs; i++) {
-        final opacity = i.isEven ? 0.5 : 0.75;
-        final w = Stopwatch()..start();
-        final r = updateNode(
-          current,
-          target,
-          (n) => n.copyWith(common: n.common.copyWith(opacity: opacity)),
-        );
-        final editMs = _ms(w);
-        w
-          ..reset()
-          ..start();
-        previous = i == 0 ? resolver.resolve(current) : last;
-        last = resolver.resolve(r.document);
-        final resolveMs = _ms(w);
-        current = r.document;
-        if (i >= warmup) {
-          editTimes.add(editMs);
-          resolveTimes.add(resolveMs);
-        }
-      }
-      // Memo hits: every resolved node off the edited path is reused.
-      final path = {
-        ...DocumentIndex.of(current).locate(target)!.ancestorIds,
+  test('updateNode (path copy) + re-resolve stays under $_editBudgetMs ms', () {
+    const warmup = 20;
+    const runs = 101;
+    final target = middleTextId(doc);
+    final resolver = Resolver()..resolve(doc);
+    var current = doc;
+    DocumentIndex.of(current); // the editor holds an index for its document
+    final editTimes = <double>[];
+    final resolveTimes = <double>[];
+    late ResolvedDocument previous;
+    late ResolvedDocument last;
+    for (var i = 0; i < warmup + runs; i++) {
+      final opacity = i.isEven ? 0.5 : 0.75;
+      final w = Stopwatch()..start();
+      final r = updateNode(
+        current,
         target,
-      };
-      var reused = 0, fresh = 0;
-      last.nodeIndex.forEach((id, n) {
-        if (identical(previous.nodeIndex[id], n)) {
-          reused++;
-        } else {
-          fresh++;
-          expect(path.contains(id), isTrue, reason: '$id was re-resolved');
-        }
-      });
-      final e = _median(editTimes), rr = _median(resolveTimes);
-      // ignore: avoid_print
-      print(
-        'updateNode + re-resolve ($nodeCount nodes): edit median '
-        '${e.toStringAsFixed(3)} ms, re-resolve median '
-        '${rr.toStringAsFixed(3)} ms, $reused nodes reused, $fresh '
-        're-resolved (budget $_editBudgetMs ms)',
+        (n) => n.copyWith(common: n.common.copyWith(opacity: opacity)),
       );
-      expect(last, Resolver().resolve(current));
-      expect(e + rr, lessThan(_editBudgetMs));
-    },
-  );
+      final editMs = _ms(w);
+      w
+        ..reset()
+        ..start();
+      previous = i == 0 ? resolver.resolve(current) : last;
+      last = resolver.resolve(r.document);
+      final resolveMs = _ms(w);
+      current = r.document;
+      if (i >= warmup) {
+        editTimes.add(editMs);
+        resolveTimes.add(resolveMs);
+      }
+    }
+    // Memo hits: every resolved node off the edited path is reused.
+    final path = {
+      ...DocumentIndex.of(current).locate(target)!.ancestorIds,
+      target,
+    };
+    var reused = 0, fresh = 0;
+    last.nodeIndex.forEach((id, n) {
+      if (identical(previous.nodeIndex[id], n)) {
+        reused++;
+      } else {
+        fresh++;
+        expect(path.contains(id), isTrue, reason: '$id was re-resolved');
+      }
+    });
+    final e = _median(editTimes), rr = _median(resolveTimes);
+    // ignore: avoid_print
+    print(
+      'updateNode + re-resolve ($nodeCount nodes): edit median '
+      '${e.toStringAsFixed(3)} ms, re-resolve median '
+      '${rr.toStringAsFixed(3)} ms, $reused nodes reused, $fresh '
+      're-resolved (budget $_editBudgetMs ms)',
+    );
+    expect(last, Resolver().resolve(current));
+    expect(e + rr, lessThan(_editBudgetMs));
+  });
 
   test('explain with a warm memo stays under $_editBudgetMs ms', () {
     final target = middleTextId(doc);
