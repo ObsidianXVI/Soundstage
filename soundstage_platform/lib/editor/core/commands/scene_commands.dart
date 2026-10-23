@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../command.dart';
@@ -157,5 +159,84 @@ class UpdateSceneSettings extends EditCommand {
       return next == s ? s : next;
     });
     return resultOf(state, r, label: label, coalesceKey: coalesceKey);
+  }
+}
+
+/// Duplicates a scene right after the original, with fresh ids for the
+/// scene and everything inside it (nodes, clocks, tracks, paints,
+/// interactions), and makes the copy active. References inside the copy
+/// (a track's target, a scroll clock's scene, property paths naming a paint)
+/// follow the new ids; references to anything outside the scene (assets,
+/// components, tokens, other scenes) are kept.
+class DuplicateScene extends EditCommand {
+  const DuplicateScene(this.sceneId, {this.ids});
+
+  final String sceneId;
+  final ir.IdGenerator? ids;
+
+  @override
+  String get label => 'Duplicate scene';
+
+  @override
+  CommandResult apply(EditorState state) {
+    final doc = state.document;
+    final i = ir.DocumentIndex.of(doc).sceneIndexOf(sceneId);
+    if (i == null) {
+      return failedCommand(state, label, [
+        commandError('Scene "$sceneId" does not exist.'),
+      ]);
+    }
+    final gen = ids ?? ir.IdGenerator.forDocument(doc);
+    // A full JSON tree (the generated `toJson` leaves nested objects).
+    final json = jsonDecode(jsonEncode(doc.scenes[i]));
+    // Every `id` value inside the scene names something that needs a copy.
+    final idMap = <String, String>{};
+    void collect(Object? v) {
+      switch (v) {
+        case final Map<Object?, Object?> m:
+          for (final e in m.entries) {
+            if (e.key == 'id' && e.value is String) {
+              idMap.putIfAbsent(e.value! as String, gen.next);
+            }
+            collect(e.value);
+          }
+        case final Iterable<Object?> l:
+          l.forEach(collect);
+        default:
+      }
+    }
+
+    collect(json);
+    final token = RegExp(r'(?<![A-Za-z0-9_])[A-Za-z0-9_]+(?![A-Za-z0-9_])');
+    String remap(String s) =>
+        s.replaceAllMapped(token, (m) => idMap[m[0]] ?? m[0]!);
+    Object? rewrite(Object? v) => switch (v) {
+      final String s => remap(s),
+      final Map<Object?, Object?> m => <String, Object?>{
+        for (final e in m.entries)
+          // Keys are field names, except the generated-id ones.
+          (ir.isGeneratedId(e.key! as String)
+              ? remap(e.key! as String)
+              : e.key! as String): rewrite(
+            e.value,
+          ),
+      },
+      final List<Object?> l => [for (final x in l) rewrite(x)],
+      _ => v,
+    };
+    var copy = ir.Scene.fromJson(
+      (rewrite(json)! as Map<Object?, Object?>).cast<String, dynamic>(),
+    );
+    copy = copy.copyWith(
+      name: doc.scenes[i].name.isEmpty ? '' : '${doc.scenes[i].name} copy',
+    );
+    final r = ir.insertScene(doc, i + 1, copy);
+    return resultOf(
+      state,
+      r,
+      label: label,
+      selectionAfter: const {},
+      activeSceneAfter: copy.id,
+    );
   }
 }

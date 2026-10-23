@@ -302,5 +302,38 @@ void main() {
         isFalse,
       );
     });
+
+    test('DuplicateScene copies with fresh ids and activates the copy', () {
+      final c = editorContainer();
+      final r = expectRoundTrip(
+        c,
+        DuplicateScene('s1', ids: IdGenerator.seeded(9)),
+      );
+      expect(c.doc.scenes.map((s) => s.name), ['One', 'One copy', 'Two']);
+      expect(c.st.activeSceneId, r.activeSceneAfter);
+      final src = c.doc.scenes[0], copy = c.doc.scenes[1];
+      Iterable<String> ids(Node n) sync* {
+        yield n.id;
+        if (n is FrameNode) {
+          for (final k in n.children) {
+            yield* ids(k);
+          }
+        }
+      }
+
+      final a = ids(src.root).toList(), b = ids(copy.root).toList();
+      expect(b, hasLength(a.length));
+      expect(b.toSet().intersection(a.toSet()), isEmpty);
+      expect(copy.id, isNot(src.id));
+      expect((copy.clocks.single as SceneScrollClock).sceneId, copy.id);
+      expect(copy.clocks.single.id, isNot(src.clocks.single.id));
+      expect(copy.kind, src.kind);
+      expect(copy.scrollLength, src.scrollLength);
+      expect(
+        validateDocument(c.doc).where((d) => d.severity == IrSeverity.error),
+        isEmpty,
+      );
+      expect(c.ctl.execute(const DuplicateScene('nope')).ok, isFalse);
+    });
   });
 }
