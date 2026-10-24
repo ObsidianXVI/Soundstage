@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
@@ -279,6 +280,10 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
   // ---- Press, drag, release --------------------------------------------
 
   void _onDown(PointerDownEvent e) {
+    if (e.buttons == kSecondaryMouseButton && _session == null) {
+      _contextMenu(e);
+      return;
+    }
     if (e.buttons & kPrimaryButton == 0 || widget.pansWith(e)) return;
     if (_st.tool != EditorTool.move || _session != null) return;
     final p = e.localPosition;
@@ -333,6 +338,41 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
       mods,
       hits: ids,
       move: _st.selection.contains(target),
+    );
+  }
+
+  /// Right-click: selects the node under the pointer (keeping a selection
+  /// that contains it) on that artboard, then offers "Reset overrides on
+  /// (breakpoint)" for the breakpoint in effect there (T1.10).
+  void _contextMenu(PointerDownEvent e) {
+    if (_st.tool != EditorTool.move) return;
+    final p = e.localPosition;
+    final hits = _g.hitTest(p);
+    final bp = hits.isEmpty ? _g.artboardAt(p) : hits.first.breakpointId;
+    if (bp == null) return;
+    _ctl.setEditingBreakpoint(bp);
+    final target = _targetOf(hits, _modifiers().deep);
+    if (target != null && !_st.selection.contains(target)) {
+      _ctl.click([
+        for (final h in hits) h.nodeId,
+      ], (shift: false, deep: _modifiers().deep, alt: false).sel);
+    }
+    final st = _st;
+    if (st.selection.isEmpty) return;
+    final effective = st.breakpointId;
+    final name = breakpointName(st.document, effective);
+    final ids = st.selection.toList();
+    showSsContextMenu(
+      context,
+      position: e.position,
+      entries: [
+        SsMenuItem(
+          label: 'Reset overrides on $name',
+          icon: SsIcons.rotateCcw,
+          enabled: hasOverridesOn(st.document, ids, effective),
+          onSelected: () => _ctl.execute(ResetBreakpointOverrides(ids)),
+        ),
+      ],
     );
   }
 

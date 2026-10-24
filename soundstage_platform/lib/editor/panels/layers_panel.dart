@@ -9,6 +9,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../core/core.dart';
+import '../inspector/fields/field_frame.dart' show overrideColor;
 import 'layers_model.dart';
 
 /// The Layers panel (architecture §15): the active scene's node tree.
@@ -660,6 +661,15 @@ class _LayerTile extends ConsumerWidget {
     final common = node.common;
     final c = context.ss.colors;
     final badge = roleBadge(common.role);
+    // T1.10 hook: a dot on layers with any breakpoint override.
+    final patched =
+        !row.readOnly &&
+        ref.watch(
+          editorControllerProvider.select((s) {
+            final n = ir.DocumentIndex.of(s.document).node(id);
+            return n != null && ir.hasAnyBreakpointPatch(n);
+          }),
+        );
     final ctl = ref.read(editorControllerProvider.notifier);
     return Opacity(
       opacity: dragging ? 0.5 : 1,
@@ -695,13 +705,45 @@ class _LayerTile extends ConsumerWidget {
                   label: 'Read-only',
                   child: SsIcon(SsIcons.lock, size: 12, color: c.textDisabled),
                 )
-              : (badge == null
+              : (badge == null && !patched
                     ? null
-                    : _RoleBadge(role: common.role, text: badge)),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (patched) const BreakpointOverrideDot(),
+                          if (patched && badge != null)
+                            const SizedBox(width: SsSpace.s1),
+                          if (badge != null)
+                            _RoleBadge(role: common.role, text: badge),
+                        ],
+                      )),
         ),
       ),
     );
   }
+}
+
+/// The Layers panel's mark for a layer with breakpoint overrides (T1.10),
+/// in the inspector's override tint.
+class BreakpointOverrideDot extends StatelessWidget {
+  const BreakpointOverrideDot({super.key});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'Has breakpoint overrides',
+    child: SsTooltip(
+      message: 'Has breakpoint overrides',
+      child: Container(
+        key: const ValueKey<String>('layer-override-dot'),
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: overrideColor(context),
+          shape: BoxShape.circle,
+        ),
+      ),
+    ),
+  );
 }
 
 class _RoleBadge extends StatelessWidget {

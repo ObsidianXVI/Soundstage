@@ -11,6 +11,7 @@ import '../fields/rows.dart';
 import '../inspector_providers.dart';
 import '../property_writer.dart';
 import '../section_registry.dart';
+import 'breakpoint_overrides_action.dart';
 
 /// The kind icon and spoken kind of a single selected node, or null when it
 /// is gone. Recomputed per document change, compared by value.
@@ -47,6 +48,7 @@ final InspectorSectionSpec headerSection = InspectorSectionSpec(
   appliesTo: (info) => !info.isEmpty,
   collapsible: false,
   builder: (context, info) => const _Header(),
+  actions: (context, info) => const [ResetOverridesAction()],
 );
 
 class _Header extends ConsumerWidget {

@@ -108,10 +108,10 @@ void main() {
     (tester) async {
       await _pump(tester, const Size(1440, 900));
       expect(find.text('Both'), findsOneWidget);
-      expect(find.text('This breakpoint'), findsOneWidget);
+      expect(find.text('This breakpoint: Desktop'), findsOneWidget);
       final e = _editor(tester);
       expect(e.read(editorControllerProvider).editScope, EditScope.both);
-      await tester.tap(find.text('This breakpoint'));
+      await tester.tap(find.text('This breakpoint: Desktop'));
       await tester.pump();
       expect(
         e.read(editorControllerProvider).editScope,

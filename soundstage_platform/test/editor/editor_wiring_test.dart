@@ -156,7 +156,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
     await tester.pump();
     expect(st().effectiveScope, EditScope.both);
-    await tester.tap(find.text('This breakpoint'));
+    await tester.tap(find.text('This breakpoint: Desktop'));
     await tester.pump();
     expect(st().editScope, EditScope.thisBreakpoint);
   });

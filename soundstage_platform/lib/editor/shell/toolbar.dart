@@ -4,9 +4,11 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import '../canvas/camera.dart';
 import '../canvas/canvas_controller.dart';
+import '../core/commands/breakpoint_commands.dart';
 import '../core/editor_controller.dart';
 import '../core/editor_state.dart';
 import '../shortcuts/shortcut_map.dart';
+import 'breakpoint_manager.dart';
 import 'editor_layout.dart';
 
 /// The editor toolbar: back, title, tools, edit scope, save status,
@@ -57,7 +59,16 @@ class EditorToolbar extends ConsumerWidget {
     final history = ref.watch(
       editorControllerProvider.select((s) => s.history),
     );
+    // The breakpoint "This breakpoint" writes to: the one in effect on the
+    // edited artboard (its free width may fall in another's range).
+    final bpName = ref.watch(
+      editorControllerProvider.select(
+        (s) => breakpointName(s.document, s.breakpointId),
+      ),
+    );
     final canvas = ref.watch(canvasControllerProvider);
+    // Below this window width the scope label shortens ("Only Tablet").
+    final compact = MediaQuery.sizeOf(context).width < 1280;
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: SsSpace.s2),
@@ -98,8 +109,9 @@ class EditorToolbar extends ConsumerWidget {
           const Spacer(),
           SsTooltip(
             message:
-                'Edit scope: change both breakpoints, or only this one. '
-                'Alt flips scope',
+                'Edit scope: Both changes the shared design (every '
+                'breakpoint); This breakpoint changes $bpName only, the '
+                'breakpoint in effect on the edited artboard. Alt flips scope',
             placement: SsPlacement.belowCenter,
             child: SsSegmented<EditScope>(
               key: ValueKey<String>('edit-scope${flipped ? '-flipped' : ''}'),
@@ -108,15 +120,19 @@ class EditorToolbar extends ConsumerWidget {
                   : 'Edit scope',
               selected: scope,
               onChanged: (v) => editor.setEditScope(flipped ? v.flipped : v),
-              segments: const [
-                SsSegment(value: EditScope.both, label: 'Both'),
+              segments: [
+                const SsSegment(value: EditScope.both, label: 'Both'),
                 SsSegment(
                   value: EditScope.thisBreakpoint,
-                  label: 'This breakpoint',
+                  label: bpName.isEmpty
+                      ? 'This breakpoint'
+                      : (compact ? 'Only $bpName' : 'This breakpoint: $bpName'),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: SsSpace.s1),
+          const BreakpointManagerButton(),
           const Spacer(),
           if (saveStatus != null) ...[saveStatus!, const _Divider()],
           SsIconButton(

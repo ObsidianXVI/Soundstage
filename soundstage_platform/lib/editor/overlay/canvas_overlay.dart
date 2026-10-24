@@ -11,6 +11,7 @@ import 'package:soundstage_platform/runtime/runtime.dart';
 
 import '../canvas/camera.dart';
 import '../canvas/canvas_controller.dart';
+import '../inspector/fields/field_frame.dart' show overrideColor;
 import '../interaction/transform_math.dart';
 import 'interaction_model.dart';
 import 'overlay_geometry.dart';
@@ -83,6 +84,7 @@ class _CanvasOverlayState extends ConsumerState<CanvasOverlay> {
             artboardOutline: t.colors.border,
             measure: t.colors.measure,
             spacing: t.colors.spacing,
+            overrideMarker: overrideColor(context),
           ),
           labelStyle: t.text.caption.copyWith(color: t.colors.textSecondary),
           sizeStyle: t.text.caption.copyWith(color: t.colors.textDisabled),
@@ -106,6 +108,9 @@ class OverlayModel extends ChangeNotifier {
   String? context;
   bool showHandles = true;
   Object? _document;
+
+  /// The document shown (for the per-artboard override markers).
+  ir.StageDocument? get document => _document as ir.StageDocument?;
 
   /// Repaints when anything it shows changed (identity for collections).
   void update({
@@ -140,9 +145,13 @@ class OverlayColors {
     required this.artboardOutline,
     required this.measure,
     required this.spacing,
+    this.overrideMarker = const Color(0xFFB48CFF),
   });
 
   final Color accent, onAccent, artboardOutline, measure, spacing;
+
+  /// Breakpoint override markers (the inspector's override tint).
+  final Color overrideMarker;
 
   @override
   bool operator ==(Object other) =>
@@ -151,11 +160,18 @@ class OverlayColors {
       other.onAccent == onAccent &&
       other.artboardOutline == artboardOutline &&
       other.measure == measure &&
-      other.spacing == spacing;
+      other.spacing == spacing &&
+      other.overrideMarker == overrideMarker;
 
   @override
-  int get hashCode =>
-      Object.hash(accent, onAccent, artboardOutline, measure, spacing);
+  int get hashCode => Object.hash(
+    accent,
+    onAccent,
+    artboardOutline,
+    measure,
+    spacing,
+    overrideMarker,
+  );
 }
 
 /// Paints the overlay (see [CanvasOverlay]).
@@ -264,6 +280,7 @@ class OverlayPainter extends CustomPainter {
         if (o == null) continue;
         canvas.drawPath(o.outline, hair..color = colors.accent);
       }
+      _overrideMarkers(canvas, a);
       if (model.selection.isNotEmpty) {
         final frame = SelectionFrame.of(geometry, model.selection, bp);
         if (frame != null) {
@@ -284,6 +301,46 @@ class OverlayPainter extends CustomPainter {
       }
     }
     _interaction(canvas, cam);
+  }
+
+  /// Test hook: the (node, artboard) pairs that got an override marker in
+  /// the last paint.
+  static final List<(String, String)> debugOverrideMarkers = [];
+
+  /// A small diamond at the top-right corner of each selected node that
+  /// has a patch on the breakpoint in effect on artboard [a] (T1.10).
+  void _overrideMarkers(Canvas canvas, ArtboardInfo a) {
+    if (identical(a, geometry.canvas.artboards.values.first)) {
+      debugOverrideMarkers.clear();
+    }
+    final doc = model.document;
+    final bp = a.effectiveBreakpointId;
+    if (doc == null || bp.isEmpty || model.selection.isEmpty) return;
+    final index = ir.DocumentIndex.of(doc);
+    final fill = Paint()..color = colors.overrideMarker;
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xFFFFFFFF);
+    for (final id in model.selection) {
+      final n = index.node(id);
+      if (n == null || !ir.hasBreakpointPatch(n, bp)) continue;
+      final o = geometry.rectFor(id, a.breakpointId);
+      if (o == null) continue;
+      final b = o.bounds;
+      final c = Offset(b.right + 7, b.top - 7);
+      const r = 4.0;
+      final diamond = Path()
+        ..moveTo(c.dx, c.dy - r)
+        ..lineTo(c.dx + r, c.dy)
+        ..lineTo(c.dx, c.dy + r)
+        ..lineTo(c.dx - r, c.dy)
+        ..close();
+      canvas
+        ..drawPath(diamond, fill)
+        ..drawPath(diamond, edge);
+      debugOverrideMarkers.add((id, a.breakpointId));
+    }
   }
 
   void _artboardLabel(Canvas canvas, ArtboardInfo a, Rect r, Paint hair) {
