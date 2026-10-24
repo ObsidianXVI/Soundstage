@@ -70,3 +70,20 @@ class EditorShortcutAction<T extends Intent> extends Action<T> {
     return null;
   }
 }
+
+/// An action for the clipboard intents: stands down whenever a text field
+/// has focus (even with Cmd held), so Cmd+C/X/V edit that field's text.
+class ClipboardShortcutAction<T extends Intent> extends Action<T> {
+  ClipboardShortcutAction(this._invoke);
+
+  final void Function(T intent) _invoke;
+
+  @override
+  bool isEnabled(T intent) => !primaryFocusIsTextInput();
+
+  @override
+  Object? invoke(T intent) {
+    _invoke(intent);
+    return null;
+  }
+}

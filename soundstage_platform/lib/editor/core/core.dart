@@ -8,6 +8,7 @@ export 'commands/align_commands.dart';
 export 'commands/asset_commands.dart';
 export 'commands/gesture_commands.dart';
 export 'commands/node_commands.dart';
+export 'commands/paste_commands.dart';
 export 'commands/property_commands.dart';
 export 'commands/scene_commands.dart';
 export 'editor_controller.dart';

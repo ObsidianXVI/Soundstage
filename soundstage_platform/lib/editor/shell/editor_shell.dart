@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
+import '../clipboard/clipboard_actions.dart';
 import '../core/editor_controller.dart';
 import '../insert/editor_notices.dart';
 import '../inspector/inspector.dart';
@@ -209,6 +211,7 @@ class _DockedEditor extends ConsumerWidget {
     void help() => showShortcutHelp(context);
     final editor = ref.read(editorControllerProvider.notifier);
     final canvas = ref.read(canvasControllerProvider);
+    final clip = ref.read(clipboardActionsProvider);
 
     return EditorNoticeHost(
       child: EditorShortcuts(
@@ -230,6 +233,18 @@ class _DockedEditor extends ConsumerWidget {
             (_) => onPreview(),
           ),
           SaveIntent: EditorShortcutAction<SaveIntent>((_) => onSave?.call()),
+          CopyIntent: ClipboardShortcutAction<CopyIntent>(
+            (_) => unawaited(clip.copy()),
+          ),
+          CutIntent: ClipboardShortcutAction<CutIntent>(
+            (_) => unawaited(clip.cut()),
+          ),
+          PasteIntent: ClipboardShortcutAction<PasteIntent>(
+            (_) => unawaited(clip.paste()),
+          ),
+          PasteReplaceIntent: ClipboardShortcutAction<PasteReplaceIntent>(
+            (_) => unawaited(clip.paste(replace: true)),
+          ),
           SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
             (i) => editor.setTool(i.tool),
           ),

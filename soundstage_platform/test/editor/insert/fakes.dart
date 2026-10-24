@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 
+import 'package:soundstage_platform/editor/clipboard/system_clipboard.dart';
 import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
@@ -97,4 +98,31 @@ class StubPngLoader implements LocalAssetLoader {
 
   @override
   void releaseObjectUrl(String assetId) {}
+}
+
+/// A [SystemClipboard] held in memory.
+class FakeClipboard implements SystemClipboard {
+  String? text;
+  EditorFile? image;
+  bool denyRead = false;
+  bool denyWrite = false;
+
+  @override
+  Future<void> writeText(String t) async {
+    if (denyWrite) throw const ClipboardDenied();
+    text = t;
+    image = null;
+  }
+
+  @override
+  Future<String?> readText() async {
+    if (denyRead) throw const ClipboardDenied();
+    return text;
+  }
+
+  @override
+  Future<EditorFile?> readImage() async {
+    if (denyRead) throw const ClipboardDenied();
+    return image;
+  }
 }
