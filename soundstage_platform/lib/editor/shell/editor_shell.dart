@@ -123,9 +123,9 @@ class _EditorScope extends ConsumerWidget {
         if (box.maxWidth < kEditorMinWidth) {
           return ContentModeScreen(
             title: title,
-            scenes: document.scenes,
             onPlay: onPreview,
             onBack: onBack,
+            saveStatus: saveStatus,
           );
         }
         return _AltScopeFlip(

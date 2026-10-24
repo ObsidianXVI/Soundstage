@@ -129,7 +129,7 @@ void main() {
       expect(find.byType(ContentModeScreen), findsOneWidget);
       expect(find.textContaining('larger window'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Play story'));
+      await tester.tap(find.bySemanticsLabel('Preview story'));
       await tester.pump();
       await tester.pump();
       expect(app.uri.path, '/play/demo-static');

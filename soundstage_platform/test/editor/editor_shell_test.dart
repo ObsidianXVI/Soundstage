@@ -244,11 +244,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('The Hour Between'), findsOneWidget);
-      expect(find.text('Opening'), findsOneWidget);
-      expect(find.text('Lighthouse'), findsOneWidget);
+      expect(find.text('Opening'), findsOneWidget); // the scene pager
       expect(find.textContaining('larger window'), findsOneWidget);
       expect(find.text('Scenes'), findsNothing); // no left panel
-      await tester.tap(find.text('Play story'));
+      await tester.tap(find.bySemanticsLabel('Preview story'));
       expect(log, ['preview']);
     });
   }
