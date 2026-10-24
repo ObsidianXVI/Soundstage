@@ -413,6 +413,256 @@ class SetImageFill extends EditCommand {
   }
 }
 
+/// Replaces the image a reader sees on node [nodeId] at breakpoint
+/// [breakpointId] with asset [assetId] (content mode's *Replace image*;
+/// DECISIONS 24/10/26 "T1.13 content mode").
+///
+/// The image is the first visible image paint of the node's fills as that
+/// breakpoint resolves them (the paint content mode shows). Its
+/// `fills.<paintId>.assetId` is traced with `Resolver.explain`, and the new
+/// asset is written into exactly the layer that supplies it:
+///
+/// - the shared base (other breakpoints that share it change too; their
+///   own patches are kept);
+/// - a breakpoint patch, also one reached through an `inheritsFrom` chain:
+///   the patch's keys over the path are rewritten in place (a patch of the
+///   whole `fills` stack keeps every other paint and field);
+/// - an instance override (or, for a node inside an instance with no
+///   override yet, a new override on the instance: components are never
+///   edited from here).
+///
+/// Only the asset id changes: the paint id, scale mode, focal point, crop
+/// and filters stay. The edit scope is ignored. A fill that comes from a
+/// shared fill style or a token is refused (styles are edited in the full
+/// editor).
+class ReplaceVisibleImage extends EditCommand {
+  const ReplaceVisibleImage(
+    this.nodeId,
+    this.assetId, {
+    required this.breakpointId,
+    this.resolver,
+  });
+
+  final String nodeId;
+  final String assetId;
+  final String breakpointId;
+
+  /// Defaults to a fresh one; pass the breakpoint's long-lived resolver so
+  /// `explain` reuses its memo.
+  final ir.Resolver? resolver;
+
+  @override
+  String get label => 'Replace image';
+
+  @override
+  CommandResult apply(EditorState state) {
+    final doc = state.document;
+    final reg = ir.PropertyRegistry.standard;
+    final res = resolver ?? ir.Resolver();
+    final ctx = ir.ResolveContext(breakpointId: breakpointId);
+    CommandResult fail(String m) =>
+        failedCommand(state, label, [commandError(m, nodeId: nodeId)]);
+
+    final fills = res.explain(doc, nodeId, const ir.PropertyPath('fills'), ctx);
+    final shown = fills.finalValue;
+    if (shown is! ir.PaintsValue) {
+      return fills.diagnostics.isNotEmpty
+          ? failedCommand(state, label, fills.diagnostics)
+          : fail('"$nodeId" has no image to replace.');
+    }
+    final images = shown.value.whereType<ir.ImagePaint>().toList();
+    final paint =
+        images.where((p) => p.visible).firstOrNull ?? images.firstOrNull;
+    if (paint == null) return fail('"$nodeId" has no image to replace.');
+    if (paint.assetId == assetId) {
+      return CommandResult(document: doc, label: label);
+    }
+
+    final path = 'fills.${paint.id}.assetId';
+    final value = ir.IrValue.string(assetId);
+    final p = res.explain(doc, nodeId, ir.PropertyPath(path), ctx);
+    final index = ir.DocumentIndex.of(doc);
+    final slash = nodeId.indexOf('/');
+
+    for (final e in p.entries.reversed) {
+      switch (e.source) {
+        case ir.AnimatedSource() || ir.DocumentDefaultSource():
+          continue;
+        case ir.PaintStyleSource() || ir.TokenSource():
+          return fail(
+            'This image comes from a shared style; change it in the full '
+            'editor.',
+          );
+        case ir.BreakpointPatchSource(:final breakpointId)
+            when slash < 0 && index.contains(e.nodeId):
+          return _done(state, _rewritePatch(doc, e, breakpointId, path, value));
+        case ir.InstanceOverrideSource(:final instanceId, :final innerPath)
+            when index.node(instanceId) is ir.InstanceNode:
+          return _done(
+            state,
+            _rewriteOverride(doc, instanceId, innerPath, e.keys, path, value),
+          );
+        case ir.BaseSource() when slash < 0:
+          return _done(
+            state,
+            ir.updateNode(doc, nodeId, (n) => reg.trySet(n, path, value) ?? n),
+          );
+        case _ when slash >= 0:
+          // Inside an instance, supplied by the component (its default, a
+          // patch on its nodes, a binding): an override on the instance.
+          return _done(
+            state,
+            setInstanceOverride(
+              doc,
+              nodeId.substring(0, slash),
+              nodeId.substring(slash + 1),
+              path,
+              value,
+            ),
+          );
+        case _:
+          continue;
+      }
+    }
+    return fail('Could not find where the image of "$nodeId" is set.');
+  }
+
+  CommandResult _done(EditorState state, ir.EditResult r) =>
+      resultOf(state, r, label: label);
+
+  /// [keys] of a patch, rewritten so that [path] reads [value] inside them.
+  static Map<String, ir.IrValue>? _rewrite(
+    ir.Node carrier,
+    Map<String, ir.IrValue> patch,
+    Iterable<String> keys,
+    String path,
+    ir.IrValue value,
+  ) {
+    final reg = ir.PropertyRegistry.standard;
+    final next = {...patch};
+    var any = false;
+    for (final k in keys) {
+      final v = patch[k];
+      if (v == null) continue;
+      if (k == path) {
+        next[k] = value;
+        any = true;
+      } else if (path.startsWith('$k.')) {
+        if (v is ir.TokenRefValue) return null;
+        final withOuter = reg.trySet(carrier, k, v);
+        final written = withOuter == null
+            ? null
+            : reg.trySet(withOuter, path, value);
+        final out = written == null ? null : reg.get(written, k);
+        if (out == null) return null;
+        next[k] = out;
+        any = true;
+      }
+    }
+    return any ? next : null;
+  }
+
+  static ir.EditResult _rewritePatch(
+    ir.StageDocument doc,
+    ir.ProvenanceEntry e,
+    String breakpointId,
+    String path,
+    ir.IrValue value,
+  ) {
+    var failed = false;
+    final r = ir.updateNode(doc, e.nodeId, (n) {
+      final patch = n.common.breakpointOverrides[breakpointId];
+      final next = patch == null
+          ? null
+          : _rewrite(n, patch, e.keys, path, value);
+      if (next == null) {
+        failed = true;
+        return n;
+      }
+      return n.copyWith(
+        common: n.common.copyWith(
+          breakpointOverrides: {
+            ...n.common.breakpointOverrides,
+            breakpointId: next,
+          },
+        ),
+      );
+    });
+    if (!failed) return r;
+    // The patch holds a value above the path that cannot be rewritten (a
+    // token): add the path to the same patch, after it.
+    return ir.setBreakpointPatchValue(doc, e.nodeId, breakpointId, path, value);
+  }
+
+  static ir.EditResult _rewriteOverride(
+    ir.StageDocument doc,
+    String instanceId,
+    String innerPath,
+    List<String> keys,
+    String path,
+    ir.IrValue value,
+  ) {
+    final inst = ir.DocumentIndex.of(doc).node(instanceId)! as ir.InstanceNode;
+    final patch = inst.overrides[innerPath];
+    // The override holds a whole value above the path: rewrite it inside a
+    // carrier node of the same kind (any node with fills will do).
+    const carrier = ir.FrameNode(common: ir.NodeCommon(id: ''));
+    final next = patch == null
+        ? null
+        : _rewrite(carrier, patch, keys, path, value);
+    if (next == null) {
+      return setInstanceOverride(doc, instanceId, innerPath, path, value);
+    }
+    return ir.updateNode(
+      doc,
+      instanceId,
+      (n) => (n as ir.InstanceNode).copyWith(
+        overrides: {...n.overrides, innerPath: next},
+      ),
+    );
+  }
+}
+
+/// Points audio track [trackId] at asset [assetId] (content mode's
+/// *Replace sound*: the new file is a new asset, so other tracks that share
+/// the old one keep it). The old asset stays in the library until the
+/// unused-asset clean-up removes it.
+class SetAudioTrackAsset extends EditCommand {
+  const SetAudioTrackAsset(this.trackId, this.assetId);
+
+  final String trackId;
+  final String assetId;
+
+  @override
+  String get label => 'Replace sound';
+
+  @override
+  CommandResult apply(EditorState state) {
+    final doc = state.document;
+    final i = doc.audioTracks.indexWhere((t) => t.id == trackId);
+    if (i < 0) {
+      return failedCommand(state, label, [
+        commandError('There is no audio track "$trackId".'),
+      ]);
+    }
+    if (!doc.assets.containsKey(assetId)) {
+      return failedCommand(state, label, [
+        commandError('There is no asset "$assetId".'),
+      ]);
+    }
+    if (doc.audioTracks[i].assetId == assetId) {
+      return CommandResult(document: doc, label: label);
+    }
+    final tracks = [...doc.audioTracks];
+    tracks[i] = tracks[i].copyWith(assetId: assetId);
+    return CommandResult(
+      document: doc.copyWith(audioTracks: tracks),
+      label: label,
+      changed: true,
+    );
+  }
+}
+
 // ---- Fonts ---------------------------------------------------------------------
 
 /// The family of [doc] called [name] (case-insensitive), or null.

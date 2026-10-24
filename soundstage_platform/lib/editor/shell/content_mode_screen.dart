@@ -42,8 +42,9 @@ const double kContentTarget = 44;
 ///   form: no style or link shortcuts). Decorative text is not editable.
 ///   Writes go to the shared base, one undo step per session.
 /// - Tap an image-filled frame to replace its image (the device picker; the
+///   new image goes into the layer that supplies the one shown, and the
 ///   paint keeps its scale mode, focal point and filters) or to edit its
-///   alt text.
+///   alt text. Replacing a sound repoints only that track at a new asset.
 /// - "Content" lists every editable slot, so the page works by keyboard and
 ///   screen reader without hunting on the picture.
 ///
@@ -279,8 +280,10 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
 
   // ---- Media ----------------------------------------------------------------------------
 
-  /// Picks an image and swaps it into the slot [id]: the paint keeps its
-  /// scale mode, focal point and filters. One undo step.
+  /// Picks an image and swaps it into the slot [id] in the layer that
+  /// supplies the image shown here (base, a breakpoint patch or an instance
+  /// override; see [ReplaceVisibleImage]): the paint keeps its id, scale
+  /// mode, focal point, crop and filters. One undo step.
   Future<void> _replaceImage(String id) async {
     if (_busy) return;
     final notices = ref.read(editorNoticesProvider);
@@ -300,7 +303,17 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
           .read(insertActionsProvider)
           .addToLibrary(files.take(1));
       if (assets.isEmpty || !mounted) return;
-      final r = _ctl.execute(BaseScoped(SetImageFill([id], assets.first.id)));
+      final bp = _breakpoint(ref.read(editorControllerProvider).document);
+      if (bp == null) return;
+      _ctl.resolvedFor(bp.id); // brings the memo up to date
+      final r = _ctl.execute(
+        ReplaceVisibleImage(
+          id,
+          assets.first.id,
+          breakpointId: bp.id,
+          resolver: _ctl.resolverFor(bp.id),
+        ),
+      );
       if (r.ok) {
         _ctl.squashHistoryAfter(anchor, 'Replace image');
       } else {
@@ -329,11 +342,11 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
     );
   }
 
-  Future<void> _replaceAudio(String assetId) async {
+  Future<void> _replaceAudio(String trackId) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await ref.read(assetActionsProvider).pickAndReplace(assetId);
+      await ref.read(assetActionsProvider).pickAndReplaceTrack(trackId);
     } on StateError {
       ref
           .read(editorNoticesProvider)
@@ -1142,7 +1155,7 @@ class _ContentList extends ConsumerWidget {
                 label: assetName(a.assetId),
                 semanticLabel: 'Replace sound file: ${assetName(a.assetId)}',
                 trailing: 'Replace',
-                onTap: busy ? null : () => onReplaceAudio(a.assetId),
+                onTap: busy ? null : () => onReplaceAudio(a.id),
               ),
           ],
         ),

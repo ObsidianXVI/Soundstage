@@ -409,6 +409,62 @@ void main() {
       expect(r.docs, isNotEmpty);
     });
 
+    testWidgets('Replace image writes the mobile patch when mobile shows '
+        'its own image; desktop keeps its image', (tester) async {
+      final doc = ir
+          .updateNode(
+            _doc(),
+            'fig',
+            (n) => n.copyWith(
+              common: n.common.copyWith(
+                breakpointOverrides: {
+                  'mobile': {
+                    'fills.p1.assetId': const ir.IrValue.string('img2'),
+                  },
+                },
+              ),
+            ),
+          )
+          .document;
+      final withImg2 = doc.copyWith(
+        assets: {
+          ...doc.assets,
+          'img2': doc.assets['img1']!.copyWith(id: 'img2', uri: 'local://img2'),
+        },
+      );
+      final r = await _pump(
+        tester,
+        const Size(390, 844),
+        document: withImg2,
+        pick: [
+          (
+            name: 'new.jpg',
+            bytes: FakeAssetService.png(40, 20),
+            mime: 'image/jpeg',
+          ),
+        ],
+      );
+      await r.tapNode('fig');
+      await tester.tap(find.text('Replace image'));
+      await r.settle();
+      await r.settle();
+      final fig = r.node('fig') as ir.FrameNode;
+      expect((fig.appearance.fills.single as ir.ImagePaint).assetId, 'img1');
+      expect(fig.common.breakpointOverrides['mobile'], {
+        'fills.p1.assetId': const ir.IrValue.string('asset1'),
+      });
+      expect(r.st.history.undoLabel, 'Replace image');
+      r.ctl.undo();
+      await tester.pump();
+      expect(
+        (r
+            .node('fig')
+            .common
+            .breakpointOverrides['mobile']!['fills.p1.assetId']),
+        const ir.IrValue.string('img2'),
+      );
+    });
+
     testWidgets('alt text is edited on the figure', (tester) async {
       final r = await _pump(tester, const Size(390, 844));
       await r.tapNode('fig');
@@ -445,7 +501,15 @@ void main() {
       await r.settle();
       await r.settle();
       expect(r.picked, contains('audio/*'));
-      expect(r.st.document.assets['aud1']!.byteSize, 5);
+      // A new asset; only this track points at it; the old file stays.
+      final track = r.st.document.audioTracks.single;
+      expect(track.assetId, isNot('aud1'));
+      expect(r.st.document.assets[track.assetId]!.name, 'storm.mp3');
+      expect(r.st.document.assets['aud1']!.byteSize, isNot(5));
+      expect(r.st.history.undoLabel, 'Replace sound');
+      r.ctl.undo();
+      await tester.pump();
+      expect(r.st.document.audioTracks.single.assetId, 'aud1');
       await tester.tap(_label('Edit text: Hello world'));
       await tester.pump();
       await tester.pump();
