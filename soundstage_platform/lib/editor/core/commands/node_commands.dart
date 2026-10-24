@@ -4,6 +4,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../command.dart';
 import '../editor_state.dart';
+import 'scoped_insert.dart';
 
 // Structural node commands (architecture §15). Each wraps the IR's
 // path-copy edit helpers; ids for new nodes come from an injected
@@ -28,7 +29,11 @@ class InsertNodes extends EditCommand {
   CommandResult apply(EditorState state) {
     final parent = ir.DocumentIndex.of(state.document).node(parentId);
     final at = index ?? (parent is ir.FrameNode ? parent.children.length : 0);
-    final r = ir.insertNodes(state.document, parentId, at, nodes);
+    final r = scopeInsert(
+      state,
+      ir.insertNodes(state.document, parentId, at, nodes),
+      [for (final n in nodes) n.id],
+    );
     return resultOf(
       state,
       r,

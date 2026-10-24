@@ -2,6 +2,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../command.dart';
 import '../editor_state.dart';
+import 'scoped_insert.dart';
 
 /// What a paste brings into the document besides the nodes: the assets,
 /// font families and named styles they use (already stored and with ids
@@ -108,6 +109,9 @@ class PasteNodes extends EditCommand {
     ];
     final at = index ?? (parent is ir.FrameNode ? parent.children.length : 0);
     var r = ir.insertNodes(doc, parentId, at, placed);
+    if (replaceIds.isEmpty) {
+      r = scopeInsert(state, r, [for (final n in placed) n.id]);
+    }
     if (r.ok && replaceIds.isNotEmpty) {
       final removed = ir.removeNodes(r.document, replaceIds);
       r = removed.ok

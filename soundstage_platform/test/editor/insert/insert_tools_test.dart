@@ -50,6 +50,41 @@ void main() {
       expect(h.doc.scenes.first.root.children.any((c) => c.id == id), isFalse);
     });
 
+    for (final (artboard, other) in [
+      ('desktop', 'mobile'),
+      ('mobile', 'desktop'),
+    ]) {
+      testWidgets('This breakpoint: a node drawn on $artboard is hidden on '
+          '$other (one undo)', (tester) async {
+        final h = await pump(tester);
+        h.ctl.setEditScope(EditScope.thisBreakpoint);
+        await useTool(h, EditorTool.rectangle);
+        await h.click(
+          artboard == 'desktop' ? h.desk(850, 250) : h.mob(100, 250),
+        );
+        final id = lastChildOf(h, 'root');
+        final c = h.common(id);
+        expect(c.visible, isTrue);
+        expect(
+          c.breakpointOverrides[other]?['visible'],
+          const ir.IrValue.boolean(false),
+        );
+        expect(c.breakpointOverrides[artboard], isNull);
+        h.ctl.undo();
+        expect(
+          h.doc.scenes.first.root.children.any((n) => n.id == id),
+          isFalse,
+        );
+      });
+    }
+
+    testWidgets('Both: a drawn node has no patches', (tester) async {
+      final h = await pump(tester);
+      await useTool(h, EditorTool.rectangle);
+      await h.click(h.desk(850, 250));
+      expect(h.common(lastChildOf(h, 'root')).breakpointOverrides, isEmpty);
+    });
+
     testWidgets('each tool makes its node kind', (tester) async {
       final h = await pump(tester);
       final kinds = <EditorTool, bool Function(ir.Node)>{
@@ -318,6 +353,35 @@ void main() {
         ..undo()
         ..undo();
       expect(h.doc.assets, isEmpty);
+    });
+
+    testWidgets('This breakpoint: a picked image is hidden on the other '
+        'artboard', (tester) async {
+      final h = await pump(
+        tester,
+        overrides: [
+          editorAssetServiceProvider.overrideWithValue(FakeAssetService()),
+          editorFilePickerProvider.overrideWithValue(
+            ({String accept = '', bool multiple = false}) async => [
+              (
+                name: 'photo.jpg',
+                bytes: FakeAssetService.png(400, 200),
+                mime: 'image/jpeg',
+              ),
+            ],
+          ),
+        ],
+      );
+      h.ctl.setEditScope(EditScope.thisBreakpoint);
+      h.ctl.setTool(EditorTool.image);
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump();
+      final c = h.common(lastChildOf(h, 'root'));
+      expect(
+        c.breakpointOverrides['mobile']?['visible'],
+        const ir.IrValue.boolean(false),
+      );
+      expect(c.breakpointOverrides['desktop'], isNull);
     });
 
     testWidgets('a cancelled picker returns to Move', (tester) async {
