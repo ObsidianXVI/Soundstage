@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +25,7 @@ String lastChildOf(Harness h, String parent) =>
     (h.node(parent) as ir.FrameNode).children.last.id;
 
 void main() {
-  setUp(() => StageAssetResolver.defaultLocal = _StubLoader());
+  setUp(() => StageAssetResolver.defaultLocal = StubPngLoader());
   tearDown(() => StageAssetResolver.defaultLocal = null);
 
   group('click', () {
@@ -361,24 +359,4 @@ void main() {
       expect(h.st.selectionContext, 'box');
     });
   });
-}
-
-/// Serves a 1 x 1 PNG for every `local://` image, so painting an inserted
-/// image has something to decode.
-class _StubLoader implements LocalAssetLoader {
-  static final _png = Uint8List.fromList(
-    base64Decode(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/'
-      'iZk9HQAAAABJRU5ErkJggg==',
-    ),
-  );
-
-  @override
-  Future<Uint8List?> loadBytes(String assetId) async => _png;
-
-  @override
-  Future<String?> acquireObjectUrl(String assetId) async => null;
-
-  @override
-  void releaseObjectUrl(String assetId) {}
 }

@@ -9,7 +9,9 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../core/editor_controller.dart';
+import '../insert/editor_notices.dart';
 import '../inspector/inspector.dart';
+import '../panels/assets_panel.dart';
 import '../panels/layers_panel.dart';
 import '../panels/scenes_panel.dart';
 import '../shortcuts/editor_shortcuts.dart';
@@ -208,91 +210,99 @@ class _DockedEditor extends ConsumerWidget {
     final editor = ref.read(editorControllerProvider.notifier);
     final canvas = ref.read(canvasControllerProvider);
 
-    return EditorShortcuts(
-      onEditorIntent: editor.perform,
-      actions: <Type, Action<Intent>>{
-        ShowShortcutHelpIntent: EditorShortcutAction<ShowShortcutHelpIntent>(
-          (_) => help(),
-        ),
-        ToggleLeftPanelIntent: EditorShortcutAction<ToggleLeftPanelIntent>(
-          (_) => notifier.toggleLeft(),
-        ),
-        ToggleRightPanelIntent: EditorShortcutAction<ToggleRightPanelIntent>(
-          (_) => notifier.toggleRight(),
-        ),
-        ToggleTimelineIntent: EditorShortcutAction<ToggleTimelineIntent>(
-          (_) => notifier.toggleTimeline(),
-        ),
-        PreviewIntent: EditorShortcutAction<PreviewIntent>((_) => onPreview()),
-        SaveIntent: EditorShortcutAction<SaveIntent>((_) => onSave?.call()),
-        SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
-          (i) => editor.setTool(i.tool),
-        ),
-        ZoomInIntent: EditorShortcutAction<ZoomInIntent>(
-          (_) => canvas.zoomIn(),
-        ),
-        ZoomOutIntent: EditorShortcutAction<ZoomOutIntent>(
-          (_) => canvas.zoomOut(),
-        ),
-        ZoomTo100Intent: EditorShortcutAction<ZoomTo100Intent>(
-          (_) => canvas.zoomTo100(),
-        ),
-        ZoomToFitIntent: EditorShortcutAction<ZoomToFitIntent>(
-          (_) => canvas.zoomToFit(),
-        ),
-        ZoomToSelectionIntent: EditorShortcutAction<ZoomToSelectionIntent>((_) {
-          final st = ref.read(editorControllerProvider);
-          canvas.zoomToNodes(st.selection, breakpointId: st.breakpointId);
-        }),
-      },
-      child: Focus(
-        autofocus: true,
-        child: ColoredBox(
-          color: c.surface0,
-          child: Column(
-            children: [
-              EditorToolbar(
-                title: title,
-                onBack: onBack,
-                onPreview: onPreview,
-                onHelp: help,
-                saveStatus: saveStatus,
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    if (layout.leftOpen) ...[
-                      SizedBox(
-                        width: leftW.toDouble(),
-                        child: _LeftPanel(document: document),
-                      ),
-                      ResizeHandle(
-                        semanticLabel: 'Resize left panel',
-                        onDelta: (d) =>
-                            notifier.setLeftWidth(leftW + d, available: width),
-                        onReset: () => notifier.setLeftWidth(264),
-                      ),
-                    ],
-                    const Expanded(child: EditorCanvas()),
-                    if (layout.rightOpen) ...[
-                      ResizeHandle(
-                        semanticLabel: 'Resize inspector',
-                        onDelta: (d) => notifier.setRightWidth(
-                          rightW - d,
-                          available: width,
-                        ),
-                        onReset: () => notifier.setRightWidth(288),
-                      ),
-                      SizedBox(
-                        width: rightW.toDouble(),
-                        child: const Inspector(),
-                      ),
-                    ],
-                  ],
+    return EditorNoticeHost(
+      child: EditorShortcuts(
+        onEditorIntent: editor.perform,
+        actions: <Type, Action<Intent>>{
+          ShowShortcutHelpIntent: EditorShortcutAction<ShowShortcutHelpIntent>(
+            (_) => help(),
+          ),
+          ToggleLeftPanelIntent: EditorShortcutAction<ToggleLeftPanelIntent>(
+            (_) => notifier.toggleLeft(),
+          ),
+          ToggleRightPanelIntent: EditorShortcutAction<ToggleRightPanelIntent>(
+            (_) => notifier.toggleRight(),
+          ),
+          ToggleTimelineIntent: EditorShortcutAction<ToggleTimelineIntent>(
+            (_) => notifier.toggleTimeline(),
+          ),
+          PreviewIntent: EditorShortcutAction<PreviewIntent>(
+            (_) => onPreview(),
+          ),
+          SaveIntent: EditorShortcutAction<SaveIntent>((_) => onSave?.call()),
+          SelectToolIntent: EditorShortcutAction<SelectToolIntent>(
+            (i) => editor.setTool(i.tool),
+          ),
+          ZoomInIntent: EditorShortcutAction<ZoomInIntent>(
+            (_) => canvas.zoomIn(),
+          ),
+          ZoomOutIntent: EditorShortcutAction<ZoomOutIntent>(
+            (_) => canvas.zoomOut(),
+          ),
+          ZoomTo100Intent: EditorShortcutAction<ZoomTo100Intent>(
+            (_) => canvas.zoomTo100(),
+          ),
+          ZoomToFitIntent: EditorShortcutAction<ZoomToFitIntent>(
+            (_) => canvas.zoomToFit(),
+          ),
+          ZoomToSelectionIntent: EditorShortcutAction<ZoomToSelectionIntent>((
+            _,
+          ) {
+            final st = ref.read(editorControllerProvider);
+            canvas.zoomToNodes(st.selection, breakpointId: st.breakpointId);
+          }),
+        },
+        child: Focus(
+          autofocus: true,
+          child: ColoredBox(
+            color: c.surface0,
+            child: Column(
+              children: [
+                EditorToolbar(
+                  title: title,
+                  onBack: onBack,
+                  onPreview: onPreview,
+                  onHelp: help,
+                  saveStatus: saveStatus,
                 ),
-              ),
-              _TimelineStrip(open: layout.timelineOpen),
-            ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (layout.leftOpen) ...[
+                        SizedBox(
+                          width: leftW.toDouble(),
+                          child: _LeftPanel(document: document),
+                        ),
+                        ResizeHandle(
+                          semanticLabel: 'Resize left panel',
+                          onDelta: (d) => notifier.setLeftWidth(
+                            leftW + d,
+                            available: width,
+                          ),
+                          onReset: () => notifier.setLeftWidth(264),
+                        ),
+                      ],
+                      const Expanded(child: EditorCanvas()),
+                      if (layout.rightOpen) ...[
+                        ResizeHandle(
+                          semanticLabel: 'Resize inspector',
+                          onDelta: (d) => notifier.setRightWidth(
+                            rightW - d,
+                            available: width,
+                          ),
+                          onReset: () => notifier.setRightWidth(288),
+                        ),
+                        SizedBox(
+                          width: rightW.toDouble(),
+                          child: const Inspector(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                _TimelineStrip(open: layout.timelineOpen),
+              ],
+            ),
           ),
         ),
       ),
@@ -367,12 +377,7 @@ class _LeftPanel extends ConsumerWidget {
               child: switch (tab) {
                 LeftPanelTab.scenes => const ScenesPanel(),
                 LeftPanelTab.layers => const LayersPanel(),
-                LeftPanelTab.assets => const _EmptyState(
-                  icon: SsIcons.image,
-                  title: 'Assets',
-                  body:
-                      'Images, video, audio and fonts you upload appear here.',
-                ),
+                LeftPanelTab.assets => const AssetsPanel(),
               },
             ),
           ),

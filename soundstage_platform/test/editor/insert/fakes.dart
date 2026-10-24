@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 
 import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
+import 'package:soundstage_platform/runtime/runtime.dart';
 
 /// An in-memory [EditorAssetService]. A file's pixel size is read from its
 /// first four bytes (big-endian width and height as 16-bit numbers), so
@@ -75,4 +77,24 @@ class FakeAssetService implements EditorAssetService {
 
   @override
   Future<ir.Asset?> stored(String assetId) async => entries[assetId];
+}
+
+/// Serves a 1 x 1 PNG for every `local://` image, so painting an inserted
+/// image has something to decode.
+class StubPngLoader implements LocalAssetLoader {
+  static final _png = Uint8List.fromList(
+    base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/'
+      'iZk9HQAAAABJRU5ErkJggg==',
+    ),
+  );
+
+  @override
+  Future<Uint8List?> loadBytes(String assetId) async => _png;
+
+  @override
+  Future<String?> acquireObjectUrl(String assetId) async => null;
+
+  @override
+  void releaseObjectUrl(String assetId) {}
 }
