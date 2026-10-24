@@ -34,6 +34,7 @@ export 'src/render/render_stage_text.dart';
 export 'src/render/shape_geometry.dart';
 export 'src/render/stage_environment.dart';
 export 'src/render/text/stage_text_layout.dart';
+export 'src/render/text/text_editing.dart';
 export 'src/render/text/text_reveal.dart';
 export 'src/render/text/text_style_mapping.dart';
 export 'src/scenes/sliver_stage_scene.dart';

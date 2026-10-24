@@ -9,6 +9,7 @@ import 'render_stage_box.dart';
 import 'render_stage_frame.dart' show stageDevicePixelRatio;
 import 'stage_environment.dart';
 import 'text/stage_text_layout.dart';
+import 'text/text_editing.dart';
 import 'text/text_paint.dart';
 import 'text/text_reveal.dart';
 
@@ -55,8 +56,79 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
     return StageTextLayout(
       paragraphs: _rendered,
       fonts: environment.fonts,
-      settings: _settings,
+      settings: _layoutSettings,
     );
+  }
+
+  /// [_settings], without truncation while [editing] reveals the full text.
+  StageTextSettings get _layoutSettings {
+    final s = _settings;
+    if (_editing?.revealFull != true || !s.truncates) return s;
+    return StageTextSettings(
+      autoResize: s.autoResize == ir.TextAutoResize.truncate
+          ? ir.TextAutoResize.fixed
+          : s.autoResize,
+      maxLines: s.maxLines,
+      alignVertical: s.alignVertical,
+      leadingTrim: s.leadingTrim,
+    );
+  }
+
+  // ---- In-place editing (T1.8) ----------------------------------------------
+
+  StageTextEditing? _editing;
+
+  /// The editing decoration (selection, caret, composing underline) the
+  /// editor sets on the node being edited; null outside edit mode. Paint
+  /// only, except that a truncating node relays out to show its full text.
+  StageTextEditing? get editing => _editing;
+  set editing(StageTextEditing? value) {
+    if (value == _editing) return;
+    final wasFull = _editing?.revealFull == true;
+    final full = value?.revealFull == true;
+    _editing = value;
+    if (wasFull != full && _settings.truncates) {
+      _resetLayouts();
+      markStageLayoutDirty();
+      return;
+    }
+    if (!_detaching) markNeedsPaint();
+  }
+
+  /// Text-editing geometry of the laid-out text, in this box's coordinates
+  /// (paragraph offsets). Needs a layout.
+  StageTextEditingGeometry get editingGeometry {
+    _syncAnimated();
+    _paint.relayout();
+    return StageTextEditingGeometry(_paint, hasSize ? size.height : 0);
+  }
+
+  /// The document offset nearest to [local] (a point in this box).
+  int textOffsetAt(Offset local) {
+    final (p, o) = editingGeometry.positionAt(local);
+    return documentOffsetOf(renderedParagraphs, p, o);
+  }
+
+  /// The caret rect at document [offset], in this box.
+  Rect caretRectAt(int offset, {bool upstream = false, double width = 1.5}) {
+    final (p, o) = paragraphPointOf(renderedParagraphs, offset);
+    return editingGeometry.caretRect(p, o, upstream: upstream, width: width);
+  }
+
+  /// The selection rects of document range [start, end), in this box.
+  List<Rect> selectionRectsFor(int start, int end) {
+    final paras = renderedParagraphs;
+    final (pa, oa) = paragraphPointOf(paras, start < end ? start : end);
+    final (pb, ob) = paragraphPointOf(paras, start < end ? end : start);
+    return editingGeometry.selectionRects(pa, oa, pb, ob);
+  }
+
+  /// The visual line around document [offset], as document offsets.
+  (int, int) lineBoundaryAt(int offset, {bool upstream = false}) {
+    final paras = renderedParagraphs;
+    final (p, o) = paragraphPointOf(paras, offset);
+    final (a, b) = editingGeometry.lineBoundary(p, o, upstream: upstream);
+    return (documentOffsetOf(paras, p, a), documentOffsetOf(paras, p, b));
   }
 
   // ---- Animated text styles (T0.7) ----------------------------------------------
@@ -294,6 +366,11 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
       ..relayout()
       ..reveal = _reveal;
     _reveal?.beginPaint();
+    final editing = _editing;
+    final geometry = editing == null
+        ? null
+        : StageTextEditingGeometry(_paint, size.height);
+    geometry?.paint(context.canvas, offset, editing!, _rendered, under: true);
     paintStageText(
       context: context,
       offset: offset,
@@ -307,6 +384,7 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
       devicePixelRatio: stageDevicePixelRatio(),
       opacity: paintOpacity,
     );
+    geometry?.paint(context.canvas, offset, editing!, _rendered, under: false);
   }
 
   @override
