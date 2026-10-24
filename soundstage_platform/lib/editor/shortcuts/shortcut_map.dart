@@ -372,6 +372,13 @@ const List<ShortcutDef> kEditorShortcuts = <ShortcutDef>[
     keys: [ShortcutKey(LogicalKeyboardKey.keyL)],
   ),
   ShortcutDef(
+    id: 'toolImage',
+    label: 'Place image',
+    group: 'Tools',
+    intent: SelectToolIntent(EditorTool.image),
+    keys: [ShortcutKey(LogicalKeyboardKey.keyK, mod: true, shift: true)],
+  ),
+  ShortcutDef(
     id: 'toolHand',
     label: 'Hand',
     group: 'Tools',

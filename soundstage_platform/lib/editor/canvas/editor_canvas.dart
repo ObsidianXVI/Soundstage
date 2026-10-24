@@ -10,6 +10,8 @@ import 'package:soundstage_platform/editor/core/editor_state.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
+import '../insert/canvas_drop.dart';
+import '../insert/insert_tool_layer.dart';
 import '../interaction/canvas_interaction.dart';
 import '../overlay/canvas_overlay.dart';
 import 'artboard.dart';
@@ -202,26 +204,30 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
           child: ClipRect(
             child: ColoredBox(
               color: c.surface0,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ArtboardCanvas(
-                    controller: _c,
-                    breakpointIds: [for (final b in boards) b.id],
-                    children: [
-                      for (final b in boards)
-                        Artboard(
-                          key: ValueKey<String>('artboard-${b.id}'),
-                          breakpoint: b,
-                          controller: _c,
-                          environment: env,
-                        ),
-                    ],
-                  ),
-                  CanvasOverlay(controller: _c),
-                  CanvasInteraction(controller: _c, pansWith: _pansWith),
-                  ArtboardChrome(controller: _c, breakpoints: boards),
-                ],
+              child: CanvasDropTarget(
+                controller: _c,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ArtboardCanvas(
+                      controller: _c,
+                      breakpointIds: [for (final b in boards) b.id],
+                      children: [
+                        for (final b in boards)
+                          Artboard(
+                            key: ValueKey<String>('artboard-${b.id}'),
+                            breakpoint: b,
+                            controller: _c,
+                            environment: env,
+                          ),
+                      ],
+                    ),
+                    CanvasOverlay(controller: _c),
+                    CanvasInteraction(controller: _c, pansWith: _pansWith),
+                    InsertToolLayer(controller: _c, pansWith: _pansWith),
+                    ArtboardChrome(controller: _c, breakpoints: boards),
+                  ],
+                ),
               ),
             ),
           ),
