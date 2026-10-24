@@ -8,7 +8,6 @@ import 'package:soundstage_platform/editor/inspector/sections/paint_stack.dart';
 import 'package:soundstage_platform/editor/inspector/sections/text_section.dart';
 import 'package:soundstage_platform/editor/text/text_edit_controller.dart';
 import 'package:soundstage_platform/editor/text/text_edit_session.dart';
-import 'package:soundstage_platform/editor/text/text_icons.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import 'inspector_harness.dart';
@@ -185,7 +184,7 @@ void main() {
     tester,
   ) async {
     final c = await _pump(tester);
-    await tester.tap(_icon('field:alignHorizontal', TextIcons.alignCenter));
+    await tester.tap(_icon('field:alignHorizontal', SsIcons.alignCenter));
     await tester.pump();
     expect(_t(c).alignHorizontal, ir.TextAlignHorizontal.center);
     await typeInto(tester, 'style.paragraphSpacing', '12');
@@ -196,7 +195,7 @@ void main() {
     await typeInto(tester, 'style.paragraphIndent', '8');
     expect(_t(c).content[1].style?.paragraphIndent, 8);
     expect(_t(c).content[0].style?.paragraphIndent, isNull);
-    await tester.tap(_icon('field:style.listStyle', TextIcons.listOrdered));
+    await tester.tap(_icon('field:style.listStyle', SsIcons.listOrdered));
     await tester.pump();
     expect(_t(c).content[1].style?.listStyle, ir.ListStyle.ordered);
   });
@@ -264,7 +263,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('field:style.openType.liga')));
     await tester.pump();
     expect(_t(c).style.openType!['liga'], 0);
-    await tester.tap(_icon('field:style.baselineShift', TextIcons.superscript));
+    await tester.tap(_icon('field:style.baselineShift', SsIcons.superscript));
     await tester.pump();
     expect(_t(c).style.baselineShift, ir.BaselineShift.superscript);
   });
@@ -284,7 +283,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('field:truncation')));
     await tester.pump();
     expect(_t(c).truncation, ir.TextTruncation.ending);
-    await tester.tap(_icon('field:alignVertical', TextIcons.alignBottom));
+    await tester.tap(
+      _icon('field:alignVertical', SsIcons.alignVerticalJustifyEnd),
+    );
     await tester.pump();
     expect(_t(c).alignVertical, ir.TextAlignVertical.bottom);
   });

@@ -5,7 +5,6 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../../core/core.dart';
 import '../../text/text_edit_controller.dart';
-import '../../text/text_icons.dart';
 import '../../text/text_style_target.dart';
 import '../fields/field_frame.dart';
 import '../fields/props.dart';
@@ -128,17 +127,17 @@ class _TextControls extends StatelessWidget {
           children: [
             BoolIconProp(
               path: 'style.italic',
-              icon: TextIcons.italic,
+              icon: SsIcons.italic,
               semanticLabel: 'Italic',
             ),
             _DecorationToggle(
               kind: 'underline',
-              icon: TextIcons.underline,
+              icon: SsIcons.underline,
               label: 'Underline',
             ),
             _DecorationToggle(
               kind: 'strikethrough',
-              icon: TextIcons.strikethrough,
+              icon: SsIcons.strikethrough,
               label: 'Strikethrough',
             ),
           ],
@@ -151,10 +150,10 @@ class _TextControls extends StatelessWidget {
           semanticLabel: 'Horizontal text alignment',
           iconOnly: true,
           options: [
-            EnumOption('left', 'Left', icon: TextIcons.alignLeft),
-            EnumOption('center', 'Centre', icon: TextIcons.alignCenter),
-            EnumOption('right', 'Right', icon: TextIcons.alignRight),
-            EnumOption('justified', 'Justify', icon: TextIcons.alignJustify),
+            EnumOption('left', 'Left', icon: SsIcons.alignLeft),
+            EnumOption('center', 'Centre', icon: SsIcons.alignCenter),
+            EnumOption('right', 'Right', icon: SsIcons.alignRight),
+            EnumOption('justified', 'Justify', icon: SsIcons.alignJustify),
           ],
         ),
       ),
@@ -165,9 +164,17 @@ class _TextControls extends StatelessWidget {
           semanticLabel: 'Vertical text alignment',
           iconOnly: true,
           options: [
-            EnumOption('top', 'Top', icon: TextIcons.alignTop),
-            EnumOption('middle', 'Middle', icon: TextIcons.alignMiddle),
-            EnumOption('bottom', 'Bottom', icon: TextIcons.alignBottom),
+            EnumOption('top', 'Top', icon: SsIcons.alignVerticalJustifyStart),
+            EnumOption(
+              'middle',
+              'Middle',
+              icon: SsIcons.alignVerticalJustifyCenter,
+            ),
+            EnumOption(
+              'bottom',
+              'Bottom',
+              icon: SsIcons.alignVerticalJustifyEnd,
+            ),
           ],
         ),
       ),
@@ -215,8 +222,8 @@ class _TextControls extends StatelessWidget {
           iconOnly: true,
           options: [
             EnumOption('none', 'No list', icon: SsIcons.minus),
-            EnumOption('unordered', 'Bullets', icon: TextIcons.list),
-            EnumOption('ordered', 'Numbers', icon: TextIcons.listOrdered),
+            EnumOption('unordered', 'Bullets', icon: SsIcons.list),
+            EnumOption('ordered', 'Numbers', icon: SsIcons.listOrdered),
           ],
         ),
       ),
@@ -227,13 +234,9 @@ class _TextControls extends StatelessWidget {
           semanticLabel: 'Baseline shift',
           iconOnly: true,
           options: [
-            EnumOption('none', 'Normal', icon: TextIcons.baseline),
-            EnumOption(
-              'superscript',
-              'Superscript',
-              icon: TextIcons.superscript,
-            ),
-            EnumOption('subscript', 'Subscript', icon: TextIcons.subscript),
+            EnumOption('none', 'Normal', icon: SsIcons.baseline),
+            EnumOption('superscript', 'Superscript', icon: SsIcons.superscript),
+            EnumOption('subscript', 'Subscript', icon: SsIcons.subscript),
           ],
         ),
       ),
