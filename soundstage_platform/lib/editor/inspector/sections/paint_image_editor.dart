@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -19,6 +20,7 @@ import 'package:soundstage_platform/runtime/runtime.dart'
         stageColor;
 
 import '../../core/core.dart';
+import '../../panels/asset_actions.dart';
 import '../fields/field_frame.dart';
 import '../fields/props.dart';
 import '../fields/rows.dart';
@@ -374,14 +376,19 @@ void _openAssetMenu(
           onSelected: () => w.set('$path.assetId', ir.IrValue.string(a.id)),
         ),
       const SsMenuDivider(),
-      const SsMenuItem(
+      SsMenuItem(
         label: 'Upload…',
         icon: SsIcons.imagePlus,
-        enabled: false,
+        onSelected: () => unawaited(_uploadAndUse(ref, w, path)),
       ),
-      const SsMenuLabel('Uploading comes with the Assets panel (T1.9)'),
     ],
   );
+}
+
+/// Picks an image file, adds it to the library and makes the paint use it.
+Future<void> _uploadAndUse(WidgetRef ref, PropertyWriter w, String path) async {
+  final asset = await ref.read(assetActionsProvider).uploadImage();
+  if (asset != null) w.set('$path.assetId', ir.IrValue.string(asset.id));
 }
 
 class _AssetChooser extends ConsumerWidget {

@@ -152,6 +152,38 @@ class LocalAssetStore implements LocalAssetLoader {
     return toAsset(meta);
   }
 
+  /// Replaces the file of asset [assetId] with [bytes] (re-analysed), keeping
+  /// its id, creation time and, unless [name] is given, its name: every use
+  /// in a document follows. Throws like [put]; nothing changes on failure.
+  Future<ir.Asset> replace(
+    String assetId,
+    Uint8List bytes,
+    String mime, {
+    String? name,
+  }) async {
+    final old = await _db.getAsset(assetId);
+    if (old == null) {
+      throw UnsupportedAssetException('There is no stored asset "$assetId".');
+    }
+    if (assetKindForMime(mime) == null) {
+      throw UnsupportedAssetException('"$mime" is not a supported media type.');
+    }
+    final analysis = await _analyzer.analyze(bytes, mime);
+    final meta = AssetMeta(
+      id: assetId,
+      mime: mime,
+      byteSize: bytes.length,
+      createdAt: old.meta.createdAt,
+      name: name ?? old.meta.name,
+      width: analysis.width,
+      height: analysis.height,
+      duration: analysis.duration,
+      dominantColor: analysis.dominantColor,
+    );
+    await _db.putAsset(AssetRecord(meta, bytes));
+    return toAsset(meta);
+  }
+
   /// Stores [bytes] under the id and metadata of [asset] (importing or
   /// duplicating a document: nothing is decoded again). Returns the entry
   /// with its `local://` URI.

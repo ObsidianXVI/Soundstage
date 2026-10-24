@@ -19,6 +19,26 @@ class SaveIntent extends ShellIntent {
   const SaveIntent();
 }
 
+/// Cmd+C / Cmd+X / Cmd+V / Shift+Cmd+V: the clipboard (T1.9). These stand
+/// down while a text field has focus, so the field copies and pastes its
+/// own text.
+class CopyIntent extends ShellIntent {
+  const CopyIntent();
+}
+
+class CutIntent extends ShellIntent {
+  const CutIntent();
+}
+
+class PasteIntent extends ShellIntent {
+  const PasteIntent();
+}
+
+/// Paste over the selection ("paste to replace").
+class PasteReplaceIntent extends ShellIntent {
+  const PasteReplaceIntent();
+}
+
 // -- Tools -----------------------------------------------------------------
 class SelectToolIntent extends ShellIntent {
   const SelectToolIntent(this.tool);

@@ -13,8 +13,9 @@ import 'editor_layout.dart';
 
 /// The editor toolbar: back, title, tools, edit scope, save status,
 /// undo/redo, zoom, panel toggles, preview and help, bound to the
-/// `EditorController` and the canvas camera. Insert tools select but do
-/// nothing yet (T1.9).
+/// `EditorController` and the canvas camera. The insert tools (frame, text,
+/// rectangle, ellipse, line) draw on the canvas (`InsertToolLayer`); the
+/// image tool opens the file picker.
 class EditorToolbar extends ConsumerWidget {
   const EditorToolbar({
     required this.title,
@@ -39,6 +40,8 @@ class EditorToolbar extends ConsumerWidget {
     (EditorTool.text, SsIcons.type, 'Text', 'toolText'),
     (EditorTool.rectangle, SsIcons.square, 'Rectangle', 'toolRectangle'),
     (EditorTool.ellipse, SsIcons.circle, 'Ellipse', 'toolEllipse'),
+    (EditorTool.line, SsIcons.minus, 'Line', 'toolLine'),
+    (EditorTool.image, SsIcons.imagePlus, 'Image', 'toolImage'),
     (EditorTool.hand, SsIcons.hand, 'Hand', 'toolHand'),
   ];
 

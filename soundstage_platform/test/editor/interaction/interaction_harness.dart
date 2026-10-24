@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/canvas/camera.dart';
@@ -254,6 +255,7 @@ Future<Harness> pumpCanvas(
   ir.StageDocument? doc,
   Size size = const Size(1800, 1000),
   CanvasCamera camera = const CanvasCamera(panX: 40, panY: 60),
+  List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -262,6 +264,7 @@ Future<Harness> pumpCanvas(
     ProviderScope(
       overrides: [
         initialDocumentProvider.overrideWithValue(doc ?? interactionDoc()),
+        ...overrides,
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

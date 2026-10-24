@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
@@ -142,12 +143,16 @@ Future<ProviderContainer> pumpPanel(
   ir.StageDocument? doc,
   double height = 600,
   double width = 264,
+  List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = Size(width + 40, height + 40);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
-    overrides: [initialDocumentProvider.overrideWithValue(doc ?? panelsDoc())],
+    overrides: [
+      initialDocumentProvider.overrideWithValue(doc ?? panelsDoc()),
+      ...overrides,
+    ],
   );
   addTearDown(container.dispose);
   await tester.pumpWidget(
