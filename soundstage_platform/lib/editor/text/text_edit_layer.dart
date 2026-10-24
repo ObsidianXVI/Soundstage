@@ -40,9 +40,18 @@ const Duration kCaretBlink = Duration(milliseconds: 530);
 /// - On hover, a text node with a semantic role shows a small role label at
 ///   its top-left.
 class TextEditLayer extends ConsumerStatefulWidget {
-  const TextEditLayer({required this.controller, super.key});
+  const TextEditLayer({
+    required this.controller,
+    this.contentOnly = false,
+    super.key,
+  });
 
   final CanvasController controller;
+
+  /// Content mode (T1.13): sessions change the words only (no style or
+  /// link shortcuts), and a tap places the caret instead of selecting a
+  /// word.
+  final bool contentOnly;
 
   @override
   ConsumerState<TextEditLayer> createState() => TextEditLayerState();
@@ -135,6 +144,7 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
       onExit: () => _end(),
       onLinkRequest: _showLinkPrompt,
       onRestoreEditMode: _onRestore,
+      contentOnly: widget.contentOnly,
     );
     final typed = _typeStart;
     _typeStart = null;
@@ -147,10 +157,16 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
       if (local != null &&
           box != null &&
           (Offset.zero & box.size).inflate(4).contains(local)) {
-        // Entered by double-click: select the word; a third click selects
-        // the paragraph.
-        session.selectWordAt(box.textOffsetAt(local));
-        _clicks = 2;
+        if (widget.contentOnly) {
+          // A tap: the caret goes where the finger is.
+          session.pointerAt(box.textOffsetAt(local));
+          _clicks = 1;
+        } else {
+          // Entered by double-click: select the word; a third click
+          // selects the paragraph.
+          session.selectWordAt(box.textOffsetAt(local));
+          _clicks = 2;
+        }
         _lastClickTime = down.time;
         _lastClickAt = _toLayer(down.global);
       }

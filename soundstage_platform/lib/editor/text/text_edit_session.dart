@@ -63,6 +63,7 @@ class TextEditSession extends ChangeNotifier
     this.onExit,
     this.onLinkRequest,
     this.onRestoreEditMode,
+    this.contentOnly = false,
   }) : _mac = mac ?? _isMac(),
        _clock = clock ?? _defaultClock,
        historyAnchor = controller.history.lastEntry {
@@ -73,6 +74,10 @@ class TextEditSession extends ChangeNotifier
   }
 
   final EditorController controller;
+
+  /// Content mode (T1.13): only the words change. Bold/italic/underline,
+  /// links and role shortcuts do nothing.
+  final bool contentOnly;
 
   /// The current editor state (`ref.read(editorControllerProvider)`).
   final EditorState Function() readState;
@@ -282,6 +287,7 @@ class TextEditSession extends ChangeNotifier
   /// Cmd+B / I / U: toggles [t] over the selection, or for the next typed
   /// text at a collapsed caret.
   void toggle(TextToggle t) {
+    if (contentOnly) return;
     final rn = resolvedNode;
     if (rn == null) return;
     final c = content;
@@ -345,6 +351,7 @@ class TextEditSession extends ChangeNotifier
   /// with a collapsed caret outside a link, the URL is inserted as linked
   /// text.
   void applyLink(String? url) {
+    if (contentOnly) return;
     final link = url == null || url.trim().isEmpty
         ? null
         : ir.SpanLink.url(url.trim());
@@ -372,6 +379,7 @@ class TextEditSession extends ChangeNotifier
   /// Sets the node's semantic role (Cmd+Alt+1…6, 0). Roles are not per
   /// breakpoint.
   void setRole(ir.NodeRole role) {
+    if (contentOnly) return;
     _endBurst();
     _remember(readState().revision);
     controller.execute(_SharedSetProperty(nodeId, 'role', role.name));
@@ -469,7 +477,7 @@ class TextEditSession extends ChangeNotifier
           toggle(TextToggle.underline);
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyK when !shift:
-          onLinkRequest?.call();
+          if (!contentOnly) onLinkRequest?.call();
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyZ:
           if (!(shift ? redo() : undo())) onExit?.call();

@@ -575,3 +575,20 @@ ir.FrameNode reorderInFlow(ir.FrameNode frame, Set<String> ids, int step) {
     children: [for (final c in frame.children) flows(c) ? order[k++] : c],
   );
 }
+
+/// Runs [inner] against the shared base whatever the edit scope is (content
+/// mode: its edits are about the story's words and media, not about one
+/// breakpoint's layout).
+class BaseScoped extends EditCommand {
+  const BaseScoped(this.inner);
+
+  final EditCommand inner;
+
+  @override
+  String get label => inner.label;
+
+  @override
+  CommandResult apply(EditorState state) => inner.apply(
+    state.copyWith(editScope: EditScope.both, scopeFlipped: false),
+  );
+}
