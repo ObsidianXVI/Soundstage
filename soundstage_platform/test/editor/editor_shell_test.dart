@@ -87,7 +87,14 @@ void main() {
         );
         expect(find.text('Scenes'), findsOneWidget);
         expect(find.text('Opening'), findsOneWidget);
-        expect(find.text('Nothing selected'), findsOneWidget);
+        // Nothing selected: the inspector shows the active scene's settings.
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey<String>('inspector')),
+            matching: find.text('Scene settings'),
+          ),
+          findsOneWidget,
+        );
         expect(find.text('Timeline'), findsOneWidget);
         // One artboard per primary breakpoint (desktop and mobile).
         expect(find.byType(Artboard), findsNWidgets(2));

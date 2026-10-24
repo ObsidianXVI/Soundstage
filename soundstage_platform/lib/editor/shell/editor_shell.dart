@@ -9,6 +9,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../core/editor_controller.dart';
+import '../inspector/inspector.dart';
 import '../panels/layers_panel.dart';
 import '../panels/scenes_panel.dart';
 import '../shortcuts/editor_shortcuts.dart';
@@ -284,7 +285,7 @@ class _DockedEditor extends ConsumerWidget {
                       ),
                       SizedBox(
                         width: rightW.toDouble(),
-                        child: const _InspectorPlaceholder(),
+                        child: const Inspector(),
                       ),
                     ],
                   ],
@@ -379,115 +380,6 @@ class _LeftPanel extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// The inspector arrives in T1.7; until then it names the selection.
-class _InspectorPlaceholder extends ConsumerWidget {
-  const _InspectorPlaceholder();
-
-  static String kindOf(ir.Node n) => switch (n) {
-    ir.FrameNode(:final autoLayout) =>
-      autoLayout == null ? 'Frame' : 'Frame · auto layout',
-    ir.TextNode() => 'Text',
-    ir.ShapeNode(:final geometry) => switch (geometry) {
-      ir.RectangleGeometry() => 'Rectangle',
-      ir.EllipseGeometry() => 'Ellipse',
-      ir.LineGeometry() => 'Line',
-      ir.PolygonGeometry() => 'Polygon',
-      ir.StarGeometry() => 'Star',
-    },
-    ir.InstanceNode() => 'Instance',
-    ir.VideoNode() => 'Video',
-    ir.EmbedNode() => 'Embed',
-  };
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = context.ss;
-    final c = t.colors;
-    final selection = ref.watch(
-      editorControllerProvider.select((s) => s.selection),
-    );
-    final bp = ref.watch(
-      editorControllerProvider.select((s) => s.breakpointId),
-    );
-    Widget body;
-    if (selection.isEmpty || bp == null) {
-      body = const _EmptyState(
-        icon: SsIcons.slidersHorizontal,
-        title: 'Nothing selected',
-        body: 'Select a layer to edit its properties.',
-      );
-    } else {
-      final index = ref.watch(resolvedForProvider(bp)).resolved.nodeIndex;
-      final nodes = [
-        for (final id in selection)
-          if (index[id] case final n?) n.node,
-      ];
-      body = Padding(
-        padding: const EdgeInsets.all(SsSpace.s3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (nodes.length == 1) ...[
-              Text(
-                nodes.single.common.name.isEmpty
-                    ? kindOf(nodes.single)
-                    : nodes.single.common.name,
-                key: const ValueKey<String>('inspector-selection-name'),
-                style: t.text.bodyStrong,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: SsSpace.s1),
-              Text(
-                kindOf(nodes.single),
-                key: const ValueKey<String>('inspector-selection-kind'),
-                style: t.text.small.copyWith(color: c.textSecondary),
-              ),
-            ] else
-              Text(
-                '${selection.length} layers selected',
-                key: const ValueKey<String>('inspector-selection-name'),
-                style: t.text.bodyStrong,
-              ),
-            const SizedBox(height: SsSpace.s3),
-            Text(
-              'Properties arrive with the inspector.',
-              style: t.text.caption,
-            ),
-          ],
-        ),
-      );
-    }
-    return Container(
-      color: c.surface1,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(
-            height: 36,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: SsSpace.s3),
-                child: _InspectorTitle(),
-              ),
-            ),
-          ),
-          Expanded(child: body),
-        ],
-      ),
-    );
-  }
-}
-
-class _InspectorTitle extends StatelessWidget {
-  const _InspectorTitle();
-
-  @override
-  Widget build(BuildContext context) =>
-      Text('Inspector', style: context.ss.text.bodyStrong);
 }
 
 class _TimelineStrip extends ConsumerWidget {

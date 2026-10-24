@@ -18,7 +18,12 @@ arrow-up arrow-down align-start-vertical align-center-vertical align-end-vertica
 align-start-horizontal align-center-horizontal align-end-horizontal monitor tablet
 smartphone link unlink grip-vertical music book-open external-link rotate-ccw
 sliders-horizontal scan component command circle-help eye-closed audio-lines film
-layout-template mouse-pointer scaling ruler''';
+layout-template mouse-pointer scaling ruler
+align-horizontal-space-between align-vertical-space-between flip-horizontal
+flip-vertical wrap-text arrow-left-right arrow-up-down square-dashed ban crop
+rotate-cw expand shrink chevrons-up-down grip-horizontal blend droplet sun
+square-round-corner ellipsis-vertical image-plus fold-horizontal unfold-horizontal
+move-horizontal move-vertical circle-dashed''';
 
 String _camel(String kebab) {
   final parts = kebab.split('-');

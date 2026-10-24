@@ -41,10 +41,7 @@ void main() {
       );
 
       test('uses the shared-base model and validates clean', () {
-        expect(doc.primaryBreakpoints.map((b) => b.id), [
-          'desktop',
-          'mobile',
-        ]);
+        expect(doc.primaryBreakpoints.map((b) => b.id), ['desktop', 'mobile']);
         expect(validateDocument(doc), isEmpty);
       });
 

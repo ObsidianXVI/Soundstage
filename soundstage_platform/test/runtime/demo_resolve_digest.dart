@@ -3,13 +3,7 @@ import 'dart:convert';
 import 'package:soundstage_platform/ir/ir.dart';
 
 /// The demo documents under `assets/demo/`.
-const demoFiles = [
-  'motion',
-  'paint_gallery',
-  'sound',
-  'spike',
-  'static',
-];
+const demoFiles = ['motion', 'paint_gallery', 'sound', 'spike', 'static'];
 
 /// Viewport widths the demos are compared at.
 const digestWidths = [390.0, 834.0, 1440.0];
