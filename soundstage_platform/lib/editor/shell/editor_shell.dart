@@ -242,7 +242,7 @@ class _DockedEditor extends ConsumerWidget {
         ),
         ZoomToSelectionIntent: EditorShortcutAction<ZoomToSelectionIntent>((_) {
           final st = ref.read(editorControllerProvider);
-          canvas.zoomToNodes(st.selection, breakpointId: st.breakpointId);
+          canvas.zoomToNodes(st.selection, breakpointId: st.artboardId);
         }),
       },
       child: Focus(

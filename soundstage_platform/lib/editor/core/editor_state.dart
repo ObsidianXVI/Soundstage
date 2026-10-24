@@ -43,7 +43,10 @@ abstract class HistoryStatus with _$HistoryStatus {
 ///   (Figma's selection level); null means the active scene's root.
 /// - `textEditId`: the text node being edited in place, if any.
 /// - `activeSceneId`, `editingBreakpointId`: the scene on the canvas and the
-///   artboard (breakpoint) being edited.
+///   artboard (its primary breakpoint) being edited.
+/// - `artboardWidths`: the free preview width of each artboard that is not
+///   at its design width (mirrored from the canvas), so edits know the
+///   breakpoint in effect there ([breakpointId]).
 /// - `editScope` plus `scopeFlipped` (Alt held): see [effectiveScope].
 /// - `autoKey`: write keyframes at the playhead (M2; ignored in M1).
 /// - `playheads`: clock time per scene id (0 in M1).
@@ -60,6 +63,7 @@ abstract class EditorState with _$EditorState {
     String? hoverId,
     String? activeSceneId,
     String? editingBreakpointId,
+    @Default(<String, double>{}) Map<String, double> artboardWidths,
     @Default(EditScope.both) EditScope editScope,
     @Default(false) bool scopeFlipped,
     @Default(EditorTool.move) EditorTool tool,
@@ -94,12 +98,27 @@ abstract class EditorState with _$EditorState {
     return null;
   }
 
-  /// The breakpoint edits go to: [editingBreakpointId] when it exists, else
-  /// the document's default.
-  String? get breakpointId {
+  /// The edited artboard (its primary breakpoint's id):
+  /// [editingBreakpointId] when it exists, else the document's default.
+  String? get artboardId {
     final id = editingBreakpointId;
     if (id != null && document.breakpoints.any((b) => b.id == id)) return id;
     return defaultBreakpointId(document);
+  }
+
+  /// The breakpoint in effect on the edited artboard, which edits, the
+  /// inspector and provenance use (DECISIONS wave D: "what you edit is what
+  /// you see"): the artboard's own breakpoint at its design width, else the
+  /// breakpoint its free width falls in.
+  String? get breakpointId => effectiveBreakpointOf(artboardId);
+
+  /// The breakpoint in effect on the artboard of [artboardId] (see
+  /// [breakpointId]).
+  String? effectiveBreakpointOf(String? artboardId) {
+    if (artboardId == null) return null;
+    final w = artboardWidths[artboardId];
+    if (w == null) return artboardId;
+    return ir.breakpointForWidth(document, w)?.id ?? artboardId;
   }
 
   /// Ids of the primary breakpoints (the side-by-side artboards).

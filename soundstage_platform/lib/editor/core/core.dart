@@ -5,6 +5,7 @@ library;
 
 export 'command.dart';
 export 'commands/align_commands.dart';
+export 'commands/breakpoint_commands.dart';
 export 'commands/gesture_commands.dart';
 export 'commands/node_commands.dart';
 export 'commands/property_commands.dart';

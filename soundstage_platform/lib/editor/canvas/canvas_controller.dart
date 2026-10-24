@@ -307,9 +307,17 @@ class _Signal extends ChangeNotifier {
 
 /// The canvas state of the editor in scope (one per editor: it is scoped
 /// with `initialDocumentProvider`, so each opened story gets its own).
+///
+/// Its free preview widths are mirrored into the editor state
+/// (`EditorController.setArtboardWidths`), so edits go to the breakpoint in
+/// effect on the edited artboard.
 final canvasControllerProvider = Provider<CanvasController>((ref) {
   ref.watch(initialDocumentProvider);
   final c = CanvasController();
+  void sync() => ref
+      .read(editorControllerProvider.notifier)
+      .setArtboardWidths(c.previewWidths.value);
+  c.previewWidths.addListener(sync);
   ref.onDispose(c.dispose);
   return c;
-}, dependencies: [initialDocumentProvider]);
+}, dependencies: [initialDocumentProvider, editorControllerProvider]);

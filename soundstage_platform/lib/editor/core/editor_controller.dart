@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -221,7 +222,7 @@ class EditorController extends Notifier<EditorState> {
       selectionContext: s.context,
       textEditId: s.textEditId,
     );
-    if (starts) events.requestTextEdit(s.textEditId!, state.breakpointId);
+    if (starts) events.requestTextEdit(s.textEditId!, state.artboardId);
   }
 
   /// The current selection as a [SelectionState].
@@ -316,6 +317,14 @@ class EditorController extends Notifier<EditorState> {
     if (state.document.breakpoints.any((b) => b.id == breakpointId)) {
       state = state.copyWith(editingBreakpointId: breakpointId);
     }
+  }
+
+  /// The artboards' free preview widths (artboard id → width; absent = at
+  /// the design width), mirrored from the canvas. They decide the
+  /// breakpoint in effect on the edited artboard (`EditorState.breakpointId`).
+  void setArtboardWidths(Map<String, double> widths) {
+    if (mapEquals(widths, state.artboardWidths)) return;
+    state = state.copyWith(artboardWidths: Map.unmodifiable(widths));
   }
 
   void setTool(EditorTool tool) => state = state.copyWith(tool: tool);
