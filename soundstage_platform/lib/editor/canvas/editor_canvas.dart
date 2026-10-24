@@ -52,6 +52,11 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   StageEnvironment? _env;
   Object? _envKey;
 
+  /// Decoded images and failed loads, kept across environment changes (an
+  /// asset added or replaced keeps every other image decoded; a changed
+  /// asset record retries its failed load at once).
+  final StageImageCache _images = StageImageCache();
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +68,7 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
     _c.detachTicker();
+    _images.clear();
     super.dispose();
   }
 
@@ -142,7 +148,11 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
         last.$2 != key.$2 ||
         last.$3 != key.$3) {
       _envKey = key;
-      _env = StageEnvironment.forDocument(doc, mode: StageRenderMode.edit);
+      _env = StageEnvironment.forDocument(
+        doc,
+        mode: StageRenderMode.edit,
+        imageCache: _images,
+      );
     }
     return _env!;
   }
