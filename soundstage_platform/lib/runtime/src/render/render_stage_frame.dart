@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -333,14 +334,37 @@ class RenderStageFrame extends RenderStageBox
   Size performStageLayout() {
     final l = computeFrameLayout(constraints);
     final children = getChildrenAsList();
+    var bottom = 0.0;
     for (var i = 0; i < children.length; i++) {
       final child = children[i];
       final box = l.boxes[i];
       child.layout(BoxConstraints.tight(box.size));
       (child.parentData! as StageParentData).offset = box.topLeft;
+      if (child.common.visible) {
+        bottom = math.max(bottom, rotatedBottom(box, child.common.rotation));
+      }
     }
+    _contentBottom = bottom;
     _paintOrdered = [for (final i in l.paintOrder) children[i]];
     return l.size;
+  }
+
+  double _contentBottom = 0;
+
+  /// The lowest bottom edge of the visible children's boxes (rotated boxes
+  /// count with their rotated footprint; paint-only `motion` does not), in
+  /// this frame's coordinates, as of the last layout. A flow scene grows its
+  /// root to it (`RenderStageScene`).
+  double get contentBottom => _contentBottom;
+
+  /// The bottom of [box] turned by [rotation] degrees about its centre.
+  static double rotatedBottom(Rect box, double rotation) {
+    final deg = rotation % 360;
+    if (deg == 0) return box.bottom;
+    final a = deg * math.pi / 180;
+    final extent =
+        (box.width * math.sin(a)).abs() + (box.height * math.cos(a)).abs();
+    return box.center.dy + extent / 2;
   }
 
   // ---- Paint --------------------------------------------------------------------

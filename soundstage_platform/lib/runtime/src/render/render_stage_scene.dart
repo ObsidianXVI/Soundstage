@@ -3,7 +3,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../paint/appearance_painter.dart';
 import 'render_stage_box.dart';
-import 'render_stage_frame.dart' show stageDevicePixelRatio;
+import 'render_stage_frame.dart' show RenderStageFrame, stageDevicePixelRatio;
 import 'stage_environment.dart';
 
 /// Hosts one scene's stage root at a viewport size (architecture §3.2) and
@@ -11,7 +11,13 @@ import 'stage_environment.dart';
 ///
 /// - `pinned`: the root is sized to the viewport.
 /// - `flow`: the root is laid out at the viewport width with its own
-///   vertical sizing (hug or stored height); the scene is that tall.
+///   vertical sizing (hug or stored height), and then **grows to its
+///   content**: when a child's (rotated) box reaches below that height, the
+///   root is laid out again exactly as tall as the lowest child bottom, so
+///   nothing below the stored height is clipped or unreachable (DECISIONS
+///   wave D). Its reference size stays the stored height, so top-anchored
+///   children keep their place; bottom/centre/scale-anchored children follow
+///   the grown bottom. One extra pass at most.
 ///
 /// Scrolling, pinning and the scene clock are T0.6 (`SliverStageScene`).
 class RenderStageScene extends RenderBox
@@ -76,6 +82,15 @@ class RenderStageScene extends RenderBox
       return;
     }
     c.layout(_childConstraints, parentUsesSize: true);
+    if (_kind == ir.SceneKind.flow) {
+      final bottom = c is RenderStageFrame ? c.contentBottom : 0.0;
+      if (bottom > c.size.height + 0.5) {
+        c.layout(
+          BoxConstraints.tightFor(width: _viewportSize.width, height: bottom),
+          parentUsesSize: true,
+        );
+      }
+    }
     size = constraints.constrain(
       _kind == ir.SceneKind.pinned ? _viewportSize : c.size,
     );
