@@ -398,7 +398,7 @@ class TextEditSession extends ChangeNotifier
     if (!alive) return false;
     final s = _selectionAt[readState().revision];
     _composing = TextRange.empty;
-    selection = s ?? TextSelection.collapsed(offset: text.length);
+    selection = s ?? _selection;
     _syncPlatform(force: true);
     notifyListeners();
     return true;
