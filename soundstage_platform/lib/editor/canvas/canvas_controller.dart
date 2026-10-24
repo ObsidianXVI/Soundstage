@@ -71,6 +71,31 @@ class ArtboardInfo {
   Rect worldRect = Rect.zero;
 }
 
+/// The gradient paint being edited with on-canvas handles (T1.7b): paint
+/// [paintId] of the stack at [stackPath] (`fills` or `strokes.paints`) of
+/// node [nodeId].
+@immutable
+class GradientEditTarget {
+  const GradientEditTarget(this.nodeId, this.stackPath, this.paintId);
+
+  final String nodeId;
+  final String stackPath;
+  final String paintId;
+
+  /// The paint's property path (`fills.<paintId>`).
+  String get path => '$stackPath.$paintId';
+
+  @override
+  bool operator ==(Object other) =>
+      other is GradientEditTarget &&
+      other.nodeId == nodeId &&
+      other.stackPath == stackPath &&
+      other.paintId == paintId;
+
+  @override
+  int get hashCode => Object.hash(nodeId, stackPath, paintId);
+}
+
 /// The editor canvas's own state (one per editor): the camera, the
 /// free-width preview widths and the artboards' live geometry. UI state, so
 /// it lives here and not in `EditorState`.
@@ -93,6 +118,15 @@ class CanvasController {
   final ValueNotifier<Map<String, double>> previewWidths = ValueNotifier(
     const {},
   );
+
+  /// The gradient being edited on the canvas, or null (T1.7b). The
+  /// inspector's "edit on canvas" toggle sets it; Esc, a selection change
+  /// or the paint going away clears it.
+  final ValueNotifier<GradientEditTarget?> gradientEdit = ValueNotifier(null);
+
+  /// Starts or stops editing [target] on the canvas.
+  void toggleGradientEdit(GradientEditTarget target) =>
+      gradientEdit.value = gradientEdit.value == target ? null : target;
 
   /// Fires when the artboards' layout changed (sizes, positions) or what
   /// they show; for painters only.
@@ -296,6 +330,7 @@ class CanvasController {
     _anim = null;
     camera.dispose();
     previewWidths.dispose();
+    gradientEdit.dispose();
     interaction.dispose();
     _geometry.dispose();
   }

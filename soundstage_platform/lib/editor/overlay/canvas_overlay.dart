@@ -13,6 +13,7 @@ import '../canvas/camera.dart';
 import '../canvas/canvas_controller.dart';
 import '../inspector/fields/field_frame.dart' show overrideColor;
 import '../interaction/transform_math.dart';
+import 'gradient_handles.dart';
 import 'interaction_model.dart';
 import 'overlay_geometry.dart';
 import 'selection_frame.dart';
@@ -93,6 +94,7 @@ class _CanvasOverlayState extends ConsumerState<CanvasOverlay> {
             widget.controller.camera,
             widget.controller.geometry,
             widget.controller.interaction,
+            widget.controller.gradientEdit,
             _model,
           ]),
         ),
@@ -281,6 +283,7 @@ class OverlayPainter extends CustomPainter {
         canvas.drawPath(o.outline, hair..color = colors.accent);
       }
       _overrideMarkers(canvas, a);
+      _gradientHandles(canvas, a);
       if (model.selection.isNotEmpty) {
         final frame = SelectionFrame.of(geometry, model.selection, bp);
         if (frame != null) {
@@ -340,6 +343,67 @@ class OverlayPainter extends CustomPainter {
         ..drawPath(diamond, fill)
         ..drawPath(diamond, edge);
       debugOverrideMarkers.add((id, a.breakpointId));
+    }
+  }
+
+  /// Handle radius (screen px) of the on-canvas gradient editor.
+  static const double gradientHandleRadius = 5;
+
+  /// The on-canvas gradient handles (T1.7b) on artboard [a]: the start →
+  /// end line with the colour stops on it, a dashed line to the width
+  /// handle (radial, angular, diamond), and the handle dots.
+  void _gradientHandles(Canvas canvas, ArtboardInfo a) {
+    final target = geometry.canvas.gradientEdit.value;
+    if (target == null || !model.selection.contains(target.nodeId)) return;
+    final box = a.registry[target.nodeId];
+    final o = geometry.rectFor(target.nodeId, a.breakpointId);
+    if (box == null || o == null) return;
+    final paint = gradientPaintOf(box.node, target.path);
+    if (paint == null) return;
+    final pts = GradientHandlePoints.of(paint.handles, o.size);
+    final s = o.toScreen(pts.start), e = o.toScreen(pts.end);
+    final shadow = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = const Color(0x66000000);
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xFFFFFFFF);
+    canvas
+      ..drawLine(s, e, shadow)
+      ..drawLine(s, e, line);
+    if (hasWidthHandle(paint.kind)) {
+      final w = o.toScreen(pts.width);
+      _dashed(canvas, s, w, shadow);
+      _dashed(canvas, s, w, line);
+    }
+    final white = Paint()..color = const Color(0xFFFFFFFF);
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = colors.accent;
+    void dot(Offset c, double r) {
+      canvas
+        ..drawCircle(c, r + 1, shadow..style = PaintingStyle.fill)
+        ..drawCircle(c, r, white)
+        ..drawCircle(c, r, ring);
+      shadow.style = PaintingStyle.stroke;
+    }
+
+    dot(s, gradientHandleRadius);
+    dot(e, gradientHandleRadius);
+    if (hasWidthHandle(paint.kind)) {
+      dot(o.toScreen(pts.width), gradientHandleRadius - 1);
+    }
+    for (final stop in paint.stops) {
+      final c = o.toScreen(pts.stopPoint(stop.position));
+      final r = Rect.fromCenter(center: c, width: 10, height: 10);
+      canvas
+        ..drawRect(r.inflate(1.5), white)
+        ..drawRect(r, Paint()..color = stageColor(stop.color))
+        ..drawRect(r.inflate(1.5), ring..strokeWidth = 1);
+      ring.strokeWidth = 1.5;
     }
   }
 

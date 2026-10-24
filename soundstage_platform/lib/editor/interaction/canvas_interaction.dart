@@ -11,6 +11,8 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
 import '../canvas/canvas_controller.dart';
+import '../overlay/canvas_overlay.dart' show OverlayPainter;
+import '../overlay/gradient_handles.dart';
 import '../overlay/interaction_model.dart';
 import '../overlay/overlay_geometry.dart';
 import '../overlay/selection_frame.dart';
@@ -123,6 +125,14 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
+    // Gradient editing ends when its node leaves the selection.
+    ref.listenManual(editorControllerProvider.select((s) => s.selection), (
+      _,
+      next,
+    ) {
+      final t = _c.gradientEdit.value;
+      if (t != null && !next.contains(t.nodeId)) _c.gradientEdit.value = null;
+    });
   }
 
   @override
@@ -154,6 +164,17 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
       }
       if (_isModifier(e.logicalKey)) s.update(_pointer, _modifiers());
       return false;
+    }
+    if (e is KeyDownEvent &&
+        e.logicalKey == LogicalKeyboardKey.escape &&
+        _c.gradientEdit.value != null) {
+      // Esc leaves gradient editing first (not "select parent").
+      _c.gradientEdit.value = null;
+      final keep = _ctl.selectionState;
+      scheduleMicrotask(() {
+        if (mounted) _ctl.applySelection(keep);
+      });
+      return true;
     }
     final alt = HardwareKeyboard.instance.isAltPressed;
     if (alt != _alt) {
@@ -302,6 +323,8 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
       return;
     }
 
+    if (_gradientPress(p, mods)) return;
+
     final z = _zoneAt(p);
     if (z != null) {
       _ctl.setEditingBreakpoint(z.breakpointId);
@@ -445,6 +468,112 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
         }
         return null;
     }
+  }
+
+  // ---- Gradient handles (T1.7b) ------------------------------------------
+
+  /// What a press at [p] hits of the gradient being edited, on the artboard
+  /// under it: a handle, a colour stop, or (with [onLine]) the start → end
+  /// line. Null when gradient editing is off or nothing is hit.
+  ({
+    String breakpointId,
+    OverlayRect rect,
+    ir.GradientPaint paint,
+    GradientHandleKind? handle,
+    int? stop,
+    double? linePosition,
+  })?
+  _gradientHit(Offset p) {
+    final target = _c.gradientEdit.value;
+    if (target == null || !_st.selection.contains(target.nodeId)) return null;
+    final bp = _g.artboardAt(p);
+    if (bp == null) return null;
+    final box = _c.artboards[bp]?.registry[target.nodeId];
+    final o = _g.rectFor(target.nodeId, bp);
+    if (box == null || o == null) return null;
+    final paint = gradientPaintOf(box.node, target.path);
+    if (paint == null) return null;
+    final pts = GradientHandlePoints.of(paint.handles, o.size);
+    const slop = OverlayPainter.gradientHandleRadius + 3;
+    final handles = [
+      (GradientHandleKind.end, pts.end),
+      (GradientHandleKind.start, pts.start),
+      if (hasWidthHandle(paint.kind)) (GradientHandleKind.width, pts.width),
+    ];
+    for (final (kind, at) in handles) {
+      if ((o.toScreen(at) - p).distance <= slop) {
+        return (
+          breakpointId: bp,
+          rect: o,
+          paint: paint,
+          handle: kind,
+          stop: null,
+          linePosition: null,
+        );
+      }
+    }
+    for (var i = paint.stops.length - 1; i >= 0; i--) {
+      final at = o.toScreen(pts.stopPoint(paint.stops[i].position));
+      if ((at - p).distance <= 7) {
+        return (
+          breakpointId: bp,
+          rect: o,
+          paint: paint,
+          handle: null,
+          stop: i,
+          linePosition: null,
+        );
+      }
+    }
+    final inv = Matrix4.tryInvert(o.transform);
+    if (inv == null) return null;
+    final local = MatrixUtils.transformPoint(inv, p);
+    final t = pts.positionAt(local);
+    if ((o.toScreen(pts.stopPoint(t)) - p).distance <= 4) {
+      return (
+        breakpointId: bp,
+        rect: o,
+        paint: paint,
+        handle: null,
+        stop: null,
+        linePosition: t,
+      );
+    }
+    return null;
+  }
+
+  /// Starts a handle or stop drag, or (Alt-click on the line) adds a stop.
+  /// Returns whether the press was the gradient editor's.
+  bool _gradientPress(Offset p, CanvasModifiers mods) {
+    final hit = _gradientHit(p);
+    if (hit == null) return false;
+    final target = _c.gradientEdit.value!;
+    _ctl.setEditingBreakpoint(hit.breakpointId);
+    final t = hit.linePosition;
+    if (t != null) {
+      if (!mods.alt) return false;
+      _ctl.execute(
+        SetProperty(
+          [target.nodeId],
+          target.path,
+          ir.IrValue.paint(gradientWithStopAt(hit.paint, t)),
+        ),
+      );
+      return true;
+    }
+    final key = 'gradient:${identityHashCode(this)}:${++_serial}';
+    _session = _GradientSession(
+      this,
+      hit.breakpointId,
+      key,
+      target,
+      hit.rect,
+      hit.paint,
+      handle: hit.handle,
+      stop: hit.stop,
+      pressAt: p,
+    );
+    return true;
   }
 
   // ---- Shared helpers ---------------------------------------------------
@@ -611,6 +740,83 @@ abstract class _Transform extends _Session {
     apply(unchanged, from: startDoc, selection: startSelection);
     s._ctl.endGesture();
     s._m.clearGesture();
+  }
+}
+
+// ---- Gradient handles -------------------------------------------------------
+
+/// A drag of a gradient handle or colour stop (T1.7b): every move writes
+/// the normalised handles (or the stop position) through `SetProperty`,
+/// recomputed from the gesture's start (one undo step). Shift snaps the
+/// axis angle to 15°.
+class _GradientSession extends _Transform {
+  _GradientSession(
+    super.s,
+    super.bp,
+    super.key,
+    this.target,
+    this.rect,
+    this.paint, {
+    required Offset pressAt,
+    this.handle,
+    this.stop,
+  }) : super(
+         label: handle == null ? 'Move gradient stop' : 'Move gradient handle',
+       ) {
+    s._m.update((m) => m.breakpointId = bp);
+    // Keep the grab point under the pointer (no jump to the handle centre).
+    final h = handle;
+    final inv = Matrix4.tryInvert(rect.transform);
+    if (h != null && inv != null) {
+      final pts = GradientHandlePoints.of(paint.handles, rect.size);
+      final at = switch (h) {
+        GradientHandleKind.start => pts.start,
+        GradientHandleKind.end => pts.end,
+        GradientHandleKind.width => pts.width,
+      };
+      _grab = at - MatrixUtils.transformPoint(inv, pressAt);
+    }
+  }
+
+  Offset _grab = Offset.zero;
+  final GradientEditTarget target;
+  final OverlayRect rect;
+  final ir.GradientPaint paint;
+  final GradientHandleKind? handle;
+  final int? stop;
+
+  @override
+  void update(Offset screen, CanvasModifiers mods) {
+    final inv = Matrix4.tryInvert(rect.transform);
+    if (inv == null) return;
+    final local = MatrixUtils.transformPoint(inv, screen) + _grab;
+    final path = target.path;
+    final w = <String, ir.IrValue>{};
+    final h = handle;
+    if (h != null) {
+      final next = dragGradientHandle(
+        paint.handles,
+        paint.kind,
+        rect.size,
+        h,
+        local,
+        snap: mods.shift,
+      );
+      for (final f in gradientDragFields(paint.handles, paint.kind, h)) {
+        final v = switch (f) {
+          GradientHandleKind.start => next.start,
+          GradientHandleKind.end => next.end,
+          GradientHandleKind.width => next.width,
+        };
+        w['$path.handles.${f.name}'] = ir.IrValue.point(v);
+      }
+    } else if (stop != null) {
+      final pts = GradientHandlePoints.of(paint.handles, rect.size);
+      w['$path.stops.$stop.position'] = ir.IrValue.number(
+        clampStopPosition(paint.stops, stop!, pts.positionAt(local)),
+      );
+    }
+    apply((st) => writes(st, {target.nodeId: w}));
   }
 }
 

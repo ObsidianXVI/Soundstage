@@ -10,6 +10,7 @@ import 'package:soundstage_platform/runtime/runtime.dart' show stageColor;
 import 'package:soundstage_platform/runtime/src/paint/gradient.dart'
     show diamondMesh, gradientShader;
 
+import '../../canvas/canvas_controller.dart';
 import '../fields/field_frame.dart';
 import '../fields/props.dart';
 import '../property_writer.dart';
@@ -193,11 +194,26 @@ class PaintRow extends ConsumerWidget {
           const SizedBox(width: 2),
           Opacity(
             opacity: paint.visible ? 1 : 0.5,
-            child: PaintSwatch(
-              key: ValueKey<String>('paint-swatch:$paintId'),
-              paint: paint,
-              selected: expanded,
-              onTap: () => uiState.toggle(paintId),
+            child: _SwatchDoubleClick(
+              // Double-clicking a gradient's swatch edits it on the canvas.
+              onDoubleClick: paint is ir.GradientPaint && !locked
+                  ? () {
+                      final node = gradientEditNodeId(context);
+                      if (node == null) return;
+                      uiState.expand(paintId);
+                      ref
+                          .read(canvasControllerProvider)
+                          .toggleGradientEdit(
+                            GradientEditTarget(node, stackPath, paintId),
+                          );
+                    }
+                  : null,
+              child: PaintSwatch(
+                key: ValueKey<String>('paint-swatch:$paintId'),
+                paint: paint,
+                selected: expanded,
+                onTap: () => uiState.toggle(paintId),
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -276,6 +292,43 @@ class PaintRow extends ConsumerWidget {
         }
       },
       child: body,
+    );
+  }
+}
+
+/// Detects a double click on its child without a double-tap recogniser
+/// (which would delay every single tap on the swatch).
+class _SwatchDoubleClick extends StatefulWidget {
+  const _SwatchDoubleClick({required this.child, this.onDoubleClick});
+
+  final Widget child;
+  final VoidCallback? onDoubleClick;
+
+  @override
+  State<_SwatchDoubleClick> createState() => _SwatchDoubleClickState();
+}
+
+class _SwatchDoubleClickState extends State<_SwatchDoubleClick> {
+  Duration? _last;
+
+  @override
+  Widget build(BuildContext context) {
+    final cb = widget.onDoubleClick;
+    if (cb == null) return widget.child;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (e) {
+        final last = _last;
+        if (last != null &&
+            e.timeStamp - last <= const Duration(milliseconds: 400)) {
+          _last = null;
+          // After the second tap's own toggle, so the paint stays open.
+          WidgetsBinding.instance.addPostFrameCallback((_) => cb());
+        } else {
+          _last = e.timeStamp;
+        }
+      },
+      child: widget.child,
     );
   }
 }

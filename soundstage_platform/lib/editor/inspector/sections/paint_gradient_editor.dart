@@ -7,6 +7,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart' show stageColor;
 
+import '../../canvas/canvas_controller.dart';
 import '../fields/field_frame.dart';
 import '../fields/props.dart';
 import '../fields/rows.dart';
@@ -332,6 +333,7 @@ class _PaintGradientEditorState extends ConsumerState<PaintGradientEditor> {
         Row(
           children: [
             Expanded(child: Text('Stops', style: t.text.caption)),
+            GradientCanvasToggle(stackPath: widget.stackPath, paintId: p.id),
             SsIconButton(
               key: ValueKey<String>('gradient-swap:${p.id}'),
               icon: SsIcons.arrowLeftRight,
@@ -392,6 +394,50 @@ class _PaintGradientEditorState extends ConsumerState<PaintGradientEditor> {
           _HandleRow(label: 'Width', path: '$_path.handles.width'),
         ],
       ],
+    );
+  }
+}
+
+/// The single selected layer's id (authored or instance-inner), or null for
+/// none or several: on-canvas gradient editing works on one layer.
+String? gradientEditNodeId(BuildContext context) {
+  final ids = InspectorScope.of(context).ids;
+  return ids.length == 1 ? ids.single : null;
+}
+
+/// Toggles editing paint [paintId] of [stackPath] with handles on the
+/// canvas (T1.7b). Enabled for a single selected layer.
+class GradientCanvasToggle extends ConsumerWidget {
+  const GradientCanvasToggle({
+    required this.stackPath,
+    required this.paintId,
+    super.key,
+  });
+
+  final String stackPath;
+  final String paintId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canvas = ref.watch(canvasControllerProvider);
+    final node = gradientEditNodeId(context);
+    final target = node == null
+        ? null
+        : GradientEditTarget(node, stackPath, paintId);
+    return ValueListenableBuilder<GradientEditTarget?>(
+      valueListenable: canvas.gradientEdit,
+      builder: (context, editing, _) => SsIconButton(
+        key: ValueKey<String>('gradient-edit:$paintId'),
+        icon: SsIcons.move,
+        semanticLabel: 'Edit gradient on canvas',
+        tooltip: 'Edit gradient on canvas (Esc to finish)',
+        selected: target != null && editing == target,
+        size: 24,
+        iconSize: 14,
+        onPressed: target == null
+            ? null
+            : () => canvas.toggleGradientEdit(target),
+      ),
     );
   }
 }
