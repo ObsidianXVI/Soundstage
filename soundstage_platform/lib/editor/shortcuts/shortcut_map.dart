@@ -7,6 +7,7 @@ import 'package:soundstage_platform/editor/core/commands/node_commands.dart'
 import 'package:soundstage_platform/editor/core/editor_state.dart';
 import 'package:soundstage_platform/editor/core/shortcuts.dart';
 
+import '../text/text_edit_controller.dart' show primaryFocusIsStageText;
 import 'intents.dart';
 
 /// A key combination as data, so it can both fire an intent and be shown in
@@ -533,6 +534,7 @@ Iterable<Type> get editorIntentTypes => {
 
 /// True when the primary focus is inside an editable text.
 bool primaryFocusIsTextInput() {
+  if (primaryFocusIsStageText()) return true;
   final ctx = FocusManager.instance.primaryFocus?.context;
   if (ctx == null) return false;
   if (ctx.widget is EditableText) return true;

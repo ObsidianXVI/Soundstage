@@ -432,6 +432,30 @@ class StageTextLayout {
   Iterable<TextPainter> get visiblePainters =>
       _paras.where((p) => p.visible).map((p) => p.painter);
 
+  /// The number of paragraphs (shown or not).
+  int get paragraphCount => _paras.length;
+
+  /// Paragraph [index] as laid out, for text editing (T1.8): its painter,
+  /// its top-left in the text block (before [alignOffset]), whether it is
+  /// shown, and the painter text units before the paragraph's own text (1
+  /// when an indent placeholder leads it).
+  StageTextParagraphBox paragraphBox(int index) {
+    final p = _paras[index];
+    final root = p.painter.text;
+    var lead = 0;
+    if (root is TextSpan) {
+      final kids = root.children;
+      if (kids != null && kids.isNotEmpty && kids.first is WidgetSpan) lead = 1;
+    }
+    return StageTextParagraphBox(
+      painter: p.painter,
+      offset: p.offset,
+      visible: p.visible,
+      leadingUnits: lead,
+      source: p.source,
+    );
+  }
+
   void dispose() {
     for (final p in _paras) {
       p.dispose();
@@ -604,6 +628,24 @@ class StageTextLayout {
     }
     return painter;
   }
+}
+
+/// One laid-out paragraph of a [StageTextLayout] (see
+/// [StageTextLayout.paragraphBox]).
+class StageTextParagraphBox {
+  const StageTextParagraphBox({
+    required this.painter,
+    required this.offset,
+    required this.visible,
+    required this.leadingUnits,
+    required this.source,
+  });
+
+  final TextPainter painter;
+  final Offset offset;
+  final bool visible;
+  final int leadingUnits;
+  final ir.ResolvedParagraph source;
 }
 
 class _Variant {

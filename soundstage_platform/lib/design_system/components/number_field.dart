@@ -245,7 +245,9 @@ class _SsNumberFieldState extends State<SsNumberField> {
         label: widget.semanticLabel ?? label,
         value: widget.mixed
             ? 'Mixed'
-            : '${_format()}${unit == null ? '' : ' $unit'}',
+            : (_current == null
+                  ? 'Not set'
+                  : '${_format()}${unit == null ? '' : ' $unit'}'),
         increasedValue: enabled
             ? _format(_clamp((_current ?? 0) + widget.step))
             : null,

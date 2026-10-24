@@ -133,6 +133,31 @@ class History {
     return e.after;
   }
 
+  /// The most recent undo entry, or null (an anchor for [squashAfter]).
+  HistoryEntry? get lastEntry => _undo.isEmpty ? null : _undo.last;
+
+  /// Merges every undo entry recorded after [anchor] (null: all of them)
+  /// into one entry labelled [label] (a text-editing session undoes as one
+  /// operation once it ends). The redo stack is dropped when anything
+  /// merged. Returns whether the history changed. An [anchor] no longer in
+  /// the history (capped away) merges from the oldest entry.
+  bool squashAfter(HistoryEntry? anchor, String label) {
+    final i = anchor == null ? -1 : _undo.indexOf(anchor);
+    final from = i + 1;
+    if (from >= _undo.length) return false;
+    final merged = HistoryEntry(
+      label: label,
+      before: _undo[from].before,
+      after: _undo.last.after,
+    );
+    _undo
+      ..removeRange(from, _undo.length)
+      ..add(merged);
+    _redo.clear();
+    _gesture = null;
+    return true;
+  }
+
   /// Forgets everything (e.g. when another document is opened).
   void clear() {
     _undo.clear();
