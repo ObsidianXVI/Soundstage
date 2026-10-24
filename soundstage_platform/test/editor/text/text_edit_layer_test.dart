@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
@@ -176,4 +177,29 @@ void main() {
       }
     });
   }
+
+  testWidgets('Cmd+K opens the link prompt; Enter applies the link', (
+    tester,
+  ) async {
+    final h = await pumpCanvas(tester);
+    await h.click(h.desk(110, 658));
+    h.ctl.selectChildrenOfSelection();
+    await tester.pump();
+    // Ctrl off macOS (the test platform).
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    final field = find.descendant(
+      of: find.byKey(const ValueKey('text-link-field')),
+      matching: find.byType(EditableText),
+    );
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'https://example.com');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    final span = (h.node('txt') as ir.TextNode).content.single.spans.single;
+    expect(span.link, const ir.SpanLink.url('https://example.com'));
+    expect(h.st.textEditId, 'txt');
+  });
 }

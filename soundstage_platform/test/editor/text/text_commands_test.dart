@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
+import 'package:soundstage_platform/editor/text/rich_text_model.dart';
 import 'package:soundstage_platform/ir/ir.dart';
 
 import '../core/fixtures.dart';
@@ -281,5 +284,62 @@ void main() {
       c.ctl.undo();
       expect(identical(c.doc, before), isTrue);
     });
+  });
+
+  test('property: random edits keep every content patch addressing an '
+      'existing span, and undo restores each step exactly', () {
+    final rnd = Random(11);
+    for (var run = 0; run < 40; run++) {
+      final c = editorContainer(
+        _textDoc(
+          patches: {
+            'mobile': {'content.0.spans.1.style.textCase': _red},
+          },
+        ),
+      );
+      c.ctl.setEditingBreakpoint('mobile');
+      for (var step = 0; step < 25; step++) {
+        final len = documentLength(c.t.content);
+        final a = rnd.nextInt(len + 1);
+        final b = (a + rnd.nextInt(5)).clamp(0, len);
+        c.ctl.setEditScope(
+          rnd.nextBool() ? EditScope.both : EditScope.thisBreakpoint,
+        );
+        final before = c.doc;
+        final EditCommand cmd = switch (rnd.nextInt(3)) {
+          0 => ReplaceText('t', a, b, ['x', ' y', '\n', ''][rnd.nextInt(4)]),
+          1 => StyleTextRange('t', a, b, {
+            'italic': rnd.nextBool()
+                ? const IrValue.boolean(true)
+                : const IrValue.none(),
+          }),
+          _ => StyleTextParagraphs(
+            't',
+            a,
+            b,
+            'paragraphIndent',
+            IrValue.number(rnd.nextInt(3) * 4.0),
+          ),
+        };
+        final r = c.ctl.execute(cmd);
+        expect(r.ok, isTrue, reason: '$run/$step ${r.diagnostics}');
+        for (final patch in c.t.common.breakpointOverrides.values) {
+          for (final k in patch.keys) {
+            expect(
+              PropertyRegistry.standard.get(c.t, k),
+              isNotNull,
+              reason: 'run $run step $step: $k',
+            );
+          }
+        }
+        // Mobile resolves every patch without diagnostics.
+        expect(c.paras('mobile'), hasLength(c.t.content.length));
+        if (r.changed) {
+          c.ctl.undo();
+          expect(identical(c.doc, before), isTrue);
+          c.ctl.redo();
+        }
+      }
+    }
   });
 }
