@@ -9,6 +9,7 @@ export 'commands/gesture_commands.dart';
 export 'commands/node_commands.dart';
 export 'commands/property_commands.dart';
 export 'commands/scene_commands.dart';
+export 'commands/text_commands.dart';
 export 'editor_controller.dart';
 export 'editor_events.dart';
 export 'editor_state.dart';
