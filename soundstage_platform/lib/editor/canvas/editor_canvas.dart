@@ -12,6 +12,8 @@ import 'package:soundstage_platform/runtime/runtime.dart';
 
 import '../interaction/canvas_interaction.dart';
 import '../overlay/canvas_overlay.dart';
+import '../text/text_edit_controller.dart';
+import '../text/text_edit_layer.dart';
 import 'artboard.dart';
 import 'artboard_canvas.dart';
 import 'artboard_chrome.dart';
@@ -76,6 +78,7 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   }
 
   static bool _typing() {
+    if (primaryFocusIsStageText()) return true;
     final ctx = FocusManager.instance.primaryFocus?.context;
     if (ctx == null) return false;
     return ctx.widget is EditableText ||
@@ -220,6 +223,7 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
                   ),
                   CanvasOverlay(controller: _c),
                   CanvasInteraction(controller: _c, pansWith: _pansWith),
+                  TextEditLayer(controller: _c),
                   ArtboardChrome(controller: _c, breakpoints: boards),
                 ],
               ),

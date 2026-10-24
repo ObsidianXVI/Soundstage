@@ -187,6 +187,15 @@ class EditorController extends Notifier<EditorState> {
     if (history.endGesture()) state = state.copyWith(history: _status());
   }
 
+  /// Merges the history entries recorded after [anchor] into one labelled
+  /// [label] (see [History.squashAfter]): a text-editing session becomes one
+  /// operation when it ends.
+  void squashHistoryAfter(HistoryEntry? anchor, String label) {
+    if (history.squashAfter(anchor, label)) {
+      state = state.copyWith(history: _status());
+    }
+  }
+
   /// Opens [document] fresh: history cleared, revision saved.
   void openDocument(ir.StageDocument document) {
     history.clear();
