@@ -60,7 +60,8 @@ class StageNodeWidget extends StatelessWidget {
     Set<String> repaintBoundaryIds,
   ) {
     final last = _childWidgets[node];
-    if (last != null && identical(last.repaintBoundaryIds, repaintBoundaryIds)) {
+    if (last != null &&
+        identical(last.repaintBoundaryIds, repaintBoundaryIds)) {
       return last;
     }
     return _childWidgets[node] = StageNodeWidget(

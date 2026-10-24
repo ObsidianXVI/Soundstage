@@ -90,7 +90,10 @@ class _StageSceneViewState extends State<StageSceneView> {
       child: StageNodeWidget(
         key: ValueKey<String>(root.id),
         node: root,
-        referenceSize: StageSceneView.referenceSizeFor(scene, widget.breakpoint),
+        referenceSize: StageSceneView.referenceSizeFor(
+          scene,
+          widget.breakpoint,
+        ),
         repaintBoundaryIds: _boundaryIds(),
       ),
     );
