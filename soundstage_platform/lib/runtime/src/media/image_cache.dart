@@ -32,6 +32,11 @@ const Duration kImageRetryMax = Duration(minutes: 5);
 /// wait ([kImageRetryBase] … [kImageRetryMax]). A different `version`
 /// (the asset record changed, e.g. a re-upload) forgets the failure and
 /// loads at once. A success forgets it too.
+///
+/// **Versions.** A non-null `version` is stored with the entry; [obtain]
+/// with a different one drops just that entry and decodes again. The cache
+/// is meant to outlive environment rebuilds (one per editor or player), so
+/// adding an asset leaves every other decode alone.
 class StageImageCache {
   StageImageCache({this.maxBytes = 128 << 20, DateTime Function()? now})
     : _now = now ?? DateTime.now;
@@ -70,7 +75,16 @@ class StageImageCache {
     VoidCallback? onReady,
     Object? version,
   }) {
-    final hit = _entries.remove(key);
+    var hit = _entries.remove(key);
+    if (hit != null && version != null && hit.version != version) {
+      // What [key] stands for changed (a replaced file keeps its URI):
+      // forget the old decode, keep the other entries.
+      if (hit.image != null) {
+        _bytes -= hit.bytes;
+        hit.image!.dispose();
+      }
+      hit = null;
+    }
     if (hit != null) {
       _entries[key] = hit; // most recently used
       if (hit.image == null && onReady != null) hit.listeners.add(onReady);
@@ -84,7 +98,7 @@ class StageImageCache {
         return null;
       }
     }
-    final entry = _Entry();
+    final entry = _Entry()..version = version;
     if (onReady != null) entry.listeners.add(onReady);
     _entries[key] = entry;
     load().then(
@@ -190,6 +204,7 @@ class StageImageCache {
 }
 
 class _Entry {
+  Object? version;
   ui.Image? image;
   int bytes = 0;
   final List<VoidCallback> listeners = [];
@@ -235,7 +250,14 @@ class StageMedia {
       uri,
       () => _decode(uri),
       onReady: onReady,
-      version: asset,
+      version: (
+        asset.id,
+        uri,
+        asset.mime,
+        asset.byteSize,
+        asset.width,
+        asset.height,
+      ),
     );
   }
 

@@ -8,6 +8,7 @@ import '../animator/stage_animator.dart';
 import '../clocks/clock_source.dart';
 import '../clocks/timeline_clock.dart';
 import '../media/audio.dart';
+import '../media/image_cache.dart';
 import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
 import '../widgets/stage_node_widget.dart';
@@ -133,6 +134,10 @@ class _StagePlayerState extends State<StagePlayer>
   late StageAnimator _animator;
   late StageEnvironment _env;
 
+  /// Decoded images, kept across environment rebuilds (a changed document
+  /// keeps the other images decoded).
+  final StageImageCache _images = StageImageCache();
+
   ir.StageDocument? _resolvedDoc;
   String? _resolvedBreakpoint;
   ir.ResolvedDocument? _resolved;
@@ -165,7 +170,12 @@ class _StagePlayerState extends State<StagePlayer>
   }
 
   StageEnvironment _environmentFor(StagePlayer w) =>
-      (w.environment ?? StageEnvironment.forDocument(w.document, mode: w.mode))
+      (w.environment ??
+              StageEnvironment.forDocument(
+                w.document,
+                mode: w.mode,
+                imageCache: _images,
+              ))
           .copyWith(mode: w.mode, nodes: _registry);
 
   StageAnimator _newAnimator() => StageAnimator(
@@ -235,6 +245,7 @@ class _StagePlayerState extends State<StagePlayer>
     _animator.dispose();
     _scroll.dispose();
     _focus.dispose();
+    _images.clear();
     super.dispose();
   }
 
