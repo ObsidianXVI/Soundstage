@@ -32,7 +32,7 @@ void main() {
   group('StageImageCache failures (negative cache)', () {
     test('a failed load is reported once and not requested again '
         'before its retry time', () async {
-      var now = DateTime(2026);
+      final now = DateTime(2026);
       final cache = StageImageCache(now: () => now);
       var loads = 0;
       Future<ui.Image> load() async {
