@@ -519,3 +519,22 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
     (the fade is done). The demos' `?stats=1` mode logs them, the decoded-image cache and the
     scroll offset (`window.__ss_offset`, per frame `__ss_offset_f`) and an independent audio clock
     (`__ss_audio_clock`) for scripted measurements (`_dev/spike_report.md`).
+53. **Failed images are a negative cache (wave D fix).** `StageImageCache` reports a failed load
+    once and remembers it outside the LRU (eviction and `release` keep it). Until its retry time
+    `obtain` returns null without loading; after it, one silent retry, with the wait doubling from
+    `kImageRetryBase` (2 s) up to `kImageRetryMax` (5 min). `StageMedia.image` passes the asset
+    record as the cache `version`, so a changed record (a re-upload) retries at once. A missing
+    asset record requests nothing (validation reports it). The editor canvas keeps one cache
+    across environment changes, so adding an asset no longer drops every decoded image.
+54. **Flow scenes grow to their content (wave D fix).** After laying out a flow root at its own
+    height, `RenderStageScene` lays it out again at `RenderStageFrame.contentBottom` (the lowest
+    visible child, rotated footprint included, `motion` excluded) when that is lower, so nodes
+    below the stored height are drawn, hit and selectable, in the player and on the artboards.
+    The reference size stays the stored height: top-anchored children keep their place,
+    bottom/centre/scale-anchored ones follow the grown bottom. Pinned scenes are unchanged.
+55. **Node widgets rebuild along the edited path (wave D perf).** `StageNodeWidget.forChild`
+    returns the same widget instance while the child's `ResolvedNode` is identical and the
+    boundary set is the same object (`StageSceneView` keeps it stable by value), so Flutter skips
+    untouched subtrees. Editing one leaf of a 5,000-node scene rebuilds depth + 1 node widgets per
+    artboard (test `rebuild_count_test.dart`); the VM-debug canvas drag bench went from a median
+    136 ms / p95 251 ms per move to 18 / 24 ms.

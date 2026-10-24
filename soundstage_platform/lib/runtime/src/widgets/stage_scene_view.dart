@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -17,7 +18,11 @@ import 'stage_node_widget.dart';
 /// The scene root and every node a track animates are repaint boundaries
 /// (§17.1). Scrolling, pinning and clocks arrive with `StagePlayer` (T0.6);
 /// this widget is the static building block it uses.
-class StageSceneView extends StatelessWidget {
+///
+/// The boundary id set handed to the node widgets keeps its identity while
+/// its contents stay the same, so a rebuild after an edit only rebuilds the
+/// node widgets on the edited path (see [StageNodeWidget]).
+class StageSceneView extends StatefulWidget {
   const StageSceneView({
     super.key,
     required this.scene,
@@ -52,24 +57,41 @@ class StageSceneView extends StatelessWidget {
   }
 
   @override
+  State<StageSceneView> createState() => _StageSceneViewState();
+}
+
+class _StageSceneViewState extends State<StageSceneView> {
+  Set<String> _boundaries = const {};
+
+  /// The boundary ids of the current scene, as the previous set object when
+  /// the contents did not change.
+  Set<String> _boundaryIds() {
+    final scene = widget.scene;
+    final next = {
+      scene.root.id,
+      for (final t in scene.tracks) t.target,
+      ...behaviorTargetIds(scene),
+      ...widget.extraRepaintBoundaryIds,
+    };
+    if (!setEquals(next, _boundaries)) _boundaries = next;
+    return _boundaries;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final env = StageScope.of(context);
+    final scene = widget.scene;
     final root = scene.root;
     return StageSceneBox(
       kind: scene.kind,
-      viewportSize: viewportSize,
+      viewportSize: widget.viewportSize,
       background: scene.background,
       environment: env,
       child: StageNodeWidget(
         key: ValueKey<String>(root.id),
         node: root,
-        referenceSize: referenceSizeFor(scene, breakpoint),
-        repaintBoundaryIds: {
-          root.id,
-          for (final t in scene.tracks) t.target,
-          ...behaviorTargetIds(scene),
-          ...extraRepaintBoundaryIds,
-        },
+        referenceSize: StageSceneView.referenceSizeFor(scene, widget.breakpoint),
+        repaintBoundaryIds: _boundaryIds(),
       ),
     );
   }

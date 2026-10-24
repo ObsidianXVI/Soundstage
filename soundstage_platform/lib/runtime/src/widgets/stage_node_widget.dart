@@ -37,6 +37,14 @@ class StageScope extends InheritedWidget {
 /// [referenceSize] overrides the root frame's reference size (a scene root
 /// passes its breakpoint's `designSize`). Nodes in [repaintBoundaryIds]
 /// (scene roots and animated nodes, §17.1) become repaint boundaries.
+///
+/// **Rebuilds follow the edited path (§17.1).** A child's widget is reused
+/// (the same instance) while its `ResolvedNode` is identical and the
+/// boundary set is the same object, so Flutter skips it: after an edit,
+/// which re-resolves only the path to the edited node, only the widgets on
+/// that path build again ([StageNodeWidget.forChild]). Keep
+/// [repaintBoundaryIds] stable across builds (`StageSceneView` does) or
+/// every child rebuilds.
 class StageNodeWidget extends StatelessWidget {
   const StageNodeWidget({
     super.key,
@@ -45,12 +53,40 @@ class StageNodeWidget extends StatelessWidget {
     this.repaintBoundaryIds = const {},
   });
 
+  /// The widget for child [node], reused while [node] and
+  /// [repaintBoundaryIds] are the same objects as last time.
+  factory StageNodeWidget.forChild(
+    ir.ResolvedNode node,
+    Set<String> repaintBoundaryIds,
+  ) {
+    final last = _childWidgets[node];
+    if (last != null && identical(last.repaintBoundaryIds, repaintBoundaryIds)) {
+      return last;
+    }
+    return _childWidgets[node] = StageNodeWidget(
+      key: ValueKey<String>(node.id),
+      node: node,
+      repaintBoundaryIds: repaintBoundaryIds,
+    );
+  }
+
+  static final Expando<StageNodeWidget> _childWidgets = Expando(
+    'StageNodeWidget',
+  );
+
+  /// Test counter: [build] calls (an edit must rebuild only its path).
+  static int debugBuildCount = 0;
+
   final ir.ResolvedNode node;
   final Size? referenceSize;
   final Set<String> repaintBoundaryIds;
 
   @override
   Widget build(BuildContext context) {
+    assert(() {
+      debugBuildCount++;
+      return true;
+    }());
     final env = StageScope.of(context);
     final boundary = repaintBoundaryIds.contains(node.id);
     return switch (node.node) {
@@ -74,11 +110,7 @@ class StageNodeWidget extends StatelessWidget {
                 repaintBoundary: true,
               )
             else
-              StageNodeWidget(
-                key: ValueKey<String>(child.id),
-                node: child,
-                repaintBoundaryIds: repaintBoundaryIds,
-              ),
+              StageNodeWidget.forChild(child, repaintBoundaryIds),
         ],
       ),
       final ir.TextNode text => StageTextWidget(
