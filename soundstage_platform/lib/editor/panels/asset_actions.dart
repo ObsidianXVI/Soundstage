@@ -195,7 +195,7 @@ class AssetActions {
     final old = _asset(assetId);
     if (old == null) return false;
     final mime = mimeOfFile(file);
-    final kind = mime == null ? null : assetKindForMimeOrNull(mime);
+    final kind = mime == null ? null : mediaKindForMime(mime);
     if (mime == null || kind != old.kind) {
       _say(
         '${file.name}: replace "${old.name}" with another '
@@ -269,17 +269,12 @@ class AssetActions {
   Future<Uint8List?> bytes(String assetId) => _service.bytes(assetId);
 }
 
-/// The asset kind of a MIME type, or null (the store's own mapping).
-ir.AssetKind? assetKindForMimeOrNull(String mime) {
-  final m = mime.toLowerCase();
-  if (m.startsWith('image/')) return ir.AssetKind.image;
-  if (m.startsWith('video/')) return ir.AssetKind.video;
-  if (m.startsWith('audio/')) return ir.AssetKind.audio;
-  if (m.startsWith('font/')) return ir.AssetKind.font;
-  return null;
-}
-
 final assetActionsProvider = Provider<AssetActions>(
   AssetActions.new,
-  dependencies: [editorControllerProvider, insertActionsProvider],
+  dependencies: [
+    editorControllerProvider,
+    insertActionsProvider,
+    editorAssetServiceProvider,
+    editorFilePickerProvider,
+  ],
 );

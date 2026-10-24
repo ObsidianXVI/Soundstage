@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/persistence/autosave.dart';
+import 'package:soundstage_platform/app/persistence/editor_asset_service.dart';
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
@@ -80,6 +81,8 @@ class _EditPageState extends ConsumerState<EditPage> {
         backgroundColor: context.ss.colors.surface0,
         body: EditorShell(
           document: value!.document!,
+          assetService: ref.watch(appEditorAssetServiceProvider),
+          filePicker: pickEditorFiles,
           onBack: () => context.go('/'),
           onPreview: () => context.go('/play/$_id'),
           onDocumentChanged: (doc) {

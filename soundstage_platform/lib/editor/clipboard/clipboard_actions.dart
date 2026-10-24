@@ -539,5 +539,9 @@ class _Box {
 
 final clipboardActionsProvider = Provider<ClipboardActions>(
   ClipboardActions.new,
-  dependencies: [editorControllerProvider, insertActionsProvider],
+  dependencies: [
+    editorControllerProvider,
+    insertActionsProvider,
+    editorAssetServiceProvider,
+  ],
 );

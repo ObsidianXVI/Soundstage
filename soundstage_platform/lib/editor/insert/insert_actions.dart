@@ -236,5 +236,9 @@ class InsertActions {
 /// The insert actions of the open editor.
 final insertActionsProvider = Provider<InsertActions>(
   InsertActions.new,
-  dependencies: [editorControllerProvider],
+  dependencies: [
+    editorControllerProvider,
+    editorAssetServiceProvider,
+    editorFilePickerProvider,
+  ],
 );

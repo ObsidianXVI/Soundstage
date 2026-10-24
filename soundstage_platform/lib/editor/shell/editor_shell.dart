@@ -11,6 +11,7 @@ import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../clipboard/clipboard_actions.dart';
 import '../core/editor_controller.dart';
+import '../insert/asset_service.dart';
 import '../insert/editor_notices.dart';
 import '../inspector/inspector.dart';
 import '../panels/assets_panel.dart';
@@ -40,6 +41,8 @@ class EditorShell extends StatelessWidget {
     this.onDocumentChanged,
     this.onSave,
     this.saveStatus,
+    this.assetService,
+    this.filePicker,
     super.key,
   });
 
@@ -59,10 +62,23 @@ class EditorShell extends StatelessWidget {
   /// The save indicator shown in the toolbar (the app's autosave status).
   final Widget? saveStatus;
 
+  /// The asset store the app provides (the editor never imports the app).
+  /// Without it, adding files fails with a StateError.
+  final EditorAssetService? assetService;
+
+  /// The browser file picker, supplied by the app.
+  final EditorFilePicker? filePicker;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      overrides: [initialDocumentProvider.overrideWithValue(document)],
+      overrides: [
+        initialDocumentProvider.overrideWithValue(document),
+        if (assetService case final service?)
+          editorAssetServiceProvider.overrideWithValue(service),
+        if (filePicker case final picker?)
+          editorFilePickerProvider.overrideWithValue(picker),
+      ],
       child: _EditorScope(
         onBack: onBack,
         onPreview: onPreview,
