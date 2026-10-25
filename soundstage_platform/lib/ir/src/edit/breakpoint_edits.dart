@@ -276,10 +276,7 @@ List<IrDiagnostic> validateBreakpointList(List<Breakpoint> breakpoints) {
     }
     if (b.name.trim().isEmpty) {
       out.add(
-        editError(
-          IrDiagnosticKind.invalidValue,
-          'Breakpoint "${b.id}" needs a name.',
-        ),
+        editError(IrDiagnosticKind.invalidValue, 'A breakpoint needs a name.'),
       );
     }
     if (b.minWidth < 0 || !b.minWidth.isFinite) {

@@ -94,6 +94,10 @@ Future<IngestReport> ingestMedia(
   for (final f in files) {
     final mime = mimeOfFile(f);
     final kind = mime == null ? null : mediaKindForMime(mime);
+    if (kind == ir.AssetKind.font) {
+      report.problems.add('${f.name}: fonts are added in Assets → Fonts.');
+      continue;
+    }
     if (mime == null || kind == null || !kinds.contains(kind)) {
       report.problems.add(
         '${f.name}: not an image, audio or video file the editor can use.',

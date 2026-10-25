@@ -210,6 +210,10 @@ class _BreakpointDialogState extends State<BreakpointDialog> {
     return list;
   }
 
+  /// Whether the user has typed a name yet: "needs a name" is not shown
+  /// before that (the Save button is disabled meanwhile).
+  bool _nameTouched = false;
+
   void _set(ir.Breakpoint b) => setState(() => _b = b);
 
   @override
@@ -250,7 +254,10 @@ class _BreakpointDialogState extends State<BreakpointDialog> {
               placeholder: 'e.g. Tablet',
               semanticLabel: 'Breakpoint name',
               autofocus: widget.isNew,
-              onChanged: (v) => _set(_b.copyWith(name: v)),
+              onChanged: (v) {
+                _nameTouched = true;
+                _set(_b.copyWith(name: v));
+              },
             ),
           ),
           row(
@@ -326,14 +333,15 @@ class _BreakpointDialogState extends State<BreakpointDialog> {
             ),
           ),
           for (final e in errors)
-            Padding(
-              padding: const EdgeInsets.only(top: SsSpace.s1),
-              child: Text(
-                e.message,
-                key: const ValueKey<String>('bp-error'),
-                style: t.text.caption.copyWith(color: t.colors.danger),
+            if (_nameTouched || !e.message.contains('needs a name'))
+              Padding(
+                padding: const EdgeInsets.only(top: SsSpace.s1),
+                child: Text(
+                  e.message,
+                  key: const ValueKey<String>('bp-error'),
+                  style: t.text.caption.copyWith(color: t.colors.danger),
+                ),
               ),
-            ),
         ],
       ),
       actions: [

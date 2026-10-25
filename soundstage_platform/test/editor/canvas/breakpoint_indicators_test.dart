@@ -213,6 +213,26 @@ void main() {
       expect(b.inheritsFrom, isNull);
     });
 
+    testWidgets(
+      'B9: a new breakpoint shows no error (and no id) before input',
+      (tester) async {
+        await pumpManager(tester, interactionDoc());
+        await open(tester);
+        await tester.tap(find.text('Add breakpoint…'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('bp-error')), findsNothing);
+        final save = tester.widget<SsButton>(
+          find.byKey(const ValueKey('bp-save')),
+        );
+        expect(save.onPressed, isNull);
+        await tester.enterText(find.byKey(const ValueKey('bp-name')), 'x');
+        await tester.enterText(find.byKey(const ValueKey('bp-name')), '');
+        await tester.pump();
+        final msg = tester.widget<Text>(find.byKey(const ValueKey('bp-error')));
+        expect(msg.data, 'A breakpoint needs a name.');
+      },
+    );
+
     testWidgets('remove asks first, then drops the breakpoint and its '
         'patches', (tester) async {
       var doc = interactionDoc().copyWith(
