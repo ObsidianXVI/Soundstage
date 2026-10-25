@@ -16,6 +16,7 @@ import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
 import '../widgets/stage_node_widget.dart';
 import '../widgets/stage_scene_view.dart';
+import 'scroll_anchor.dart';
 import 'sliver_stage_scene.dart';
 import 'wheel_smoothing.dart';
 
@@ -26,6 +27,12 @@ class StagePlayerController {
   StageNodeRegistry? _nodes;
   ScrollController? _scroll;
   FocusNode? _focusNode;
+  void Function(String sceneId, {bool animate})? _scrollToScene;
+
+  /// Scrolls to the start of scene [sceneId] (no-op when it is unknown or
+  /// no player is attached).
+  void scrollToScene(String sceneId, {bool animate = true}) =>
+      _scrollToScene?.call(sceneId, animate: animate);
 
   /// Gives the story keyboard focus (PageDown, Space and the arrows scroll
   /// it). Call it when something that held focus, like the enter gate, is
@@ -154,6 +161,10 @@ class _StagePlayerState extends State<StagePlayer>
   Map<String, Set<String>> _sceneAssets = const {};
   bool _jumped = false;
 
+  /// Scene ids in order, as of the last resolve.
+  List<String> _sceneIds = const [];
+  SceneScrollAnchor? _anchor;
+
   /// `MediaQuery.disableAnimations`: the platform's reduced-motion setting
   /// (`prefers-reduced-motion` on the web).
   bool _reducedMotion = false;
@@ -209,7 +220,8 @@ class _StagePlayerState extends State<StagePlayer>
       .._animator = _animator
       .._nodes = _registry
       .._scroll = _scroll
-      .._focusNode = _focus;
+      .._focusNode = _focus
+      .._scrollToScene = _scrollToSceneStart;
   }
 
   void _detachController(StagePlayerController? c) {
@@ -218,7 +230,8 @@ class _StagePlayerState extends State<StagePlayer>
       .._animator = null
       .._nodes = null
       .._scroll = null
-      .._focusNode = null;
+      .._focusNode = null
+      .._scrollToScene = null;
   }
 
   @override
@@ -276,6 +289,9 @@ class _StagePlayerState extends State<StagePlayer>
         _resolvedBreakpoint == bp?.id) {
       return false;
     }
+    // Scenes may get longer or shorter: remember where the reader is, as a
+    // scene and a progress, and put it back once the new layout exists.
+    if (_sceneIds.isNotEmpty) _anchor = _captureAnchor();
     final resolved = _resolver.resolve(
       doc,
       ir.ResolveContext(breakpointId: bp?.id),
@@ -284,6 +300,7 @@ class _StagePlayerState extends State<StagePlayer>
     _resolvedDoc = doc;
     _resolvedBreakpoint = bp?.id;
     _sceneAssets = {for (final s in resolved.scenes) s.id: sceneAssetIds(s)};
+    _sceneIds = [for (final s in resolved.scenes) s.id];
     _animator.load(resolved);
     return true;
   }
@@ -361,6 +378,72 @@ class _StagePlayerState extends State<StagePlayer>
             case final RenderSliver sliver when sliver.attached)
           sliver.constraints.precedingScrollExtent,
     ];
+  }
+
+  /// `(ids, starts, end)` of the laid-out scenes, or null when a scene has
+  /// no render object yet.
+  (List<String>, List<double>, double)? _sceneLayout() {
+    if (!_scroll.hasClients || _sceneIds.isEmpty) return null;
+    final starts = <double>[];
+    for (final id in _sceneIds) {
+      final ro = _sceneKeys[id]?.currentContext?.findRenderObject();
+      if (ro is! RenderSliver || !ro.attached) return null;
+      starts.add(ro.constraints.precedingScrollExtent);
+    }
+    final p = _scroll.position;
+    return (_sceneIds, starts, p.maxScrollExtent + p.viewportDimension);
+  }
+
+  SceneScrollAnchor? _captureAnchor() {
+    final layout = _sceneLayout();
+    if (layout == null) return null;
+    return captureSceneAnchor(
+      ids: layout.$1,
+      starts: layout.$2,
+      offset: _scroll.position.pixels,
+      end: layout.$3,
+    );
+  }
+
+  /// After the first layout of a new resolve: back to the remembered
+  /// scene and progress.
+  void _restoreAnchor() {
+    final anchor = _anchor;
+    if (anchor == null) return;
+    _anchor = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final layout = _sceneLayout();
+      if (layout == null) return;
+      final target = restoreSceneAnchor(
+        anchor,
+        ids: layout.$1,
+        starts: layout.$2,
+        end: layout.$3,
+      );
+      if (target == null) return;
+      final p = _scroll.position;
+      final clamped = target.clamp(p.minScrollExtent, p.maxScrollExtent);
+      if ((clamped - p.pixels).abs() > 0.5) _scroll.jumpTo(clamped);
+    });
+  }
+
+  void _scrollToSceneStart(String sceneId, {bool animate = true}) {
+    final layout = _sceneLayout();
+    if (layout == null) return;
+    final i = layout.$1.indexOf(sceneId);
+    if (i < 0) return;
+    final p = _scroll.position;
+    final target = layout.$2[i].clamp(p.minScrollExtent, p.maxScrollExtent);
+    if (animate && !_reducedMotion) {
+      _scroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
+      );
+    } else {
+      _scroll.jumpTo(target);
+    }
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -447,10 +530,14 @@ class _StagePlayerState extends State<StagePlayer>
         final resolvedAgain = _ensureResolved(viewport.width);
         final resolved = _resolved!;
         if (resolvedAgain || _sliverViewport != viewport) {
+          if (!resolvedAgain && _sliverViewport != null) {
+            _anchor = _captureAnchor();
+          }
           _sliverViewport = viewport;
           _slivers = _buildSlivers(resolved, viewport);
         }
         _maybeJumpToInitialScene();
+        _restoreAnchor();
         return StageScope(
           environment: _env,
           child: MouseRegion(

@@ -7,6 +7,7 @@ import '../canvas/canvas_controller.dart';
 import '../core/commands/breakpoint_commands.dart';
 import '../core/editor_controller.dart';
 import '../core/editor_state.dart';
+import '../preview/preview_state.dart';
 import '../shortcuts/shortcut_map.dart';
 import 'breakpoint_manager.dart';
 import 'editor_layout.dart';
@@ -213,7 +214,9 @@ class EditorToolbar extends ConsumerWidget {
           SsButton(
             label: 'Preview',
             icon: SsIcons.play,
-            variant: SsButtonVariant.primary,
+            variant: ref.watch(previewProvider.select((s) => s.open))
+                ? SsButtonVariant.secondary
+                : SsButtonVariant.primary,
             onPressed: onPreview,
           ),
         ],
