@@ -199,9 +199,21 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
       _c = controller..attachTicker(this);
     }
     final c = context.ss.colors;
-    final doc = ref
-        .watch(editorControllerProvider.select((s) => Identity(s.document)))
-        .value;
+    // Only what the canvas itself uses (T2.1-6): the breakpoints (the
+    // artboards) and the environment's inputs, by value. Edits inside a
+    // scene rebuild the artboards (they watch their resolved scene), not
+    // the canvas.
+    ref.watch(
+      editorControllerProvider.select(
+        (s) => (
+          s.document.breakpoints,
+          s.document.fonts,
+          s.document.assets,
+          s.document.audioTracks,
+        ),
+      ),
+    );
+    final doc = ref.read(editorControllerProvider).document;
     final tool = ref.watch(editorControllerProvider.select((s) => s.tool));
     final boards = artboardBreakpoints(doc);
     final env = _environment(doc);

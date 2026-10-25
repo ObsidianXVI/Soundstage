@@ -146,14 +146,7 @@ List<TimelineRow> buildTimelineRows(
     if (t.clockId == clockId) (byNode[t.target] ??= []).add(t);
   }
   if (byNode.isEmpty) return const [];
-  final order = <String, int>{};
-  var i = 0;
-  void walk(ir.Node n) {
-    order[n.id] = i++;
-    if (n is ir.FrameNode) n.children.forEach(walk);
-  }
-
-  walk(scene.root);
+  final order = _treeOrder(scene.root);
   int rank(String id) => order[id.split('/').first] ?? 1 << 30;
   final nodes = byNode.keys.toList()
     ..sort((a, b) {
@@ -183,6 +176,24 @@ List<TimelineRow> buildTimelineRows(
     }
   }
   return rows;
+}
+
+final Expando<Map<String, int>> _orders = Expando('tree order');
+
+/// Pre-order positions of the nodes under [root], memoised per root (track
+/// edits keep the root, so they don't walk the tree again).
+Map<String, int> _treeOrder(ir.FrameNode root) {
+  final cached = _orders[root];
+  if (cached != null) return cached;
+  final order = <String, int>{};
+  var i = 0;
+  void walk(ir.Node n) {
+    order[n.id] = i++;
+    if (n is ir.FrameNode) n.children.forEach(walk);
+  }
+
+  walk(root);
+  return _orders[root] = order;
 }
 
 /// A keyframe on the timeline clipboard: where it came from and what it
@@ -285,3 +296,121 @@ final timelineControllerProvider = Provider<TimelineController>((ref) {
   ref.onDispose(c.dispose);
   return c;
 }, dependencies: [initialDocumentProvider]);
+
+// ---- Structure (T2.1-6) ------------------------------------------------------------
+
+final Expando<Map<String, ir.Track>> _tracksById = Expando('tracks by id');
+
+/// The track [id] of [scene] (looked up through a per-scene map, so a
+/// lookup is O(1) while the scene object is unchanged: row tiles select
+/// their own track on every state change, scrubbing included).
+ir.Track? trackById(ir.Scene? scene, String id) {
+  if (scene == null) return null;
+  final byId = _tracksById[scene] ??= {for (final t in scene.tracks) t.id: t};
+  return byId[id];
+}
+
+/// The rows of a scene on a clock, memoised per scene object.
+class _RowsMemo {
+  _RowsMemo(this.clockId, this.collapsed, this.breakpoints, this.rows);
+
+  final String clockId;
+  final Set<String> collapsed;
+  final List<ir.Breakpoint> breakpoints;
+  final List<TimelineRow> rows;
+}
+
+final Expando<_RowsMemo> _rowsMemo = Expando('timeline rows');
+
+/// [buildTimelineRows], memoised per scene object, clock, collapsed groups
+/// and breakpoints (their names label breakpoint-specific lanes).
+List<TimelineRow> timelineRowsFor(
+  ir.StageDocument doc,
+  ir.Scene scene,
+  String clockId, {
+  Set<String> collapsed = const {},
+}) {
+  final m = _rowsMemo[scene];
+  if (m != null &&
+      m.clockId == clockId &&
+      setEquals(m.collapsed, collapsed) &&
+      listEquals(m.breakpoints, doc.breakpoints)) {
+    return m.rows;
+  }
+  final rows = buildTimelineRows(doc, scene, clockId, collapsed: collapsed);
+  _rowsMemo[scene] = _RowsMemo(clockId, collapsed, doc.breakpoints, rows);
+  return rows;
+}
+
+/// What the lane list is made of: the scene, the clock and the rows' shape
+/// (groups, lanes, names, labels, collapse), but not the keyframes. Equal
+/// across keyframe edits, so those don't rebuild the list; each row tile
+/// watches its own tracks.
+@immutable
+class TimelineStructure {
+  const TimelineStructure(this.sceneId, this.clock, this.rows);
+
+  final String sceneId;
+  final ir.Clock clock;
+
+  /// The rows as last built (their tracks may be older than the document's;
+  /// read current tracks with [trackById]).
+  final List<TimelineRow> rows;
+
+  static bool _sameShape(TimelineRow a, TimelineRow b) => switch ((a, b)) {
+    (final GroupRow x, final GroupRow y) =>
+      x.nodeId == y.nodeId &&
+          x.name == y.name &&
+          x.collapsed == y.collapsed &&
+          listEquals(
+            [for (final t in x.tracks) t.id],
+            [for (final t in y.tracks) t.id],
+          ),
+    (final LaneRow x, final LaneRow y) =>
+      x.nodeId == y.nodeId && x.track.id == y.track.id && x.label == y.label,
+    _ => false,
+  };
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! TimelineStructure ||
+        other.sceneId != sceneId ||
+        other.clock != clock ||
+        other.rows.length != rows.length) {
+      return false;
+    }
+    if (identical(other.rows, rows)) return true;
+    for (var i = 0; i < rows.length; i++) {
+      if (!_sameShape(rows[i], other.rows[i])) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(sceneId, clock.id, rows.length);
+}
+
+/// The lane structure of scene [sceneId] on clock [clockId], or null when
+/// either is missing.
+TimelineStructure? timelineStructureOf(
+  ir.StageDocument doc,
+  String? sceneId,
+  String? clockId, {
+  Set<String> collapsed = const {},
+}) {
+  ir.Scene? scene;
+  for (final s in doc.scenes) {
+    if (s.id == sceneId) scene = s;
+  }
+  if (scene == null || clockId == null) return null;
+  ir.Clock? clock;
+  for (final c in scene.clocks) {
+    if (c.id == clockId) clock = c;
+  }
+  if (clock == null) return null;
+  return TimelineStructure(
+    scene.id,
+    clock,
+    timelineRowsFor(doc, scene, clockId, collapsed: collapsed),
+  );
+}

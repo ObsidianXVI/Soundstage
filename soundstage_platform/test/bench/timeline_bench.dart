@@ -256,7 +256,7 @@ void main() {
     print(
       'keyframe drag rebuilds per step: '
       '${(dragRebuilt.values.fold(0, (a, b) => a + b) / 120).toStringAsFixed(0)} '
-      '(${[for (final e in top.take(12)) '${e.key} ${(e.value / 120).toStringAsFixed(1)}'].join(', ')})',
+      '(${[for (final e in top) if (e.value >= 60) '${e.key} ${(e.value / 120).toStringAsFixed(1)}'].join(', ')})',
     );
 
     // ignore: avoid_print

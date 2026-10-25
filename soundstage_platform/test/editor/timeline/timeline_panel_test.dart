@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Easing;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -415,5 +416,47 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('timeline'))).height,
       kTimelineHeaderHeight + 1,
     );
+  });
+
+  testWidgets('a keyframe drag rebuilds its lane, not the shell or the list '
+      '(T2.1-6)', (tester) async {
+    final r = await pumpTimeline(tester);
+    final rebuilt = <String, int>{};
+    final g = await tester.startGesture(
+      r.at(_bx, 0.25),
+      kind: PointerDeviceKind.mouse,
+      buttons: kPrimaryButton,
+    );
+    await tester.pump();
+    await g.moveTo(r.at(_bx, 0.3));
+    await tester.pump();
+    debugOnRebuildDirtyWidget = (e, _) {
+      final n = e.widget.runtimeType.toString();
+      rebuilt[n] = (rebuilt[n] ?? 0) + 1;
+    };
+    for (var i = 1; i <= 5; i++) {
+      await g.moveTo(r.at(_bx, 0.3 + i * 0.02));
+      await tester.pump();
+    }
+    debugOnRebuildDirtyWidget = null;
+    await g.up();
+    await tester.pump();
+    expect(r.times('bx').first, closeTo(0.4, 0.01));
+    for (final shell in [
+      '_EditorScope',
+      '_DockedEditor',
+      'EditorToolbar',
+      'EditorCanvas',
+      'TimelinePanel',
+      '_Header',
+      '_TimelineBody',
+      'ListView',
+      '_RowTile',
+      'ScenesPanel',
+    ]) {
+      expect(rebuilt[shell], isNull, reason: '$shell rebuilt: $rebuilt');
+    }
+    // The dragged lane and its group's summary.
+    expect(rebuilt['_LaneKeys'], 2 * 5);
   });
 }

@@ -126,12 +126,11 @@ class _EditorScope extends ConsumerWidget {
       editorControllerProvider.select((s) => Identity(s.document)),
       (_, next) => onDocumentChanged?.call(next.value),
     );
-    final document = ref
-        .watch(editorControllerProvider.select((s) => Identity(s.document)))
-        .value;
-    final title = document.meta.title.isEmpty
-        ? 'Untitled story'
-        : document.meta.title;
+    // The title only: an edit must not rebuild the shell (T2.1-6).
+    final storyTitle = ref.watch(
+      editorControllerProvider.select((s) => s.document.meta.title),
+    );
+    final title = storyTitle.isEmpty ? 'Untitled story' : storyTitle;
     return LayoutBuilder(
       builder: (context, box) {
         if (box.maxWidth < kEditorMinWidth) {
@@ -144,7 +143,6 @@ class _EditorScope extends ConsumerWidget {
         }
         return _AltScopeFlip(
           child: _DockedEditor(
-            document: document,
             title: title,
             width: box.maxWidth,
             onBack: onBack,
@@ -198,7 +196,6 @@ class _AltScopeFlipState extends ConsumerState<_AltScopeFlip> {
 
 class _DockedEditor extends ConsumerWidget {
   const _DockedEditor({
-    required this.document,
     required this.title,
     required this.width,
     required this.onBack,
@@ -208,7 +205,6 @@ class _DockedEditor extends ConsumerWidget {
     required this.saveStatus,
   });
 
-  final ir.StageDocument document;
   final String title;
   final double width;
   final VoidCallback onBack;
@@ -335,7 +331,7 @@ class _DockedEditor extends ConsumerWidget {
                       if (layout.leftOpen) ...[
                         SizedBox(
                           width: leftW.toDouble(),
-                          child: _LeftPanel(document: document),
+                          child: const _LeftPanel(),
                         ),
                         ResizeHandle(
                           semanticLabel: 'Resize left panel',
@@ -388,9 +384,7 @@ class _DockedEditor extends ConsumerWidget {
 }
 
 class _LeftPanel extends ConsumerWidget {
-  const _LeftPanel({required this.document});
-
-  final ir.StageDocument document;
+  const _LeftPanel();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
