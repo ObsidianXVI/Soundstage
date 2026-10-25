@@ -98,7 +98,13 @@ class LayoutChildFacts {
   ];
   List<String> get freeFrameIds => [
     for (final n in frames)
-      if (!n.hasAutoLayout) n.id,
+      if (!n.hasAutoLayout && !n.hasGrid) n.id,
+  ];
+
+  /// Selected frames with a grid.
+  List<String> get gridFrameIds => [
+    for (final n in frames)
+      if (n.hasGrid) n.id,
   ];
 
   @override

@@ -7,6 +7,7 @@ import 'sections/behavior_section.dart';
 import 'sections/effects_section.dart';
 import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
+import 'sections/grid_section.dart';
 import 'sections/header_section.dart';
 import 'sections/layout_child_section.dart';
 import 'sections/modes_section.dart';
@@ -56,11 +57,13 @@ final List<InspectorSectionSpec> kInspectorSections = [
   shapeSection,
   autoLayoutSection,
   layoutChildSection,
+  gridCellSection,
   appearanceSection,
   modesSection,
   fillSection,
   strokeSection,
   effectsSection,
+  gridSection,
   textSection,
   behaviorSection,
   motionSection,

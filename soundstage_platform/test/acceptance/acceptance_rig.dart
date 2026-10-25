@@ -442,10 +442,29 @@ class Rig {
       final v = vb.localToGlobal(Offset.zero) & vb.size;
       // A margin: a field a few pixels under the viewport's top edge is
       // not reliably hit (it sits in the scroll view's edge band).
-      if (r.top >= v.top + 24 && r.bottom <= v.bottom - 24) return;
+      if (r.top >= v.top + 24 && r.bottom <= v.bottom - 24) {
+        if (_hits(box, r.center)) return;
+        // In the viewport but covered (a lazily laid out neighbour): move
+        // the list a little and look again.
+        o.position.jumpTo(
+          (o.position.pixels + (i.isEven ? 120 : -240)).clamp(
+            0,
+            o.position.maxScrollExtent,
+          ),
+        );
+        await settleAnimations();
+        continue;
+      }
       await Scrollable.ensureVisible(e, alignment: 0.5);
       await settleAnimations();
     }
+  }
+
+  /// Whether a pointer at [at] reaches [box].
+  bool _hits(RenderBox box, Offset at) {
+    final result = HitTestResult();
+    tester.binding.hitTestInView(result, at, tester.view.viewId);
+    return result.path.any((e) => e.target == box);
   }
 
   /// Types [text] into the inspector number/text field at [path] + Enter.

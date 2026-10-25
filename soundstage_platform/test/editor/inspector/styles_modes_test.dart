@@ -40,7 +40,7 @@ Future<void> _menu(WidgetTester tester, String stylePath) async {
 void main() {
   testWidgets('create a colour style from a fill, apply it to another frame, '
       'detach it', (tester) async {
-    final c = await pumpInspector(tester, _doc(), select: {'f'});
+    final c = await pumpInspector(tester, _doc(), select: {'f'}, height: 1800);
     await _menu(tester, 'fillStyleId');
     await tester.tap(find.text('Create colour style…'));
     await tester.pumpAndSettle();
@@ -79,7 +79,7 @@ void main() {
   });
 
   testWidgets('a frame and a scene pick modes per collection', (tester) async {
-    final c = await pumpInspector(tester, _doc(), select: {'f'});
+    final c = await pumpInspector(tester, _doc(), select: {'f'}, height: 1800);
     expect(find.text('Modes'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('mode-override-c1')));
     await tester.pumpAndSettle();

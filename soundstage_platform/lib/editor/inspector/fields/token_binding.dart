@@ -63,6 +63,7 @@ class BindableField extends ConsumerStatefulWidget {
 
 class _BindableFieldState extends ConsumerState<BindableField> {
   bool _hover = false;
+  final GlobalKey _buttonKey = GlobalKey(debugLabel: 'bind button');
 
   PropertyWriter get _writer => InspectorScope.of(context).writer;
 
@@ -129,7 +130,16 @@ class _BindableFieldState extends ConsumerState<BindableField> {
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (e) {
-        if (e.buttons != kSecondaryMouseButton) return;
+        if (e.buttons != kSecondaryMouseButton) {
+          // A press hides the button until the pointer moves again (a click
+          // into the field must not land on it), unless it is on it.
+          final b = _buttonKey.currentContext?.findRenderObject();
+          final onButton =
+              b is RenderBox &&
+              (b.localToGlobal(Offset.zero) & b.size).contains(e.position);
+          if (_hover && !onButton) setState(() => _hover = false);
+          return;
+        }
         offerContextEntries(context, e, [
           SsMenuItem(
             label: 'Bind to variable…',
@@ -144,8 +154,14 @@ class _BindableFieldState extends ConsumerState<BindableField> {
 
   Widget _hoverRegion() {
     return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+      // Shown on movement, not on enter: a pointer resting where it last
+      // clicked does not count as hovering.
+      onHover: (_) {
+        if (!_hover) setState(() => _hover = true);
+      },
+      onExit: (_) {
+        if (_hover) setState(() => _hover = false);
+      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -156,6 +172,7 @@ class _BindableFieldState extends ConsumerState<BindableField> {
               top: 0,
               bottom: 0,
               child: Center(
+                key: _buttonKey,
                 child: Builder(
                   builder: (anchor) => SsIconButton(
                     key: ValueKey<String>('bind-${widget.path}'),

@@ -66,7 +66,8 @@ Set<ir.Sizing> validSizings({
 
 Set<ir.Sizing> _validFor(NodeLayoutFacts n, Axis axis) => validSizings(
   kind: n.kind,
-  hasAutoLayout: n.hasAutoLayout,
+  // A grid frame hugs its tracks like an auto-layout frame its flow.
+  hasAutoLayout: n.hasAutoLayout || n.hasGrid,
   parentHasAutoLayout: n.parentHasAutoLayout,
   inFlow: n.inFlow,
   isRoot: n.isRoot,

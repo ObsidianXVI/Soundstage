@@ -368,6 +368,7 @@ class SelectionInfo {
     this.geometries = const {},
     this.flowAutoLayoutRoots = 0,
     this.hasModes = false,
+    this.inGrid = 0,
   });
 
   final List<String> ids;
@@ -400,6 +401,9 @@ class SelectionInfo {
   /// Whether some token collection has more than one mode (the Modes
   /// section has something to pick).
   final bool hasModes;
+
+  /// Selected nodes whose parent is a grid frame (§4.5).
+  final int inGrid;
 
   int get count => ids.length;
   bool get isEmpty => ids.isEmpty;
@@ -434,7 +438,8 @@ class SelectionInfo {
       other.innerNodes == innerNodes &&
       setEquals(other.geometries, geometries) &&
       other.flowAutoLayoutRoots == flowAutoLayoutRoots &&
-      other.hasModes == hasModes;
+      other.hasModes == hasModes &&
+      other.inGrid == inGrid;
 
   @override
   int get hashCode => Object.hash(
@@ -450,6 +455,7 @@ class SelectionInfo {
     Object.hashAll(geometries),
     flowAutoLayoutRoots,
     hasModes,
+    inGrid,
   );
 }
 
@@ -463,6 +469,7 @@ SelectionInfo classifySelection(
   final ids = <String>[];
   final kinds = <ir.NodeKind>{};
   var frames = 0, autoFrames = 0, inAuto = 0, absInAuto = 0, inFree = 0;
+  var inGrid = 0;
   var roots = 0, inner = 0;
   final geometries = <String>{};
   var flowRoots = 0;
@@ -505,7 +512,9 @@ SelectionInfo classifySelection(
       continue;
     }
     final parent = index[loc.parentId!]?.node;
-    if (parent is ir.FrameNode && parent.autoLayout != null) {
+    if (parent is ir.FrameNode && parent.grid != null) {
+      inGrid++;
+    } else if (parent is ir.FrameNode && parent.autoLayout != null) {
       inAuto++;
       if (node.common.layoutChild.positioning == ir.Positioning.absolute) {
         absInAuto++;
@@ -527,6 +536,7 @@ SelectionInfo classifySelection(
     geometries: geometries,
     flowAutoLayoutRoots: flowRoots,
     hasModes: doc.tokens.collections.any((c) => c.modes.length > 1),
+    inGrid: inGrid,
   );
 }
 
