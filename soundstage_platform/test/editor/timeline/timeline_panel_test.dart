@@ -281,11 +281,20 @@ void main() {
     await r.click(r.at(_bx, 0.5));
     await r.click(r.at(_bx, 0.5));
     expect(r.tl.easingSegment.value, (track: 'bx', keyframe: 'x0'));
+    await tester.pump();
     expect(find.byKey(const ValueKey('easing-hook')), findsOneWidget);
-    expect(find.text('Ease in out'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Close easing'));
+    expect(find.byKey(const ValueKey('easing-editor')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('easing-hook')),
+        matching: find.text('Ease in out'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.bySemanticsLabel('Close easing editor'));
     await tester.pump();
     expect(find.byKey(const ValueKey('easing-hook')), findsNothing);
+    expect(find.byKey(const ValueKey('easing-editor')), findsNothing);
   });
 
   testWidgets('groups collapse; canvas selection reveals and highlights a '

@@ -126,13 +126,33 @@ double springEase(double mass, double stiffness, double damping, double u) {
   }
   if (u <= 0) return 0;
   if (u >= 1) return 1;
+  final s = _springFor(mass, stiffness, damping);
+  return s.response(u * s.settleTime) / s.endValue;
+}
+
+/// The spring's natural settle time in seconds: how long the physical
+/// spring takes to come within [kSpringRestThreshold] of rest. A segment
+/// plays the response over its own duration, so this is the duration at
+/// which the spring runs at its real speed (the easing editor shows it).
+/// 0 for parameters [springEase] treats as linear.
+double springSettleTime(double mass, double stiffness, double damping) {
+  if (!(mass > 0) ||
+      !(stiffness > 0) ||
+      !mass.isFinite ||
+      !stiffness.isFinite) {
+    return 0;
+  }
+  return _springFor(mass, stiffness, damping).settleTime;
+}
+
+_Spring _springFor(double mass, double stiffness, double damping) {
   final s = _springCache.putIfAbsent((
     mass,
     stiffness,
     damping,
   ), () => _Spring(mass, stiffness, damping.isFinite ? damping : 0));
   if (_springCache.length > 256) _springCache.clear();
-  return s.response(u * s.settleTime) / s.endValue;
+  return s;
 }
 
 class _Spring {
