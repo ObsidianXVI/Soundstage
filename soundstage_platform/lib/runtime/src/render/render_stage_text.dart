@@ -21,7 +21,9 @@ import 'text/text_reveal.dart';
 /// `truncate` keep the stored box. A width imposed by the parent (fill,
 /// stretch constraints, max width) wraps the text. A `hug` layoutChild
 /// sizing also makes the node hug that axis.
-class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
+class RenderStageText extends RenderStageBox
+    with RelayoutWhenSystemFontsChangeMixin
+    implements StageTypedTrackHost {
   RenderStageText({
     required ir.TextNode node,
     required this._paragraphs,
@@ -204,6 +206,17 @@ class RenderStageText extends RenderStageBox implements StageTypedTrackHost {
     if (!attached) return;
     final l = _paintLayout ?? _measureLayout;
     if (l != null && !l.usesFamily(familyId)) return;
+    _resetLayouts();
+    markStageLayoutDirty();
+  }
+
+  /// Fallback fonts (emoji, CJK) arrive asynchronously on the web and the
+  /// engine reports them as a system font change: like `RenderParagraph`,
+  /// drop the cached painters and lay out again, so glyphs drawn from the
+  /// fallback are not left as tofu.
+  @override
+  void systemFontsDidChange() {
+    super.systemFontsDidChange();
     _resetLayouts();
     markStageLayoutDirty();
   }

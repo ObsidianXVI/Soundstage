@@ -130,7 +130,8 @@ class _Line {
 ///   the current word.
 /// - Time comes from [time] (the animator's lyrics driver, on the track's
 ///   audio clock). Changing it only repaints.
-class RenderStageLyrics extends RenderStageBox {
+class RenderStageLyrics extends RenderStageBox
+    with RelayoutWhenSystemFontsChangeMixin {
   RenderStageLyrics({
     required ir.TextNode node,
     required this._paragraphs,
@@ -326,6 +327,14 @@ class RenderStageLyrics extends RenderStageBox {
         _behavior.activeStyle.fontFamilyId == familyId ||
         _behavior.inactiveStyle.fontFamilyId == familyId;
     if (uses) _reset();
+  }
+
+  /// Fallback fonts arrive asynchronously on the web (see
+  /// `RenderStageText.systemFontsDidChange`).
+  @override
+  void systemFontsDidChange() {
+    super.systemFontsDidChange();
+    _reset();
   }
 
   @override

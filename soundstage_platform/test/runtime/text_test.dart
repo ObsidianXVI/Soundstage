@@ -412,5 +412,24 @@ void main() {
         t.firstBaseline,
       );
     });
+
+    testWidgets('B6: a system font change drops the painters and relays out', (
+      tester,
+    ) async {
+      final t = await pumpText(tester, textNode('t', text: 'a 🙂'));
+      final before = t.textLayout;
+      // The engine reports newly loaded fallback fonts as `fontsChange`.
+      await tester.binding.handleSystemMessage(<String, dynamic>{
+        'type': 'fontsChange',
+      });
+      expect(t.debugNeedsLayout, isFalse, reason: 'deferred to the next frame');
+      await tester.pump();
+      expect(
+        identical(t.textLayout, before),
+        isFalse,
+        reason: 'painters were rebuilt, so fallback glyphs are re-resolved',
+      );
+      expect(t.debugNeedsLayout, isFalse);
+    });
   });
 }
