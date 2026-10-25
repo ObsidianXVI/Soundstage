@@ -8,9 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../canvas/canvas_controller.dart';
 import '../core/commands/gesture_commands.dart';
 import '../core/commands/motion_commands.dart';
 import '../core/editor_controller.dart';
+import '../core/editor_state.dart';
 import '../shortcuts/shortcut_map.dart' show primaryFocusIsTextInput;
 import 'easing_hook.dart';
 import 'timeline_actions.dart';
@@ -86,6 +88,7 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
 
   // Kept from initState: dispose must not use ref.
   late final TimelineController _tl = ref.read(timelineControllerProvider);
+  late final CanvasController _canvas = ref.read(canvasControllerProvider);
   EditorController get _editor => ref.read(editorControllerProvider.notifier);
 
   @override
@@ -140,6 +143,8 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
   }
 
   void _playingChanged() {
+    // Only the edited artboard follows a playing playhead (T2.1-5).
+    _canvas.playheadLive.value = _tl.playing.value;
     if (_tl.playing.value) {
       _lastTick = Duration.zero;
       if (!_ticker.isActive) _ticker.start();
@@ -461,17 +466,39 @@ class _PlayheadReadout extends ConsumerWidget {
 
 // ---- Body ----------------------------------------------------------------------------
 
-/// What the body shows: the active scene, clock and span, and the rows.
+/// What the body shows: the rows' structure ([TimelineStructure]), with the
+/// scene, its tracks and the clock's span read from the current editor
+/// state on demand (the body rebuilds on structure changes only, T2.1-6).
 class _BodyModel {
-  _BodyModel(this.doc, this.scene, this.clock, this.span, this.rows);
+  _BodyModel(this._read, this.structure);
 
-  final ir.StageDocument doc;
-  final ir.Scene scene;
-  final ir.Clock clock;
-  final ClockSpan span;
-  final List<TimelineRow> rows;
+  final EditorState Function() _read;
+  final TimelineStructure structure;
 
-  String get viewKey => TimelineController.viewKey(scene.id, clock.id);
+  List<TimelineRow> get rows => structure.rows;
+  ir.Clock get clock => structure.clock;
+  ir.StageDocument get doc => _read().document;
+
+  /// The current scene.
+  ir.Scene get scene => doc.scenes.firstWhere((s) => s.id == structure.sceneId);
+
+  /// The current track [id] of the scene.
+  ir.Track? track(String id) => trackById(scene, id);
+
+  ir.Scene? _spanScene;
+  ClockSpan? _span;
+
+  /// The clock's span (memoised while the scene is unchanged).
+  ClockSpan get span {
+    final sc = scene;
+    if (!identical(sc, _spanScene) || _span == null) {
+      _spanScene = sc;
+      _span = clockSpan(doc, sc, clock);
+    }
+    return _span!;
+  }
+
+  String get viewKey => TimelineController.viewKey(structure.sceneId, clock.id);
 }
 
 class _TimelineBody extends ConsumerStatefulWidget {
@@ -537,12 +564,30 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
 
   void _selectNode(String id) => _editor.select({id});
 
+  late final CanvasController _canvas = ref.read(canvasControllerProvider);
+
+  /// A scrub drag (ruler or playhead line) is under way: only the edited
+  /// artboard follows it (T2.1-5); the others catch up when it ends.
+  void _setScrubbing(bool on) {
+    if (on || !_tl.playing.value) _canvas.playheadLive.value = on;
+  }
+
   TimelineActions get _actions =>
       TimelineActions(_editor, _tl, () => ref.read(editorControllerProvider));
+
+  late final TimelineController _timeline = ref.read(
+    timelineControllerProvider,
+  );
+  Set<String> _collapsed = const {};
+
+  void _collapsedChanged() =>
+      setState(() => _collapsed = _timeline.collapsed.value);
 
   @override
   void initState() {
     super.initState();
+    _collapsed = _timeline.collapsed.value;
+    _timeline.collapsed.addListener(_collapsedChanged);
     ref.listenManual(
       editorControllerProvider.select((s) => s.selection.firstOrNull),
       (_, id) => _revealNode(id),
@@ -551,6 +596,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
 
   @override
   void dispose() {
+    _timeline.collapsed.removeListener(_collapsedChanged);
     _rows.dispose();
     _focus.dispose();
     _marquee.dispose();
@@ -588,14 +634,16 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     if (row < 0 || row >= m.rows.length) return null;
     final r = m.rows[row];
     if (r is! LaneRow) return null;
+    final track = m.track(r.track.id);
+    if (track == null) return null;
     final v = _view(m);
     KeyframeRef? best;
     var bestD = kKeyframeHitRadius + 0.5;
-    for (final k in r.track.keyframes) {
+    for (final k in track.keyframes) {
       final d = (v.xOf(k.t) - p.dx).abs();
       if (d < bestD) {
         bestD = d;
-        best = (track: r.track.id, keyframe: k.id);
+        best = (track: track.id, keyframe: k.id);
       }
     }
     return best;
@@ -607,7 +655,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final r = m.rows[row];
     if (r is! LaneRow) return null;
     final t = _view(m).tOf(p.dx);
-    final kfs = r.track.keyframes;
+    final kfs = m.track(r.track.id)?.keyframes ?? const <ir.Keyframe>[];
     for (var i = 0; i < kfs.length - 1; i++) {
       if (kfs[i].t <= t && t < kfs[i + 1].t) {
         return (track: r.track.id, keyframe: kfs[i].id);
@@ -706,7 +754,9 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     );
     if (hit == null && _onPlayheadLine(m, e.localPosition)) {
       press.scrub = true;
+      // After _scrubTo, which stops playback (and its live flag).
       _scrubTo(m, e.localPosition.dx);
+      _setScrubbing(true);
     } else if (hit != null) {
       final sel = _tl.selection.value;
       if (press.shift) {
@@ -764,7 +814,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final m = _model;
     _press = null;
     if (p == null || m == null) return;
-    if (p.scrub) return;
+    if (p.scrub) {
+      _setScrubbing(false);
+      return;
+    }
     if (!p.dragging) {
       _lastClickAt = e.timeStamp;
       _lastClickPos = e.localPosition;
@@ -796,6 +849,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final p = _press;
     _press = null;
     if (p == null) return;
+    if (p.scrub) _setScrubbing(false);
     if (p.dragging && p.hit != null && p.base != null) {
       _editor.execute(
         GestureStep(
@@ -926,7 +980,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     for (var i = math.max(0, first); i <= last && i < m.rows.length; i++) {
       final r = m.rows[i];
       if (r is! LaneRow) continue;
-      for (final k in r.track.keyframes) {
+      for (final k in m.track(r.track.id)?.keyframes ?? const <ir.Keyframe>[]) {
         final x = v.xOf(k.t);
         if (x >= rect.left - 3 && x <= rect.right + 3) {
           out.add((track: r.track.id, keyframe: k.id));
@@ -975,85 +1029,95 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   Widget build(BuildContext context) {
     final t = context.ss;
     final c = t.colors;
-    final tl = ref.watch(timelineControllerProvider);
-    final doc = ref
-        .watch(editorControllerProvider.select((s) => Identity(s.document)))
-        .value;
-    final sceneId = ref.watch(
-      editorControllerProvider.select((s) => s.activeSceneId),
+    ref.watch(timelineControllerProvider);
+    // The rows' structure only (T2.1-6): keyframe edits and scrubbing don't
+    // rebuild the body; each row tile watches its own tracks.
+    final collapsed = _collapsed;
+    // Scrubbing changes the playheads only: the same document, scene and
+    // clock give the same structure without looking at the rows.
+    ir.StageDocument? lastDoc;
+    String? lastScene, lastClock;
+    TimelineStructure? last;
+    final structure = ref.watch(
+      editorControllerProvider.select((s) {
+        if (identical(s.document, lastDoc) &&
+            s.activeSceneId == lastScene &&
+            s.activeClockId == lastClock) {
+          return last;
+        }
+        lastDoc = s.document;
+        lastScene = s.activeSceneId;
+        lastClock = s.activeClockId;
+        return last = timelineStructureOf(
+          s.document,
+          s.activeSceneId,
+          s.activeClockId,
+          collapsed: collapsed,
+        );
+      }),
     );
-    final clockId = ref.watch(
-      editorControllerProvider.select((s) => s.activeClockId),
-    );
-    final scene = doc.scenes.where((s) => s.id == sceneId).firstOrNull;
-    final clock = scene?.clocks.where((k) => k.id == clockId).firstOrNull;
-    if (scene == null || clock == null) {
+    if (structure == null) {
       _model = null;
       return Center(child: Text('No scene', style: t.text.caption));
     }
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: tl.collapsed,
-      builder: (context, collapsed, _) {
-        final m = _model = _BodyModel(
-          doc,
-          scene,
-          clock,
-          clockSpan(doc, scene, clock),
-          reuseTimelineRows(
-            _model?.rows ?? const [],
-            buildTimelineRows(doc, scene, clock.id, collapsed: collapsed),
-          ),
-        );
-        return TapRegion(
-          onTapOutside: (_) {
-            if (_focus.hasFocus) _focus.unfocus();
-          },
-          child: Focus(
-            focusNode: _focus,
-            onKeyEvent: _onKey,
-            child: LayoutBuilder(
-              builder: (context, box) {
-                _laneWidth = math.max(1, box.maxWidth - kTimelineLabelWidth);
-                // Created here, not while painting: painters only read it.
-                _view(m);
-                return Column(
-                  children: [
-                    SizedBox(
-                      height: kTimelineRulerHeight,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: kTimelineLabelWidth,
-                            decoration: BoxDecoration(
-                              border: Border(
-                                right: BorderSide(color: c.borderSubtle),
-                                bottom: BorderSide(color: c.borderSubtle),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: _Ruler(
-                              model: m,
-                              playhead: _playhead,
-                              onScrub: (x) => _scrubTo(m, x),
-                              onWheel: (e) => _onWheel(e, ruler: true),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: m.rows.isEmpty
-                          ? _EmptyLanes(clock: clock)
-                          : _lanes(context, m),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
+    final clock = structure.clock;
+    final m = _model = _BodyModel(
+      () => ref.read(editorControllerProvider),
+      TimelineStructure(
+        structure.sceneId,
+        clock,
+        reuseTimelineRows(_model?.rows ?? const [], structure.rows),
+      ),
+    );
+    return TapRegion(
+      onTapOutside: (_) {
+        if (_focus.hasFocus) _focus.unfocus();
       },
+      child: Focus(
+        focusNode: _focus,
+        onKeyEvent: _onKey,
+        child: LayoutBuilder(
+          builder: (context, box) {
+            _laneWidth = math.max(1, box.maxWidth - kTimelineLabelWidth);
+            // Created here, not while painting: painters only read it.
+            _view(m);
+            return Column(
+              children: [
+                SizedBox(
+                  height: kTimelineRulerHeight,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: kTimelineLabelWidth,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            right: BorderSide(color: c.borderSubtle),
+                            bottom: BorderSide(color: c.borderSubtle),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _Ruler(
+                          model: m,
+                          playhead: _playhead,
+                          onScrub: (x) => _scrubTo(m, x),
+                          onScrubbing: _setScrubbing,
+                          onWheel: (e) => _onWheel(e, ruler: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: m.rows.isEmpty
+                      ? _EmptyLanes(clock: clock)
+                      : _lanes(context, m),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -1166,12 +1230,16 @@ class _Ruler extends ConsumerWidget {
     required this.model,
     required this.playhead,
     required this.onScrub,
+    required this.onScrubbing,
     required this.onWheel,
   });
 
   final _BodyModel model;
   final _PlayheadSource playhead;
   final ValueChanged<double> onScrub;
+
+  /// A scrub drag starts (true) or ends (false).
+  final ValueChanged<bool> onScrubbing;
   final ValueChanged<PointerSignalEvent> onWheel;
 
   @override
@@ -1181,11 +1249,16 @@ class _Ruler extends ConsumerWidget {
       key: const ValueKey<String>('timeline-ruler'),
       behavior: HitTestBehavior.opaque,
       onPointerDown: (e) {
-        if (e.buttons == kPrimaryButton) onScrub(e.localPosition.dx);
+        if (e.buttons != kPrimaryButton) return;
+        // After onScrub, which stops playback (and its live flag).
+        onScrub(e.localPosition.dx);
+        onScrubbing(true);
       },
       onPointerMove: (e) {
         if (e.buttons == kPrimaryButton) onScrub(e.localPosition.dx);
       },
+      onPointerUp: (_) => onScrubbing(false),
+      onPointerCancel: (_) => onScrubbing(false),
       onPointerSignal: onWheel,
       child: CustomPaint(
         painter: _RulerPainter(
@@ -1298,7 +1371,6 @@ class _RowTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.ss;
     final c = t.colors;
-    final tl = ref.watch(timelineControllerProvider);
     final row = this.row;
     final selected = ref.watch(
       editorControllerProvider.select((s) => s.selection.contains(row.nodeId)),
@@ -1364,18 +1436,75 @@ class _RowTile extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: CustomPaint(
-              painter: _LanePainter(
-                row: row,
-                viewKey: viewKey,
-                timeline: tl,
-                colors: c,
-              ),
-              child: const SizedBox.expand(),
-            ),
+            child: _LaneKeys(row: row, viewKey: viewKey),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The tracks of a row by identity: equal while none of them changed.
+class _RowTracks {
+  _RowTracks(this.tracks);
+
+  final List<ir.Track> tracks;
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! _RowTracks || other.tracks.length != tracks.length) {
+      return false;
+    }
+    for (var i = 0; i < tracks.length; i++) {
+      if (!identical(other.tracks[i], tracks[i])) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([for (final t in tracks) t.id]);
+}
+
+/// The keyframes part of a row: watches its own track(s) only, so a
+/// keyframe edit repaints its lane (and its group's summary) and nothing
+/// else (T2.1-6).
+class _LaneKeys extends ConsumerWidget {
+  const _LaneKeys({required this.row, required this.viewKey});
+
+  final TimelineRow row;
+  final String viewKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ids = switch (row) {
+      GroupRow(:final tracks) => [for (final t in tracks) t.id],
+      LaneRow(:final track) => [track.id],
+    };
+    // Same document (a scrub): same tracks, without a lookup.
+    ir.StageDocument? lastDoc;
+    _RowTracks? last;
+    final tracks = ref
+        .watch(
+          editorControllerProvider.select((s) {
+            final known = last;
+            if (known != null && identical(s.document, lastDoc)) return known;
+            lastDoc = s.document;
+            final scene = s.activeScene;
+            return last = _RowTracks([
+              for (final id in ids) ?trackById(scene, id),
+            ]);
+          }),
+        )
+        .tracks;
+    return CustomPaint(
+      painter: _LanePainter(
+        row: row,
+        tracks: tracks,
+        viewKey: viewKey,
+        timeline: ref.watch(timelineControllerProvider),
+        colors: context.ss.colors,
+      ),
+      child: const SizedBox.expand(),
     );
   }
 }
@@ -1384,12 +1513,16 @@ class _RowTile extends ConsumerWidget {
 class _LanePainter extends CustomPainter {
   _LanePainter({
     required this.row,
+    required this.tracks,
     required this.viewKey,
     required this.timeline,
     required this.colors,
   }) : super(repaint: Listenable.merge([timeline.views, timeline.selection]));
 
   final TimelineRow row;
+
+  /// The row's current tracks (one for a lane).
+  final List<ir.Track> tracks;
   final String viewKey;
   final TimelineController timeline;
   final SsColors colors;
@@ -1407,7 +1540,7 @@ class _LanePainter extends CustomPainter {
     final row = this.row;
     if (row is GroupRow) {
       final dot = Paint()..color = colors.textDisabled;
-      for (final t in row.tracks) {
+      for (final t in tracks) {
         for (final k in t.keyframes) {
           final x = v.xOf(k.t);
           if (x < -4 || x > size.width + 4) continue;
@@ -1416,8 +1549,8 @@ class _LanePainter extends CustomPainter {
       }
       return;
     }
-    if (row is! LaneRow) return;
-    final kfs = row.track.keyframes;
+    if (row is! LaneRow || tracks.isEmpty) return;
+    final kfs = tracks.single.keyframes;
     final sel = timeline.selection.value;
     // Segments: a bar between keyframes; a hold is dashed-looking (thin).
     final bar = Paint()
@@ -1465,7 +1598,12 @@ class _LanePainter extends CustomPainter {
   bool shouldRepaint(_LanePainter old) =>
       !identical(old.row, row) ||
       old.viewKey != viewKey ||
-      old.colors != colors;
+      old.colors != colors ||
+      old.tracks.length != tracks.length ||
+      [
+        for (var i = 0; i < tracks.length; i++)
+          identical(old.tracks[i], tracks[i]),
+      ].contains(false);
 }
 
 /// The playhead line, the snap guide and the box-select rectangle over the

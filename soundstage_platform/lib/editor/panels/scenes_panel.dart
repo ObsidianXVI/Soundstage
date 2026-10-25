@@ -250,12 +250,16 @@ class _ScenesPanelState extends ConsumerState<ScenesPanel> {
   @override
   Widget build(BuildContext context) {
     final t = context.ss;
-    final doc = ref.watch(editorControllerProvider.select((s) => s.document));
+    // The scenes' ids, names and kinds only (T2.1-6): edits inside a scene
+    // don't rebuild the panel.
+    final scenes = ref
+        .watch(
+          editorControllerProvider.select((s) => _SceneList(s.document.scenes)),
+        )
+        .scenes;
     final activeId = ref.watch(
       editorControllerProvider.select((s) => s.activeSceneId),
     );
-    final scenes = doc.scenes;
-
     return LayoutBuilder(
       builder: (context, box) {
         return Focus(
@@ -439,4 +443,27 @@ class _LinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_LinePainter old) =>
       old.index != index || old.scroll != scroll || old.color != color;
+}
+
+/// The scene list as the panel shows it: equal while every scene keeps its
+/// id, name and kind (and order).
+class _SceneList {
+  _SceneList(this.scenes);
+
+  final List<ir.Scene> scenes;
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! _SceneList || other.scenes.length != scenes.length) {
+      return false;
+    }
+    for (var i = 0; i < scenes.length; i++) {
+      final a = scenes[i], b = other.scenes[i];
+      if (a.id != b.id || a.name != b.name || a.kind != b.kind) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll([for (final s in scenes) s.id]);
 }
