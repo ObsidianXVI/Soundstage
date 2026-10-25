@@ -284,6 +284,7 @@ class SelectionInfo {
     this.roots = 0,
     this.innerNodes = 0,
     this.geometries = const {},
+    this.flowAutoLayoutRoots = 0,
   });
 
   final List<String> ids;
@@ -308,6 +309,10 @@ class SelectionInfo {
 
   /// The geometry kinds of the selected shapes (`ellipse`, `star`, …).
   final Set<String> geometries;
+
+  /// Selected roots of flow scenes that have auto layout (their height can
+  /// hug).
+  final int flowAutoLayoutRoots;
 
   int get count => ids.length;
   bool get isEmpty => ids.isEmpty;
@@ -340,7 +345,8 @@ class SelectionInfo {
       other.inFreeParent == inFreeParent &&
       other.roots == roots &&
       other.innerNodes == innerNodes &&
-      setEquals(other.geometries, geometries);
+      setEquals(other.geometries, geometries) &&
+      other.flowAutoLayoutRoots == flowAutoLayoutRoots;
 
   @override
   int get hashCode => Object.hash(
@@ -354,6 +360,7 @@ class SelectionInfo {
     roots,
     innerNodes,
     Object.hashAll(geometries),
+    flowAutoLayoutRoots,
   );
 }
 
@@ -369,6 +376,7 @@ SelectionInfo classifySelection(
   var frames = 0, autoFrames = 0, inAuto = 0, absInAuto = 0, inFree = 0;
   var roots = 0, inner = 0;
   final geometries = <String>{};
+  var flowRoots = 0;
   for (final id in selection) {
     final rn = index[id];
     if (rn == null) continue;
@@ -398,6 +406,13 @@ SelectionInfo classifySelection(
     if (loc == null) continue;
     if (loc.isRoot) {
       roots++;
+      final si = loc.sceneIndex;
+      if (si != null &&
+          doc.scenes[si].kind == ir.SceneKind.flow &&
+          node is ir.FrameNode &&
+          node.autoLayout != null) {
+        flowRoots++;
+      }
       continue;
     }
     final parent = index[loc.parentId!]?.node;
@@ -421,6 +436,7 @@ SelectionInfo classifySelection(
     roots: roots,
     innerNodes: inner,
     geometries: geometries,
+    flowAutoLayoutRoots: flowRoots,
   );
 }
 

@@ -91,6 +91,21 @@ void main() {
       expect(v(ir.NodeKind.frame, auto: true, root: true), isEmpty);
     });
 
+    test('a flow root with auto layout: Fixed or Hug in height only', () {
+      Set<ir.Sizing> flow(Axis axis, {bool auto = true}) => validSizings(
+        kind: ir.NodeKind.frame,
+        hasAutoLayout: auto,
+        parentHasAutoLayout: false,
+        inFlow: true,
+        isRoot: true,
+        isFlowRoot: true,
+        axis: axis,
+      );
+      expect(flow(Axis.vertical), {fixed, hug});
+      expect(flow(Axis.horizontal), isEmpty);
+      expect(flow(Axis.vertical, auto: false), isEmpty);
+    });
+
     test('hug: auto-layout frames and text only', () {
       expect(v(ir.NodeKind.frame, auto: true), {fixed, hug});
       expect(v(ir.NodeKind.text), {fixed, hug});
@@ -401,5 +416,56 @@ void main() {
         expect(fieldText('layoutChild.maxHeight'), findsOneWidget);
       });
     }
+  });
+
+  testWidgets('a flow scene root with auto layout can hug its height', (
+    tester,
+  ) async {
+    final doc = inspectorDoc([rect('a')]);
+    final flow = doc.copyWith(
+      scenes: [
+        doc.scenes.single.copyWith(
+          kind: ir.SceneKind.flow,
+          root: doc.scenes.single.root.copyWith(
+            autoLayout: const ir.AutoLayout(
+              direction: ir.LayoutDirection.vertical,
+            ),
+          ),
+        ),
+      ],
+    );
+    final c = await pumpInspector(tester, flow, select: {'root'}, height: tall);
+    expect(find.byKey(const ValueKey('section:layout_child')), findsOneWidget);
+    expect(find.byKey(const ValueKey('field:$_h')), findsNothing);
+    expect(_enabled(tester, _v), {'fixed': true, 'hug': true, 'fill': false});
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('field:$_v')),
+        matching: find.text('Hug'),
+      ),
+    );
+    await tester.pump();
+    expect(_lc(c, 'root').verticalSizing, ir.Sizing.hug);
+  });
+
+  testWidgets('a pinned scene root still has no Layout section', (
+    tester,
+  ) async {
+    final doc = inspectorDoc([rect('a')]);
+    await pumpInspector(
+      tester,
+      doc.copyWith(
+        scenes: [
+          doc.scenes.single.copyWith(
+            root: doc.scenes.single.root.copyWith(
+              autoLayout: const ir.AutoLayout(),
+            ),
+          ),
+        ],
+      ),
+      select: {'root'},
+      height: tall,
+    );
+    expect(find.byKey(const ValueKey('section:layout_child')), findsNothing);
   });
 }

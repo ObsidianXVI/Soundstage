@@ -16,18 +16,24 @@ import 'layout_child_facts.dart';
 /// How a node sizes itself in a layout (Figma's "Fixed / Hug / Fill"), and
 /// its min / max sizes. Shown for in-flow children of auto layout and for
 /// auto-layout frames themselves (their hug applies in a free parent too);
-/// never for scene roots, which the breakpoint sizes.
+/// for scene roots only the height of a flow scene's auto-layout root
+/// (Fixed or Hug: it hugs its content, padding included); the breakpoint
+/// sizes every other root.
 final InspectorSectionSpec layoutChildSection = InspectorSectionSpec(
   id: 'layout_child',
   title: 'Layout',
   appliesTo: (info) =>
-      info.roots == 0 && (info.anyLayoutChild || info.anyAutoLayout),
-  builder: (context, info) => const _LayoutChildBody(),
+      (info.roots == 0 && (info.anyLayoutChild || info.anyAutoLayout)) ||
+      (info.count > 0 && info.flowAutoLayoutRoots == info.count),
+  builder: (context, info) => _LayoutChildBody(
+    rootsOnly: info.count > 0 && info.roots == info.count,
+  ),
 );
 
 /// The sizings valid for one node on [axis] (Figma's rules):
 ///
-/// - Fixed: always (none at all for a scene root: the breakpoint sizes it).
+/// - Fixed: always (none at all for a scene root: the breakpoint sizes it;
+///   a flow scene's auto-layout root may be Fixed or Hug in height).
 /// - Hug: a frame with auto layout (it hugs its flow), or text (auto
 ///   resize). Not shapes, video, embeds, free frames or instances.
 /// - Fill: an in-flow child of an auto-layout parent (on the parent's
@@ -43,8 +49,13 @@ Set<ir.Sizing> validSizings({
   required bool inFlow,
   required bool isRoot,
   required Axis axis,
+  bool isFlowRoot = false,
 }) {
-  if (isRoot) return const {};
+  if (isRoot) {
+    return isFlowRoot && hasAutoLayout && axis == Axis.vertical
+        ? const {ir.Sizing.fixed, ir.Sizing.hug}
+        : const {};
+  }
   return {
     ir.Sizing.fixed,
     if ((kind == ir.NodeKind.frame && hasAutoLayout) ||
@@ -61,10 +72,12 @@ Set<ir.Sizing> _validFor(NodeLayoutFacts n, Axis axis) => validSizings(
   inFlow: n.inFlow,
   isRoot: n.isRoot,
   axis: axis,
+  isFlowRoot: n.isFlowRoot,
 );
 
 /// Why [s] is unavailable for [n] (the disabled segment's tooltip).
 String _whyNot(ir.Sizing s, NodeLayoutFacts n) => switch (s) {
+  _ when n.isRoot => 'Scene roots are sized by the breakpoint',
   ir.Sizing.fixed => 'Scene roots are sized by the breakpoint',
   ir.Sizing.hug =>
     n.kind == ir.NodeKind.frame
@@ -97,10 +110,20 @@ const _names = {
 };
 
 class _LayoutChildBody extends StatelessWidget {
-  const _LayoutChildBody();
+  const _LayoutChildBody({this.rootsOnly = false});
+
+  /// Flow-scene roots: only their height.
+  final bool rootsOnly;
 
   @override
   Widget build(BuildContext context) {
+    if (rootsOnly) {
+      return const _SizingRow(
+        axis: Axis.vertical,
+        path: 'layoutChild.verticalSizing',
+        label: 'Height',
+      );
+    }
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

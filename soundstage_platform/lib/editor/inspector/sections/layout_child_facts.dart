@@ -24,6 +24,7 @@ class NodeLayoutFacts {
     this.parentHasAutoLayout = false,
     this.inFlow = true,
     this.isRoot = false,
+    this.isFlowRoot = false,
     this.isInner = false,
   });
 
@@ -46,6 +47,10 @@ class NodeLayoutFacts {
   /// A scene root (sized by the breakpoint).
   final bool isRoot;
 
+  /// The root of a flow scene: its height follows its content, so with
+  /// auto layout it may hug (padding included).
+  final bool isFlowRoot;
+
   /// A node inside an instance (`instance/inner` id).
   final bool isInner;
 
@@ -61,6 +66,7 @@ class NodeLayoutFacts {
       other.parentHasAutoLayout == parentHasAutoLayout &&
       other.inFlow == inFlow &&
       other.isRoot == isRoot &&
+      other.isFlowRoot == isFlowRoot &&
       other.isInner == isInner;
 
   @override
@@ -72,6 +78,7 @@ class NodeLayoutFacts {
     parentHasAutoLayout,
     inFlow,
     isRoot,
+    isFlowRoot,
     isInner,
   );
 }
@@ -120,11 +127,13 @@ LayoutChildFacts layoutFactsOf(
         : null;
     final inFlow = node.common.layoutChild.positioning == ir.Positioning.auto;
     final inner = id.contains('/');
-    var root = false, parentAuto = false;
+    var root = false, flowRoot = false, parentAuto = false;
     if (!inner) {
       final loc = docIndex.locate(id);
       if (loc != null && loc.isRoot) {
         root = true;
+        final si = loc.sceneIndex;
+        flowRoot = si != null && doc.scenes[si].kind == ir.SceneKind.flow;
       } else if (loc != null) {
         final parent = index[loc.parentId!]?.node;
         parentAuto = parent is ir.FrameNode && parent.autoLayout != null;
@@ -143,6 +152,7 @@ LayoutChildFacts layoutFactsOf(
         parentHasAutoLayout: parentAuto,
         inFlow: inFlow,
         isRoot: root,
+        isFlowRoot: flowRoot,
         isInner: inner,
       ),
     );
