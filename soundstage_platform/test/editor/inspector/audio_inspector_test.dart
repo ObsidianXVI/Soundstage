@@ -58,6 +58,7 @@ Future<_Rig> _pump(
   WidgetTester tester, {
   List<EditorFile> picks = const [],
   double height = 1100,
+  double width = 264,
 }) async {
   final service = FakeAssetService();
   service.peaksById['a1'] = WaveformPeaks(
@@ -69,6 +70,7 @@ Future<_Rig> _pump(
     const Inspector(),
     doc: _doc(),
     height: height,
+    width: width,
     overrides: [
       editorAssetServiceProvider.overrideWithValue(service),
       editorFilePickerProvider.overrideWithValue(
@@ -444,10 +446,11 @@ void main() {
     });
   });
 
-  testWidgets('the Audio view fits a narrow inspector without overflow', (
+  testWidgets('the Audio view and list fit the narrowest inspector (240)', (
     tester,
   ) async {
-    final r = await _pump(tester, height: 700);
+    final r = await _pump(tester, width: 240, height: 700);
+    expect(tester.takeException(), isNull);
     r.c.ctl.selectAudioTrack('au1');
     await tester.pump();
     expect(tester.takeException(), isNull);
