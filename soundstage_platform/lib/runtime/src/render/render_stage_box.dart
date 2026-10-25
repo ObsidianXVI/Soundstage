@@ -9,6 +9,7 @@ import '../paint/appearance_overrides.dart';
 import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
 import 'stage_environment.dart';
+import 'stage_semantics.dart';
 
 /// Parent data of every child of a [RenderStageFrame]: `offset` is the
 /// top-left of the child's unrotated box in the frame's coordinates.
@@ -120,6 +121,9 @@ abstract class RenderStageBox extends RenderBox {
     final wasBoundary = isRepaintBoundary;
     final wasIsolating = isolatesBlend;
     _node = value;
+    if (!identical(old.common, value.common) && _semanticsChanged(old, value)) {
+      markSubtreeSemantics();
+    }
     if (old.effectiveBlendMode != value.effectiveBlendMode) {
       final p = parent;
       if (p is RenderStageBox) p.childBlendChanged();
@@ -494,6 +498,43 @@ abstract class RenderStageBox extends RenderBox {
     if (value == _placeholder) return;
     _placeholder = value;
     markStageLayoutDirty();
+  }
+
+  // ---- Semantics (stage_semantics.dart) --------------------------------------
+
+  /// The node's text for screen readers; null for non-text nodes.
+  @protected
+  String? get semanticsText => null;
+
+  static bool _semanticsChanged(ir.Node a, ir.Node b) {
+    final o = a.common;
+    final n = b.common;
+    return o.role != n.role ||
+        o.readingOrder != n.readingOrder ||
+        o.altText != n.altText ||
+        o.visible != n.visible;
+  }
+
+  /// Marks this node and its stage descendants for a semantics update
+  /// (their order or inherited role may have changed). A no-op while
+  /// semantics are off.
+  void markSubtreeSemantics() {
+    if (!attached || owner?.semanticsOwner == null) return;
+    markNeedsSemanticsUpdate();
+    visitChildren((c) {
+      if (c is RenderStageBox) c.markSubtreeSemantics();
+    });
+  }
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    describeStageSemantics(this, config, semanticsText);
+  }
+
+  @override
+  void visitChildrenForSemantics(RenderObjectVisitor visitor) {
+    if (stageExposed(this)) super.visitChildrenForSemantics(visitor);
   }
 
   ir.NodeCommon get common => _node.common;

@@ -8,6 +8,7 @@ import '../paint/appearance_compositor.dart';
 import 'render_stage_box.dart';
 import 'render_stage_frame.dart' show stageDevicePixelRatio;
 import 'stage_environment.dart';
+import 'stage_semantics.dart';
 import 'text/stage_text_layout.dart';
 import 'text/text_editing.dart';
 import 'text/text_paint.dart';
@@ -36,9 +37,14 @@ class RenderStageText extends RenderStageBox
 
   List<ir.ResolvedParagraph> _paragraphs;
   List<ir.ResolvedParagraph> get paragraphs => _paragraphs;
+
+  @override
+  String? get semanticsText => stageParagraphsText(_paragraphs);
+
   set paragraphs(List<ir.ResolvedParagraph> value) {
     if (identical(value, _paragraphs)) return;
     _paragraphs = value;
+    markNeedsSemanticsUpdate();
     _animDirty = true;
     _resetLayouts();
     markNeedsCompositingBitsUpdate();

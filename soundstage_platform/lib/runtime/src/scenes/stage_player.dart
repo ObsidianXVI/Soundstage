@@ -293,7 +293,15 @@ class _StagePlayerState extends State<StagePlayer>
           },
           builder: (context, inWindow) {
             _sceneWindowChanged(scene.id, inWindow, viewport.width);
-            if (!inWindow) return const SizedBox.shrink();
+            if (!inWindow) {
+              // Keeps the scene's landmark while its stage is not built.
+              return widget.mode == StageRenderMode.edit
+                  ? const SizedBox.shrink()
+                  : stageSceneLandmark(
+                      scene.name,
+                      child: const SizedBox.shrink(),
+                    );
+            }
             return StageSceneView(
               key: ValueKey<String>(scene.id),
               scene: scene,
@@ -372,13 +380,19 @@ class _StagePlayerState extends State<StagePlayer>
                   child: Focus(
                     focusNode: _focus,
                     autofocus: true,
-                    child: CustomScrollView(
-                      controller: _scroll,
-                      physics: widget.physics,
-                      scrollCacheExtent: ScrollCacheExtent.viewport(
-                        widget.lazyWindow,
+                    // A text direction up the semantics tree makes the
+                    // scenes (siblings in the scroll view) read in order.
+                    child: Semantics(
+                      container: true,
+                      textDirection: TextDirection.ltr,
+                      child: CustomScrollView(
+                        controller: _scroll,
+                        physics: widget.physics,
+                        scrollCacheExtent: ScrollCacheExtent.viewport(
+                          widget.lazyWindow,
+                        ),
+                        slivers: _slivers,
                       ),
-                      slivers: _slivers,
                     ),
                   ),
                 ),
