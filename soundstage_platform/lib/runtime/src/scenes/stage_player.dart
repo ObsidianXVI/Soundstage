@@ -403,12 +403,21 @@ class _StagePlayerState extends State<StagePlayer>
   }
 
   List<Widget> _buildSlivers(ir.ResolvedDocument resolved, Size viewport) {
+    final scenes = resolved.scenes;
     return [
-      for (final scene in resolved.scenes)
+      for (final (i, scene) in scenes.indexed)
         SliverStageScene(
           key: _sceneKeys.putIfAbsent(scene.id, GlobalKey.new),
           kind: scene.kind,
           scrollLength: scene.scrollLength,
+          transitionIn: i == 0
+              ? const ir.SceneTransition()
+              : scene.transitionIn,
+          overlapNext:
+              i + 1 < scenes.length &&
+                  scenes[i + 1].transitionIn.kind != ir.SceneTransitionKind.none
+              ? scenes[i + 1].transitionIn.amount
+              : 0,
           estimatedExtent: scene.root.node.common.height,
           windowViewports: widget.lazyWindow,
           content: (scene, viewport, resolved.breakpoint),

@@ -97,9 +97,18 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
     this.estimatedExtent = 0,
     this.windowViewports = 1,
     this.onLayout,
+    this.transitionIn = const ir.SceneTransition(),
+    this.overlapNext = 0,
   });
 
   final ir.SceneKind kind;
+
+  /// How this scene enters over the previous one (§3.2, m3.md T3.7).
+  final ir.SceneTransition transitionIn;
+
+  /// The next scene's transition amount (viewport heights; 0 when it has
+  /// none): it comes in over this scene's last [overlapNext] viewports.
+  final double overlapNext;
 
   /// Pinned scenes: the pin range in viewport heights.
   final double scrollLength;
@@ -126,12 +135,14 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
   @override
   RenderSliverStageScene createRenderObject(BuildContext context) =>
       RenderSliverStageScene(
-        kind: kind,
-        scrollLength: scrollLength,
-        estimatedExtent: estimatedExtent,
-        windowViewports: windowViewports,
-        onLayout: onLayout,
-      );
+          kind: kind,
+          scrollLength: scrollLength,
+          estimatedExtent: estimatedExtent,
+          windowViewports: windowViewports,
+          onLayout: onLayout,
+        )
+        ..transitionIn = transitionIn
+        ..overlapNext = overlapNext;
 
   @override
   void updateRenderObject(
@@ -143,7 +154,9 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
       ..scrollLength = scrollLength
       ..estimatedExtent = estimatedExtent
       ..windowViewports = windowViewports
-      ..onLayout = onLayout;
+      ..onLayout = onLayout
+      ..transitionIn = transitionIn
+      ..overlapNext = overlapNext;
   }
 }
 
@@ -195,6 +208,27 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
     _published = false;
     markNeedsLayout();
   }
+
+  ir.SceneTransition _transitionIn = const ir.SceneTransition();
+  set transitionIn(ir.SceneTransition value) {
+    if (value == _transitionIn) return;
+    _transitionIn = value;
+    markNeedsLayout();
+  }
+
+  double _overlapNext = 0;
+  set overlapNext(double value) {
+    if (value == _overlapNext) return;
+    _overlapNext = value;
+    markNeedsLayout();
+  }
+
+  /// The incoming crossfade's opacity (1 outside a crossfade).
+  double _fade = 1;
+
+  @visibleForTesting
+  double get fade => _fade;
+  final LayerHandle<OpacityLayer> _fadeLayer = LayerHandle<OpacityLayer>();
 
   bool _inWindow = false;
   double? _measuredExtent;
@@ -258,14 +292,43 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
       _childPosition = -s;
     }
 
+    // Transitions (m3.md T3.7). The next scene comes in over this one's
+    // last `overlapNext` viewports: this scene lays out shorter by that
+    // much (the next starts earlier) but still paints its full extent
+    // underneath, and a pinned stage stays pinned until it is covered.
+    final overlap = (_overlapNext * vh).clamp(0.0, extent);
+    final layoutTo = extent - overlap;
+    if (overlap > 0 && _kind == ir.SceneKind.pinned) {
+      final hold = math.max(vh * math.max(0.0, _scrollLength), layoutTo);
+      _childPosition = s <= hold ? 0 : hold - s;
+    }
+    // A crossfading scene holds its stage at the viewport top and fades in
+    // while its top travels the last `amount` viewports up to the top.
+    _fade = 1;
+    final t = _transitionIn;
+    if (t.kind == ir.SceneTransitionKind.crossfade && t.amount > 0 && s <= 0) {
+      final top = vh - c.remainingPaintExtent;
+      final span = t.amount * vh;
+      if (top > 0) {
+        _childPosition = -top;
+        _fade = (1 - top / span).clamp(0.0, 1.0);
+      }
+    }
+
     final paintExtent = calculatePaintOffset(c, from: 0, to: extent);
+    final layoutExtent = math.min(
+      paintExtent,
+      calculatePaintOffset(c, from: 0, to: layoutTo),
+    );
     geometry = SliverGeometry(
-      scrollExtent: extent,
+      scrollExtent: layoutTo,
       paintExtent: paintExtent,
+      layoutExtent: layoutExtent,
       cacheExtent: calculateCacheOffset(c, from: 0, to: extent),
       maxPaintExtent: extent,
       hitTestExtent: paintExtent,
-      hasVisualOverflow: s > 0 || extent > c.remainingPaintExtent,
+      hasVisualOverflow:
+          s > 0 || extent > c.remainingPaintExtent || _childPosition < 0,
     );
     if (child != null) {
       (child.parentData! as SliverPhysicalParentData).paintOffset = Offset(
@@ -294,5 +357,30 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
         );
       }
     }
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (_fade >= 1) {
+      _fadeLayer.layer = null;
+      super.paint(context, offset);
+      return;
+    }
+    if (_fade <= 0) {
+      _fadeLayer.layer = null;
+      return;
+    }
+    _fadeLayer.layer = context.pushOpacity(
+      offset,
+      (_fade * 255).round(),
+      super.paint,
+      oldLayer: _fadeLayer.layer,
+    );
+  }
+
+  @override
+  void dispose() {
+    _fadeLayer.layer = null;
+    super.dispose();
   }
 }

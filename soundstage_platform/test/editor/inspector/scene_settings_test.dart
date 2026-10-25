@@ -210,4 +210,30 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('a later scene picks its transition; the first has none', (
+    tester,
+  ) async {
+    final c = await _pump(tester, height: 1400);
+    final first = c.doc.scenes.first.id;
+    c.ctl.setActiveScene(first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('scene-transition')), findsNothing);
+    final second = c.doc.scenes[1].id;
+    c.ctl.setActiveScene(second);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('scene-transition')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Crossfade').last);
+    await tester.pumpAndSettle();
+    expect(
+      _scene(c, second).transitionIn,
+      const ir.SceneTransition(
+        kind: ir.SceneTransitionKind.crossfade,
+        amount: 0.5,
+      ),
+    );
+    await _type(tester, 'Transition length in screens', '1');
+    expect(_scene(c, second).transitionIn.amount, 1);
+  });
 }

@@ -442,4 +442,41 @@ void main() {
       expect(c.animator!.isTicking, isFalse);
     });
   });
+
+  group('scene transitions (T3.7)', () {
+    ir.StageDocument twoScenes(ir.SceneTransitionKind kind) => _doc([
+      _pinned('a', scrollLength: 1),
+      _pinned('b', scrollLength: 1).copyWith(
+        transitionIn: ir.SceneTransition(kind: kind, amount: 0.5),
+      ),
+    ]);
+
+    testWidgets('overlap: the next scene slides over the still-pinned stage', (
+      tester,
+    ) async {
+      final c = await _pump(tester, twoScenes(ir.SceneTransitionKind.overlap));
+      await _scrollTo(tester, c, 600);
+      // Without the transition b would start at the viewport bottom (600).
+      expect(_stageTop(c, 'b-root'), 300);
+      expect(_stageTop(c, 'a-root'), 0);
+      await _scrollTo(tester, c, 900);
+      expect(_stageTop(c, 'b-root'), 0);
+    });
+
+    testWidgets('crossfade: the next scene fades in at the top', (tester) async {
+      final c = await _pump(
+        tester,
+        twoScenes(ir.SceneTransitionKind.crossfade),
+      );
+      await _scrollTo(tester, c, 600);
+      expect(_stageTop(c, 'b-root'), 0);
+      expect(_sliver(tester, 1).fade, 0);
+      await _scrollTo(tester, c, 750);
+      expect(_sliver(tester, 1).fade, closeTo(0.5, 1e-9));
+      expect(_stageTop(c, 'a-root'), 0);
+      await _scrollTo(tester, c, 900);
+      expect(_sliver(tester, 1).fade, 1);
+      expect(_stageTop(c, 'b-root'), 0);
+    });
+  });
 }

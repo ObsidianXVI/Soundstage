@@ -42,9 +42,11 @@ class SceneSettings extends ConsumerWidget {
       ir.SceneExportMode? exportAs,
       ({double? value})? posterClock,
       List<ir.Paint>? background,
+      ir.SceneTransition? transitionIn,
     }) => ctl.execute(
       UpdateSceneSettings(
         scene.id,
+        transitionIn: transitionIn,
         name: name,
         kind: kind,
         scrollLength: scrollLength,
@@ -178,6 +180,67 @@ class SceneSettings extends ConsumerWidget {
             ),
           ),
           ModeOverrideRows(sceneId: scene.id),
+          if (ref.watch(
+                editorControllerProvider.select(
+                  (s) => s.document.scenes.first.id,
+                ),
+              ) !=
+              scene.id)
+            field(
+              'Transition',
+              Row(
+                children: [
+                  Expanded(
+                    child: SsDropdown<ir.SceneTransitionKind>(
+                      key: const ValueKey<String>('scene-transition'),
+                      semanticLabel: 'Transition from the previous scene',
+                      value: scene.transitionIn.kind,
+                      onChanged: (k) => update(
+                        transitionIn: scene.transitionIn.copyWith(
+                          kind: k,
+                          amount:
+                              k != ir.SceneTransitionKind.none &&
+                                  scene.transitionIn.amount <= 0
+                              ? 0.5
+                              : scene.transitionIn.amount,
+                        ),
+                      ),
+                      items: const [
+                        SsDropdownItem(
+                          value: ir.SceneTransitionKind.none,
+                          label: 'None',
+                        ),
+                        SsDropdownItem(
+                          value: ir.SceneTransitionKind.overlap,
+                          label: 'Slide over',
+                        ),
+                        SsDropdownItem(
+                          value: ir.SceneTransitionKind.crossfade,
+                          label: 'Crossfade',
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (scene.transitionIn.kind != ir.SceneTransitionKind.none)
+                    SizedBox(
+                      width: 84,
+                      child: SsNumberField(
+                        semanticLabel: 'Transition length in screens',
+                        value: scene.transitionIn.amount,
+                        unit: 'vh',
+                        min: 0.1,
+                        max: 3,
+                        step: 0.1,
+                        onChangeStart: ctl.beginGesture,
+                        onChangeEnd: ctl.endGesture,
+                        onChanged: (v) => update(
+                          transitionIn: scene.transitionIn.copyWith(amount: v),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           field(
             'Export as',
             SsSegmented<ir.SceneExportMode>(
