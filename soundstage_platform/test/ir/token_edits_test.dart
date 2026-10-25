@@ -87,10 +87,10 @@ StageDocument _doc() => StageDocument(
       ),
     ],
     textStyles: {
-      'ts1': TextStyleDef(
+      'ts1': const TextStyleDef(
         name: 'Heading',
-        style: const TextStyleOverride(fontSize: 48, fontWeight: 700),
-        bindings: const {'paragraphSpacing': TokenRef(variableId: 'vn')},
+        style: TextStyleOverride(fontSize: 48, fontWeight: 700),
+        bindings: {'paragraphSpacing': TokenRef(variableId: 'vn')},
       ),
     },
     paintStyles: const {
@@ -116,15 +116,15 @@ StageDocument _doc() => StageDocument(
                 'mobile': {'opacity': _ref('vn')},
               },
               interactions: [
-                Interaction(
+                const Interaction(
                   id: 'i1',
-                  trigger: const InteractionTrigger.tap(),
+                  trigger: InteractionTrigger.tap(),
                   actions: [
-                    const Action.setVariable(
+                    Action.setVariable(
                       variableId: 'vn',
                       value: IrValue.number(1),
                     ),
-                    const Action.openUrl(url: 'https://example.com'),
+                    Action.openUrl(url: 'https://example.com'),
                   ],
                 ),
               ],
