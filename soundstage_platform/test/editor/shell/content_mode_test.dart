@@ -222,7 +222,11 @@ Future<_Rig> _pump(
   await tester.pump();
   await tester.pump();
   final container = ProviderScope.containerOf(
-    tester.element(find.byType(ContentModeScreen)),
+    tester.element(
+      find.byType(ContentModeScreen).evaluate().isNotEmpty
+          ? find.byType(ContentModeScreen)
+          : find.byType(EditorCanvas),
+    ),
   );
   return _Rig(tester, container, service, docs, picked);
 }
@@ -514,8 +518,169 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(r.st.textEditId, 'h1');
+      // The caret is at the end, not a select-all (B11b).
+      expect(
+        r.layer.session!.selection,
+        const TextSelection.collapsed(offset: 11),
+      );
+      await r.typeDelta('!');
+      expect(r.textOf('h1'), 'Hello world!');
       expect(find.byKey(const ValueKey<String>('content-list')), findsNothing);
     });
+  });
+
+  group('taps on awkward stories (B3)', () {
+    /// A text wider than the 400 px artboard, and an image frame nested in
+    /// a frame filled with a radial gradient, low on a tall scene.
+    ir.StageDocument awkward() => ir.updateScene(_doc(), 's1', (s) {
+      final root = s.root;
+      return s.copyWith(
+        kind: ir.SceneKind.flow,
+        root: root.copyWith(
+          common: root.common.copyWith(height: 1600),
+          children: [
+            ...root.children,
+            const ir.TextNode(
+              common: ir.NodeCommon(
+                id: 'wide',
+                name: 'wide',
+                x: 20,
+                y: 420,
+                width: 1318,
+                height: 30,
+              ),
+              style: ir.TextStyleOverride(fontSize: 16),
+              content: [
+                ir.Paragraph(spans: [ir.Span(text: 'A very wide line')]),
+              ],
+            ),
+            const ir.FrameNode(
+              common: ir.NodeCommon(
+                id: 'grad',
+                name: 'grad',
+                x: 20,
+                y: 1200,
+                width: 300,
+                height: 220,
+              ),
+              appearance: ir.Appearance(
+                fills: [
+                  ir.Paint.gradient(
+                    id: 'g',
+                    kind: ir.GradientKind.radial,
+                    stops: [
+                      ir.ColorStop(
+                        position: 0,
+                        color: ir.StageColor(r: 1, g: 0, b: 0),
+                      ),
+                      ir.ColorStop(
+                        position: 1,
+                        color: ir.StageColor(r: 0, g: 0, b: 1),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              children: [
+                ir.FrameNode(
+                  common: ir.NodeCommon(
+                    id: 'pic',
+                    name: 'pic',
+                    x: 20,
+                    y: 20,
+                    width: 200,
+                    height: 150,
+                  ),
+                  appearance: ir.Appearance(
+                    fills: [ir.Paint.image(id: 'pi', assetId: 'img1')],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }).document;
+
+    /// A visible point of [id] on the surface (inside the artboard).
+    Offset visible(_Rig r, String id) {
+      final surface = r.tester.getRect(
+        find.byKey(const ValueKey<String>('content-surface')),
+      );
+      final b = r.canvas.overlay
+          .rectFor(id, 'mobile')!
+          .bounds
+          .shift(surface.topLeft);
+      return b.intersect(surface).center;
+    }
+
+    Future<void> scroll(_Rig r, double dy) async {
+      final surface = r.tester.getRect(
+        find.byKey(const ValueKey<String>('content-surface')),
+      );
+      // From the left margin, clear of the texts.
+      await r.tester.dragFrom(
+        Offset(surface.left + 6, surface.center.dy),
+        Offset(0, dy),
+      );
+      await r.tester.pump();
+    }
+
+    testWidgets('a nested image in a gradient frame opens its panel', (
+      tester,
+    ) async {
+      final r = await _pump(tester, const Size(390, 844), document: awkward());
+      await scroll(r, -700);
+      expect(r.canvas.overlay.rectFor('pic', 'mobile'), isNotNull);
+      await tester.tapAt(visible(r, 'pic'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Replace image'), findsOneWidget);
+    });
+
+    testWidgets('a text wider than the artboard starts editing; another '
+        'slot can be tapped next', (tester) async {
+      final r = await _pump(tester, const Size(390, 844), document: awkward());
+      await tester.tapAt(visible(r, 'wide'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, 'wide');
+      await scroll(r, -700);
+      await tester.tapAt(visible(r, 'pic'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, isNull);
+      expect(find.text('Replace image'), findsOneWidget);
+      await scroll(r, 700);
+      await tester.tapAt(visible(r, 'wide'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, 'wide');
+    });
+  });
+
+  testWidgets('after the full editor narrows to content mode, taps still '
+      'reach text and images (B3)', (tester) async {
+    final r = await _pump(tester, const Size(1600, 1000));
+    expect(find.byType(EditorCanvas), findsOneWidget);
+    expect(r.canvas.artboards.keys, containsAll(['desktop', 'mobile']));
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(ContentModeScreen), findsOneWidget);
+    await r.tapNode('h1');
+    expect(r.st.textEditId, 'h1');
+    await r.tapNode('fig');
+    expect(find.text('Replace image'), findsOneWidget);
+    // And back to the full editor: its artboards have geometry again.
+    tester.view.physicalSize = const Size(1600, 1000);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(EditorCanvas), findsOneWidget);
+    expect(r.canvas.overlay.rectFor('h1', 'desktop'), isNotNull);
+    expect(r.canvas.overlay.rectFor('h1', 'mobile'), isNotNull);
   });
 
   group('layout', () {

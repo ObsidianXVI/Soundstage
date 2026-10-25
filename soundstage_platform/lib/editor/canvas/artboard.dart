@@ -65,10 +65,17 @@ class _ArtboardState extends ConsumerState<Artboard>
     widget.controller.previewWidths.addListener(_widthsChanged);
   }
 
+  /// Each artboard registers its own info (and node registry). When one
+  /// surface replaces another in the same frame (the full editor narrowing
+  /// to content mode), the new artboard mounts before the old one is
+  /// disposed; sharing the old entry let the old artboard's dispose remove
+  /// the new one's, which left content-mode taps with no geometry (B3).
   void _register() {
-    _info = widget.controller.artboards[widget.breakpoint.id] ??= ArtboardInfo(
-      widget.breakpoint.id,
-    );
+    final id = widget.breakpoint.id;
+    final previous = widget.controller.artboards[id];
+    _info = ArtboardInfo(id);
+    if (previous != null) _info.worldRect = previous.worldRect;
+    widget.controller.artboards[id] = _info;
   }
 
   double? _width;
