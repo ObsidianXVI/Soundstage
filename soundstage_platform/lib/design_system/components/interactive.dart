@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'focus_release.dart';
 import 'input_modality.dart';
 
 /// Builds a control's visuals from its interaction [states]
@@ -214,7 +215,8 @@ class SsFocusRing extends StatelessWidget {
 }
 
 /// Enter/Space activation that stands down (letting the key through to a
-/// child text field) when the control is inactive.
+/// child text field) when the control is inactive or a text field inside
+/// it has focus (Enter must submit it, Space must type).
 class _ActivateAction extends Action<ActivateIntent> {
   _ActivateAction({required this.isActive, required this.onActivate});
 
@@ -222,7 +224,8 @@ class _ActivateAction extends Action<ActivateIntent> {
   final VoidCallback onActivate;
 
   @override
-  bool isEnabled(ActivateIntent intent) => isActive();
+  bool isEnabled(ActivateIntent intent) =>
+      isActive() && !isTextInputFocus(FocusManager.instance.primaryFocus);
 
   @override
   Object? invoke(ActivateIntent intent) {

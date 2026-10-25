@@ -138,7 +138,7 @@ class _SsTabsState extends State<SsTabs> {
             children: [
               Container(
                 height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: SsSpace.s2 + 2),
+                padding: const EdgeInsets.symmetric(horizontal: SsSpace.s1 + 2),
                 alignment: Alignment.center,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
