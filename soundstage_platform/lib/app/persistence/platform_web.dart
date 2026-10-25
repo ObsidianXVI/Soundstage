@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
+import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
 import 'package:web/web.dart' as web;
 
 import 'dominant_color.dart';
@@ -165,4 +166,26 @@ void Function() onPageHide(void Function() callback) {
     web.document.removeEventListener('visibilitychange', onVisibility);
     web.window.removeEventListener('pagehide', onHide);
   };
+}
+
+/// The rate audio is decoded at for peaks. Web Audio resamples to its
+/// context's rate while decoding, so a low rate keeps a ten-minute stereo
+/// file near 80 MB instead of 210 MB; 10 ms buckets of 160 samples lose
+/// nothing a waveform drawing shows.
+const int _kPeaksSampleRate = 16000;
+
+Future<WaveformPeaks?> decodePeaksInBrowser(Uint8List bytes) async {
+  try {
+    // An offline context decodes without an audio output or a user
+    // gesture. `decodeAudioData` detaches its input, so it gets a copy.
+    final ctx = web.OfflineAudioContext(1.toJS, 1, _kPeaksSampleRate);
+    final copy = Uint8List.fromList(bytes);
+    final buffer = await ctx.decodeAudioData(copy.buffer.toJS).toDart;
+    return computeWaveformPeaks([
+      for (var c = 0; c < buffer.numberOfChannels; c++)
+        buffer.getChannelData(c).toDart,
+    ], buffer.sampleRate.round());
+  } on Object {
+    return null;
+  }
 }

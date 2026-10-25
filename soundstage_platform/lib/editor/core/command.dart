@@ -16,6 +16,9 @@ part 'command.freezed.dart';
 /// - `selectionAfter`: the selection once the command applied; null keeps
 ///   the current selection (minus nodes that no longer exist).
 /// - `activeSceneAfter`: the scene to show afterwards; null keeps it.
+/// - `audioTrackAfter`: the audio track to select afterwards (clearing the
+///   node selection); null keeps the current audio selection while the
+///   track exists.
 /// - `coalesceKey`: within one gesture, consecutive commands with the same
 ///   key become one history entry.
 /// - `cascade`: references the edit removed or rebound beyond its targets.
@@ -27,6 +30,7 @@ abstract class CommandResult with _$CommandResult {
     @Default(false) bool changed,
     Set<String>? selectionAfter,
     String? activeSceneAfter,
+    String? audioTrackAfter,
     String? coalesceKey,
     @Default(<ir.IrDiagnostic>[]) List<ir.IrDiagnostic> diagnostics,
     @Default(ir.EditCascade()) ir.EditCascade cascade,
@@ -61,6 +65,7 @@ CommandResult resultOf(
   required String label,
   Set<String>? selectionAfter,
   String? activeSceneAfter,
+  String? audioTrackAfter,
   String? coalesceKey,
 }) => CommandResult(
   document: r.ok ? r.document : state.document,
@@ -68,6 +73,7 @@ CommandResult resultOf(
   changed: r.ok && r.changed,
   selectionAfter: r.ok ? selectionAfter : null,
   activeSceneAfter: r.ok ? activeSceneAfter : null,
+  audioTrackAfter: r.ok ? audioTrackAfter : null,
   coalesceKey: coalesceKey,
   diagnostics: r.diagnostics,
   cascade: r.cascade,

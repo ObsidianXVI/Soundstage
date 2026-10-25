@@ -6,6 +6,7 @@ import '../core/core.dart';
 import 'inspector_providers.dart';
 import 'property_writer.dart';
 import 'section_registry.dart';
+import 'sections/audio_inspector.dart';
 import 'sections/scene_settings.dart';
 
 export 'fields/field_frame.dart';
@@ -55,6 +56,9 @@ class _InspectorState extends ConsumerState<Inspector> {
   Widget build(BuildContext context) {
     final c = context.ss.colors;
     final ids = ref.watch(selectionIdsProvider);
+    final audioTrack = ref.watch(
+      editorControllerProvider.select((s) => s.selectedAudioTrackId),
+    );
     return Container(
       key: const ValueKey<String>('inspector'),
       color: c.surface1,
@@ -72,7 +76,11 @@ class _InspectorState extends ConsumerState<Inspector> {
             ),
           ),
           Expanded(
-            child: ids.isEmpty
+            child: ids.isEmpty && audioTrack != null
+                ? SingleChildScrollView(
+                    child: AudioTrackInspector(trackId: audioTrack),
+                  )
+                : ids.isEmpty
                 ? const _SceneInspector()
                 : InspectorScope(
                     selection: ids,

@@ -95,6 +95,7 @@ class AssetMeta {
     this.height,
     this.duration,
     this.dominantColor,
+    this.peaks,
   });
 
   final String id;
@@ -110,6 +111,25 @@ class AssetMeta {
 
   /// `0xAARRGGBB`.
   final int? dominantColor;
+
+  /// Audio only: the waveform peaks (one byte per 10 ms, see
+  /// `WaveformPeaks`), computed at upload or on first request. Null for
+  /// other kinds and for audio that has not been decoded yet.
+  final Uint8List? peaks;
+
+  /// This meta with [peaks] (and [duration], when it has none yet).
+  AssetMeta withPeaks(Uint8List peaks, {double? duration}) => AssetMeta(
+    id: id,
+    mime: mime,
+    byteSize: byteSize,
+    createdAt: createdAt,
+    name: name,
+    width: width,
+    height: height,
+    duration: this.duration ?? duration,
+    dominantColor: dominantColor,
+    peaks: peaks,
+  );
 }
 
 /// One row of the `assets` store: [meta] plus the file's bytes.

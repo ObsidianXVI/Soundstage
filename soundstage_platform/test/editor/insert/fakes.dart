@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 
+import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
 import 'package:soundstage_platform/editor/clipboard/system_clipboard.dart';
 import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
@@ -78,6 +79,17 @@ class FakeAssetService implements EditorAssetService {
 
   @override
   Future<ir.Asset?> stored(String assetId) async => entries[assetId];
+
+  /// Peaks to serve per asset id (tests set these); [peaksRequests] counts
+  /// the asks.
+  final Map<String, WaveformPeaks> peaksById = {};
+  int peaksRequests = 0;
+
+  @override
+  Future<WaveformPeaks?> peaks(String assetId) async {
+    peaksRequests++;
+    return peaksById[assetId];
+  }
 }
 
 /// Serves a 1 x 1 PNG for every `local://` image, so painting an inserted
