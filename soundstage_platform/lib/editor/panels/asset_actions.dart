@@ -205,6 +205,9 @@ class AssetActions {
     }
     try {
       final fresh = await _service.replace(assetId, file.bytes, mime);
+      if (kind == ir.AssetKind.audio) {
+        _ref.invalidate(audioPeaksProvider(assetId));
+      }
       _ctl.execute(
         UpdateAsset(
           fresh.copyWith(

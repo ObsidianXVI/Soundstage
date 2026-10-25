@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
+
 import 'records.dart';
 
 /// True where the browser services exist.
@@ -28,3 +30,8 @@ Future<List<PickedFile>> pickFiles({
 /// (`visibilitychange` to hidden, `pagehide`). Returns a function that
 /// stops listening.
 void Function() onPageHide(void Function() callback) => () {};
+
+/// Decodes audio [bytes] with Web Audio and reduces them to waveform peaks;
+/// null when they cannot be decoded. Without a browser there is nothing to
+/// decode with.
+Future<WaveformPeaks?> decodePeaksInBrowser(Uint8List bytes) async => null;
