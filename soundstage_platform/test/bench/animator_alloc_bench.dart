@@ -128,7 +128,7 @@ void main() {
   );
 
   test(
-    'animator push of 200 slot tracks allocates nothing per frame',
+    'animator push of 200 slot tracks allocates within the animator budget',
     () async {
       final s = service;
       if (s == null) {
@@ -150,7 +150,10 @@ void main() {
       run(10 * _frames); // warm up: let the optimising JIT settle
       final rates = await _perFrame(s, isolate, run);
       final total = _report('animator, 200 slot tracks', rates);
-      expect(total, lessThan(_maxPerFrame), reason: '$rates');
+      // DECISIONS 26/10/26 (T2.0 open points): relaxed from "nothing" to
+      // the T0.6b budget of up to 4 boxed doubles per frame (VM JIT
+      // dependent).
+      expect(total, lessThanOrEqualTo(4), reason: '$rates');
       animator.dispose();
     },
   );

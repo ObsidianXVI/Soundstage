@@ -44,6 +44,7 @@ export 'src/nodes/node_common.dart';
 export 'src/nodes/paint.dart';
 export 'src/nodes/stroke.dart';
 export 'src/nodes/text.dart';
+export 'src/registry/display_names.dart';
 export 'src/registry/patch.dart';
 export 'src/registry/property_descriptor.dart';
 export 'src/registry/property_registry.dart';

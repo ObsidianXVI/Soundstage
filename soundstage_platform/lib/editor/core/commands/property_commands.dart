@@ -68,6 +68,29 @@ ir.EditResult writeProperty(
     ids: ids,
   );
   if (animated != null) return animated;
+  final split = writeSplitAroundTracks(
+    state,
+    doc,
+    nodeId,
+    path,
+    value,
+    registry: reg,
+    ids: ids,
+  );
+  if (split != null) return split;
+  return _writeStatic(state, doc, nodeId, path, value, reg);
+}
+
+/// The static part of [writeProperty]: [value] at [path] on [nodeId] as
+/// routed by [routeFor] (no motion routing).
+ir.EditResult _writeStatic(
+  EditorState state,
+  ir.StageDocument doc,
+  String nodeId,
+  String path,
+  ir.IrValue value,
+  ir.PropertyRegistry reg,
+) {
   if (_isNoOp(state, doc, nodeId, path, value, reg)) {
     return ir.EditResult(document: doc, changed: false);
   }
@@ -152,7 +175,8 @@ ir.Track? animatingTrack(
 ///    scene's active clock, following the edit scope (*Both* → all
 ///    breakpoints, *This breakpoint* → the edited breakpoint only), with a
 ///    keyframe at the playhead. When the playhead is not at the clock's
-///    start (−1 for a pointer clock, else 0), a keyframe at the start holds
+///    start (0, also for a pointer clock, whose 0 is its rest position:
+///    DECISIONS 26/10/26 T2.0-1), a keyframe at the start holds
 ///    the previous static value, so the change animates rather than jumps.
 ///    Writing the static value itself creates nothing.
 ///
@@ -186,17 +210,25 @@ ir.EditResult? writeAnimated(
     );
   }
   if (!state.autoKey) return null;
+  // Sub-paths with their own tracks: the write is split instead
+  // ([writeSplitAroundTracks]), never a competing whole-value track.
+  final prefix = '$path.';
+  if (scene.tracks.any(
+    (t) => t.target == nodeId && t.property.startsWith(prefix),
+  )) {
+    return null;
+  }
   final match = reg.lookup(path);
   if (match == null || !match.descriptor.animatable) return null;
   final thisBreakpoint = state.effectiveScope == EditScope.thisBreakpoint;
   if (thisBreakpoint && bp == null) return null;
   final clockId = state.activeClockOf(scene.id);
   if (clockId == null) return null;
-  final clock = scene.clocks.firstWhere((c) => c.id == clockId);
   final t = state.playheadOf(scene.id, clockId);
   final old = staticValueAt(doc, nodeId, path, bp, registry: reg);
   if (old == value) return null;
-  final start = clock is ir.PointerClock ? -1.0 : 0.0;
+  // Every clock starts at 0 (a pointer clock's rest position; T2.0-1).
+  const start = 0.0;
   final used = <String>{};
   String next() {
     final id = freshMotionId(used, ids);
@@ -221,6 +253,111 @@ ir.EditResult? writeAnimated(
     ),
     registry: reg,
   );
+}
+
+/// The value of [path] on [nodeId] at the playhead when a track animates
+/// it at the edited breakpoint ([animatingTrack]), else null.
+ir.IrValue? animatedValueAt(
+  EditorState state,
+  ir.StageDocument doc,
+  String nodeId,
+  String path,
+) {
+  final si = ir.DocumentIndex.of(
+    doc,
+  ).locate(nodeId.split('/').first)?.sceneIndex;
+  if (si == null) return null;
+  final scene = doc.scenes[si];
+  final t = animatingTrack(scene, nodeId, path, state.breakpointId);
+  if (t == null) return null;
+  return ir.evaluateTrack(t, state.playheadOf(scene.id, t.clockId));
+}
+
+/// A write of a whole value (a paint stack, a paint, an effect list) whose
+/// sub-paths have tracks at the edited breakpoint (DECISIONS 26/10/26
+/// T2.0-2): the write is split so no part of it looks ignored.
+///
+/// - Each animated sub-path (`fills.p1.color` under `fills`) gets a
+///   keyframe at the playhead of its track's clock, holding that part of
+///   [value] (sub-paths [value] no longer has, a removed paint, are left
+///   alone).
+/// - The rest goes to the static value through the M1 routing, with the
+///   animated sub-paths keeping their previous static values (they are
+///   hidden under their tracks).
+///
+/// Auto-key creates no track here: a track on the whole path would compete
+/// with the sub-path tracks. Null when no sub-path of [path] is animated
+/// (then the write is plain static), and for nodes inside instances.
+ir.EditResult? writeSplitAroundTracks(
+  EditorState state,
+  ir.StageDocument doc,
+  String nodeId,
+  String path,
+  ir.IrValue value, {
+  ir.PropertyRegistry? registry,
+  ir.IdGenerator? ids,
+}) {
+  if (nodeId.contains('/')) return null;
+  final reg = registry ?? ir.PropertyRegistry.standard;
+  final index = ir.DocumentIndex.of(doc);
+  final si = index.locate(nodeId)?.sceneIndex;
+  if (si == null) return null;
+  final scene = doc.scenes[si];
+  final bp = state.breakpointId;
+  final prefix = '$path.';
+  final subPaths = <String>{
+    for (final t in scene.tracks)
+      if (t.target == nodeId && t.property.startsWith(prefix)) t.property,
+  };
+  final tracks = <ir.Track>[
+    for (final p in subPaths) ?animatingTrack(scene, nodeId, p, bp),
+  ];
+  if (tracks.isEmpty) return null;
+  final node = index.node(nodeId);
+  if (node == null) return null;
+  var seen = node;
+  if (bp != null) {
+    for (final b in ir.breakpointChain(doc.breakpoints, bp).chain) {
+      final p = node.common.breakpointOverrides[b.id];
+      if (p != null) seen = ir.applyPatch(seen, p);
+    }
+  }
+  final written = reg.trySet(seen, path, value);
+  if (written == null) return null;
+  var current = doc;
+  var changed = false;
+  final diags = <ir.IrDiagnostic>[];
+  var rest = written;
+  for (final t in tracks) {
+    final part = reg.get(written, t.property);
+    final old = reg.get(seen, t.property);
+    if (old != null) rest = reg.trySet(rest, t.property, old) ?? rest;
+    if (part == null) continue;
+    // Each track is written once, so its keyframes are still [t]'s.
+    final kfs = t.keyframes;
+    final r = ir.writeKeyframeAt(
+      current,
+      scene.id,
+      t.id,
+      t: state.playheadOf(scene.id, t.clockId),
+      value: part,
+      newId: freshMotionId({for (final k in kfs) k.id}, ids),
+      registry: reg,
+    );
+    if (!r.ok) return r.copyWith(document: doc, changed: false);
+    current = r.document;
+    changed |= r.changed;
+    diags.addAll(r.diagnostics);
+  }
+  final restValue = reg.get(rest, path);
+  if (restValue != null) {
+    final r = _writeStatic(state, current, nodeId, path, restValue, reg);
+    if (!r.ok) return r.copyWith(document: doc, changed: false);
+    current = r.document;
+    changed |= r.changed;
+    diags.addAll(r.diagnostics);
+  }
+  return ir.EditResult(document: current, changed: changed, diagnostics: diags);
 }
 
 /// The static (unanimated) value of [path] on [nodeId] at [breakpointId]:
@@ -661,9 +798,15 @@ class NudgeNodes extends EditCommand {
         final p = node.common.breakpointOverrides[b.id];
         if (p != null) seen = ir.applyPatch(seen, p);
       }
+      // Animated positions nudge from the value shown at the playhead.
+      double at(String path, double fallback) =>
+          switch (animatedValueAt(state, doc, id, path)) {
+            ir.NumberValue(:final value) => value,
+            _ => fallback,
+          };
       writes[id] = {
-        if (dx != 0) 'x': ir.IrValue.number(seen.common.x + dx),
-        if (dy != 0) 'y': ir.IrValue.number(seen.common.y + dy),
+        if (dx != 0) 'x': ir.IrValue.number(at('x', seen.common.x) + dx),
+        if (dy != 0) 'y': ir.IrValue.number(at('y', seen.common.y) + dy),
       };
     }
     if (writes.isEmpty && reorders.isEmpty) {
@@ -752,4 +895,160 @@ class BaseScoped extends EditCommand {
   CommandResult apply(EditorState state) => inner.apply(
     state.copyWith(editScope: EditScope.both, scopeFlipped: false),
   );
+}
+
+// ---- Inspector keyframe toggles (m2.md "Inspector") ---------------------------
+
+/// Where the keyframes of [path] on the nodes [ids] stand at the playheads
+/// (the inspector's ◇ / ◆ / half-filled toggle).
+enum KeyframeMark {
+  /// No track animates the property: ◇.
+  none,
+
+  /// Every node has a keyframe at its track's playhead: ◆.
+  atPlayhead,
+
+  /// A track exists but not every node has a keyframe at the playhead:
+  /// half-filled.
+  elsewhere,
+}
+
+/// The keyframe mark of [path] on [ids], plus the previous and next
+/// keyframe times around the playhead (for ‹ ›), on the clock of the first
+/// node's track at the edited breakpoint ([animatingTrack]).
+({KeyframeMark mark, String? clockId, double? prev, double? next})
+keyframeNavFor(EditorState state, Iterable<String> ids, String path) {
+  final doc = state.document;
+  final index = ir.DocumentIndex.of(doc);
+  var any = false, all = true;
+  String? clockId;
+  double? prev, next;
+  for (final id in ids) {
+    final si = index.locate(id.split('/').first)?.sceneIndex;
+    final scene = si == null ? null : doc.scenes[si];
+    final t = scene == null
+        ? null
+        : animatingTrack(scene, id, path, state.breakpointId);
+    if (t == null) {
+      all = false;
+      continue;
+    }
+    any = true;
+    final ph = state.playheadOf(scene!.id, t.clockId);
+    if (!t.keyframes.any((k) => (k.t - ph).abs() <= ir.kKeyframeTimeEpsilon)) {
+      all = false;
+    }
+    if (clockId != null && t.clockId != clockId) continue;
+    clockId = t.clockId;
+    for (final k in t.keyframes) {
+      if (k.t < ph - ir.kKeyframeTimeEpsilon && (prev == null || k.t > prev)) {
+        prev = k.t;
+      }
+      if (k.t > ph + ir.kKeyframeTimeEpsilon && (next == null || k.t < next)) {
+        next = k.t;
+      }
+    }
+  }
+  final mark = !any
+      ? KeyframeMark.none
+      : (all ? KeyframeMark.atPlayhead : KeyframeMark.elsewhere);
+  return (mark: mark, clockId: clockId, prev: prev, next: next);
+}
+
+/// The inspector's keyframe toggle on [path] for the nodes of [values]
+/// (`node id → the value shown at the playhead`):
+///
+/// - every node has a keyframe at its track's playhead → those keyframes
+///   are removed (a track goes with its last keyframe);
+/// - else each node without one gets a keyframe at the playhead holding
+///   its shown value: on its track, or on a new track on the scene's
+///   active clock that follows the edit scope (*Both* → all breakpoints,
+///   *This breakpoint* → the edited one), whatever auto-key says.
+class ToggleKeyframes extends EditCommand {
+  ToggleKeyframes(this.path, this.values, {this.ids});
+
+  final String path;
+  final Map<String, ir.IrValue> values;
+  final ir.IdGenerator? ids;
+
+  @override
+  String get label => 'Toggle keyframe';
+
+  @override
+  CommandResult apply(EditorState state) {
+    final mark = keyframeNavFor(state, values.keys, path).mark;
+    final bp = state.breakpointId;
+    final reg = ir.PropertyRegistry.standard;
+    final match = reg.lookup(path);
+    if (match == null || !match.descriptor.animatable) {
+      return failedCommand(state, label, [
+        commandError('"$path" cannot be animated.', path: path),
+      ]);
+    }
+    var doc = state.document;
+    final diags = <ir.IrDiagnostic>[];
+    for (final MapEntry(key: id, :value) in values.entries) {
+      final index = ir.DocumentIndex.of(doc);
+      final si = index.locate(id.split('/').first)?.sceneIndex;
+      if (si == null) continue;
+      final scene = doc.scenes[si];
+      final t = animatingTrack(scene, id, path, bp);
+      ir.EditResult r;
+      if (mark == KeyframeMark.atPlayhead) {
+        final ph = state.playheadOf(scene.id, t!.clockId);
+        r = ir.removeKeyframes(doc, scene.id, {
+          t.id: {
+            for (final k in t.keyframes)
+              if ((k.t - ph).abs() <= ir.kKeyframeTimeEpsilon) k.id,
+          },
+        });
+      } else if (t != null) {
+        r = ir.writeKeyframeAt(
+          doc,
+          scene.id,
+          t.id,
+          t: state.playheadOf(scene.id, t.clockId),
+          value: value,
+          newId: freshMotionId({for (final k in t.keyframes) k.id}, ids),
+        );
+      } else {
+        final clockId = state.activeClockOf(scene.id);
+        if (clockId == null) continue;
+        final thisBreakpoint = state.effectiveScope == EditScope.thisBreakpoint;
+        if (thisBreakpoint && bp == null) continue;
+        r = ir.addTrack(
+          doc,
+          scene.id,
+          ir.Track(
+            id: freshMotionId(trackIdsOf(doc, scene.id), ids),
+            target: id,
+            property: path,
+            clockId: clockId,
+            breakpoints: thisBreakpoint ? [bp!] : null,
+            keyframes: [
+              ir.Keyframe(
+                id: freshMotionId(const {}, ids),
+                t: state.playheadOf(scene.id, clockId),
+                value: value,
+              ),
+            ],
+          ),
+        );
+      }
+      if (!r.ok) {
+        diags.addAll(r.diagnostics.map(asWarning));
+        continue;
+      }
+      doc = r.document;
+      diags.addAll(r.diagnostics);
+    }
+    return CommandResult(
+      document: doc,
+      label: mark == KeyframeMark.atPlayhead
+          ? 'Delete keyframe'
+          : 'Add keyframe',
+      changed: !identical(doc, state.document),
+      diagnostics: diags,
+    );
+  }
 }

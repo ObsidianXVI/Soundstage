@@ -1,6 +1,7 @@
 import '../animation/interpolate.dart';
 import '../nodes/node.dart';
 import '../values/ir_value.dart';
+import 'display_names.dart';
 import 'lens.dart';
 
 /// The node kinds a property can apply to (architecture §4.1).
@@ -87,6 +88,7 @@ class PropertyDescriptor {
     this.animatable = true,
     this.invalidation = Invalidation.paint,
     Interpolation? interpolation,
+    this._label,
   }) : _leaf = leaf,
        _lens = leaf.lens,
        _codec = leaf.codec,
@@ -109,6 +111,13 @@ class PropertyDescriptor {
   final Invalidation invalidation;
   final Interpolation interpolation;
 
+  final String? _label;
+
+  /// The human name of the property ("Translate X", "Fill color"), shown
+  /// by the editor (timeline lane labels, the Motion section). An explicit
+  /// label, else one derived from [pathPattern] ([propertyDisplayName]).
+  late final String displayName = _label ?? propertyDisplayName(pathPattern);
+
   final Leaf<Node> _leaf;
   final PropertyLens _lens;
   final IrValueCodec _codec;
@@ -123,6 +132,7 @@ class PropertyDescriptor {
         animatable: animatable,
         invalidation: invalidation,
         interpolation: interpolation,
+        label: _label,
       );
 
   IrValueType get valueType => _codec.valueType;
@@ -195,6 +205,9 @@ class PropertyMatch {
 
   IrValue? interpolate(IrValue a, IrValue b, double t) =>
       descriptor.interpolate(a, b, t);
+
+  /// The property's human name (see [PropertyDescriptor.displayName]).
+  String get displayName => descriptor.displayName;
 
   @override
   String toString() => 'PropertyMatch($path → ${descriptor.pathPattern})';

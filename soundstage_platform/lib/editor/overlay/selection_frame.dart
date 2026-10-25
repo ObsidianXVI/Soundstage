@@ -194,7 +194,10 @@ Placement? placementOf(OverlayGeometry g, String id, String breakpointId) {
   if (parent is! RenderStageFrame) return null;
   final offset = (box.parentData! as BoxParentData).offset;
   final frame = parent.frame;
-  final node = box.baseNode;
+  // The node as shown, at the playhead (DECISIONS 26/10/26 T2.0-3): a drag,
+  // resize or rotation of animated geometry starts from the value on the
+  // canvas, and its writes become keyframes through the SetProperty routing.
+  final node = box.node;
   final inFlow =
       frame.grid == null &&
       frame.autoLayout != null &&
