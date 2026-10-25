@@ -197,17 +197,16 @@ class TimelineFields extends StatelessWidget {
   }
 }
 
-/// The frame choices for a pointer clock.
-typedef FrameChoice = ({String id, String name});
+/// A frame a pointer clock can be bound to; [depth] indents it in the list.
+typedef FrameChoice = ({String id, String name, int depth});
 
-/// Pointer clock fields: the frame (from the scene's frames or the current
-/// selection) and the axis.
-class PointerFields extends StatelessWidget {
+/// Pointer clock fields: the frame (searchable list of the scene's frames in
+/// layer order) and the axis.
+class PointerFields extends StatefulWidget {
   const PointerFields({
     required this.frameId,
     required this.axis,
     required this.frames,
-    required this.selectedFrameId,
     required this.onFrame,
     required this.onAxis,
     super.key,
@@ -216,15 +215,25 @@ class PointerFields extends StatelessWidget {
   final String frameId;
   final ir.PointerAxis axis;
   final List<FrameChoice> frames;
-
-  /// The single selected frame of the scene, if any ("use selection").
-  final String? selectedFrameId;
   final ValueChanged<String> onFrame;
   final ValueChanged<ir.PointerAxis> onAxis;
 
   @override
+  State<PointerFields> createState() => _PointerFieldsState();
+}
+
+class _PointerFieldsState extends State<PointerFields> {
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
-    final known = frames.any((f) => f.id == frameId);
+    final t = context.ss;
+    final c = t.colors;
+    final q = _query.trim().toLowerCase();
+    final shown = [
+      for (final f in widget.frames)
+        if (q.isEmpty || f.name.toLowerCase().contains(q)) f,
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -233,24 +242,60 @@ class PointerFields extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SsDropdown<String>(
-                semanticLabel: 'Frame',
-                value: known ? frameId : null,
-                hint: frameId,
-                items: [
-                  for (final f in frames)
-                    SsDropdownItem(value: f.id, label: f.name),
-                ],
-                onChanged: onFrame,
+              SsTextField(
+                semanticLabel: 'Search frames',
+                placeholder: 'Search frames',
+                dense: true,
+                onChanged: (v) => setState(() => _query = v),
               ),
-              FitLeft(
-                child: SsButton(
-                  label: 'Use selection',
-                  variant: SsButtonVariant.ghost,
-                  onPressed: selectedFrameId == null
-                      ? null
-                      : () => onFrame(selectedFrameId!),
+              const SizedBox(height: SsSpace.s1),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                decoration: BoxDecoration(
+                  border: Border.all(color: c.borderSubtle),
+                  borderRadius: SsRadius.brSm,
                 ),
+                child: shown.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(SsSpace.s2),
+                        child: Text(
+                          'No frames match.',
+                          style: t.text.caption.copyWith(color: c.textDisabled),
+                        ),
+                      )
+                    : ListView(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          for (final f in shown)
+                            SsInteractive(
+                              key: ValueKey('frame-${f.id}'),
+                              semanticLabel: f.name,
+                              selected: f.id == widget.frameId,
+                              onTap: () => widget.onFrame(f.id),
+                              builder: (context, s) => Container(
+                                height: 24,
+                                alignment: Alignment.centerLeft,
+                                padding: EdgeInsets.only(
+                                  left:
+                                      SsSpace.s2 +
+                                      (q.isEmpty ? f.depth * SsSpace.s3 : 0),
+                                  right: SsSpace.s2,
+                                ),
+                                color: f.id == widget.frameId
+                                    ? c.selection
+                                    : s.contains(WidgetState.hovered)
+                                    ? c.hoverLayer
+                                    : null,
+                                child: Text(
+                                  f.name,
+                                  style: t.text.small,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -261,8 +306,8 @@ class PointerFields extends StatelessWidget {
           SsSegmented<ir.PointerAxis>(
             semanticLabel: 'Axis',
             expand: true,
-            selected: axis,
-            onChanged: onAxis,
+            selected: widget.axis,
+            onChanged: widget.onAxis,
             segments: const [
               SsSegment(value: ir.PointerAxis.x, label: 'X'),
               SsSegment(value: ir.PointerAxis.y, label: 'Y'),

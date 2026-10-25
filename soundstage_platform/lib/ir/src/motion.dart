@@ -33,7 +33,8 @@ enum EasingPreset {
 /// §10.1). Every clock has an `id` (referenced by `Track.clockId`,
 /// text reveals and `clockReach` triggers) and an optional `smoothing` in
 /// seconds: the evaluated value follows the raw value with a critically
-/// damped spring. 0 = no smoothing.
+/// damped spring. 0 = no smoothing. `name` is an optional label the editor
+/// shows (empty: it derives one from the clock's kind and target).
 @Freezed(unionKey: 'type')
 sealed class Clock with _$Clock {
   /// 0–1 scroll progress through scene `sceneId` (§3.2).
@@ -41,6 +42,7 @@ sealed class Clock with _$Clock {
   const factory Clock.sceneScroll({
     required String id,
     required String sceneId,
+    @Default('') String name,
     @Default(0) double smoothing,
   }) = SceneScrollClock;
 
@@ -61,6 +63,7 @@ sealed class Clock with _$Clock {
   const factory Clock.audio({
     required String id,
     required String audioTrackId,
+    @Default('') String name,
     @Default(0) double smoothing,
   }) = AudioClock;
 
@@ -70,6 +73,7 @@ sealed class Clock with _$Clock {
     required String id,
     required String frameId,
     @Default(PointerAxis.x) PointerAxis axis,
+    @Default('') String name,
     @Default(0) double smoothing,
   }) = PointerClock;
 

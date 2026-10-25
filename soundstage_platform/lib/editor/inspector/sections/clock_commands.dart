@@ -104,17 +104,20 @@ int keyframesPastEnd(ir.Scene scene, String clockId, double duration) {
   return n;
 }
 
-/// The frames of [scene] a pointer clock can be bound to (id, display name).
-List<({String id, String name})> sceneFrames(ir.Scene scene) {
-  final out = <({String id, String name})>[];
-  void walk(ir.Node n) {
+/// The frames of [scene] a pointer clock can be bound to, in layer order
+/// (each frame before its children, topmost first), with their depth.
+List<({String id, String name, int depth})> sceneFrames(ir.Scene scene) {
+  final out = <({String id, String name, int depth})>[];
+  void walk(ir.Node n, int depth) {
     if (n is ir.FrameNode) {
       final name = n.common.name;
-      out.add((id: n.id, name: name.isEmpty ? n.id : name));
-      n.children.forEach(walk);
+      out.add((id: n.id, name: name.isEmpty ? n.id : name, depth: depth));
+      for (final c in n.children.reversed) {
+        walk(c, depth + 1);
+      }
     }
   }
 
-  walk(scene.root);
+  walk(scene.root, 0);
   return out;
 }
