@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/canvas/editor_canvas.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
+import 'package:soundstage_platform/editor/preview/preview_pane.dart';
 import 'package:soundstage_platform/editor/preview/preview_split.dart';
 import 'package:soundstage_platform/editor/preview/preview_stage.dart';
 import 'package:soundstage_platform/editor/preview/preview_state.dart';
@@ -155,13 +156,23 @@ void main() {
     Size viewport() => tester.widget<StagePlayer>(_player).viewportOverride!;
     expect(viewport(), const Size(1440, 900));
 
-    await tester.tap(find.byType(SsDropdown<String>));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PreviewPane),
+        matching: find.byType(SsDropdown<String>),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Mobile'));
     await tester.pumpAndSettle();
     expect(viewport(), const Size(390, 844));
 
-    await tester.tap(find.byType(SsDropdown<String>));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PreviewPane),
+        matching: find.byType(SsDropdown<String>),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Free width'));
     await tester.pumpAndSettle();

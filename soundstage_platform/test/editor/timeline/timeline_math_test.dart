@@ -256,4 +256,34 @@ void main() {
       'Mixed',
     );
   });
+
+  test('clock picker labels: the clock name, else derived', () {
+    final doc = StageDocument.empty(ids: IdGenerator.seeded(1));
+    expect(
+      clockLabel(doc, const Clock.sceneScroll(id: 's', sceneId: 'x')),
+      'Scene scroll',
+    );
+    expect(
+      clockLabel(doc, const Clock.timeline(id: 't', duration: 4)),
+      'Timeline · 4 s',
+    );
+    expect(
+      clockLabel(
+        doc,
+        const Clock.timeline(id: 't', duration: 4, name: 'Intro'),
+      ),
+      'Intro',
+    );
+    expect(
+      clockLabel(
+        doc,
+        const Clock.pointer(id: 'p', frameId: 'f', name: 'Hover'),
+      ),
+      'Hover',
+    );
+    expect(
+      clockLabel(doc, const Clock.pointer(id: 'p', frameId: 'f')),
+      'Pointer X · f',
+    );
+  });
 }

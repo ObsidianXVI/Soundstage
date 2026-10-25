@@ -368,8 +368,18 @@ String easingSummary(ir.Track track) {
   return first;
 }
 
-/// The clock picker's name for [clock].
+/// The clock picker's name for [clock]: its name when it has one (T2.4),
+/// else one derived from its kind and target. (A behaviour clock's `name`
+/// names the behaviour's value, not the clock, so it is always derived.)
 String clockLabel(ir.StageDocument doc, ir.Clock clock) {
+  final own = switch (clock) {
+    ir.SceneScrollClock(:final name) ||
+    ir.TimelineClock(:final name) ||
+    ir.AudioClock(:final name) ||
+    ir.PointerClock(:final name) => name,
+    ir.BehaviorClock() => '',
+  };
+  if (own.isNotEmpty) return own;
   String nodeName(String id) {
     final n = ir.DocumentIndex.of(doc).node(id);
     final name = n?.common.name ?? '';
@@ -378,8 +388,7 @@ String clockLabel(ir.StageDocument doc, ir.Clock clock) {
 
   return switch (clock) {
     ir.SceneScrollClock() => 'Scene scroll',
-    ir.TimelineClock(:final name, :final duration) =>
-      '${name.isEmpty ? 'Timeline' : name} · ${_trim(duration, 2)} s',
+    ir.TimelineClock(:final duration) => 'Timeline · ${_trim(duration, 2)} s',
     ir.AudioClock(:final audioTrackId) => () {
       for (final a in doc.audioTracks) {
         if (a.id == audioTrackId) {
