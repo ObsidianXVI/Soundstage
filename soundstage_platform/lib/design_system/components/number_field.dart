@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../tokens/motion.dart';
 import '../tokens/spacing.dart';
 import '../tokens/theme.dart';
+import 'focus_release.dart';
 import 'number_expression.dart';
 
 /// A numeric input in the Figma idiom.
@@ -77,6 +78,10 @@ class _SsNumberFieldState extends State<SsNumberField> {
   bool _hovered = false;
   bool _hasFocus = false;
   bool _scrubbing = false;
+
+  /// The text last committed, so the blur that follows an Enter does not
+  /// emit the same value twice. Cleared when the field gains focus.
+  String? _committedText;
   double _scrubStart = 0;
   double _scrubAccum = 0;
 
@@ -118,6 +123,7 @@ class _SsNumberFieldState extends State<SsNumberField> {
   void _onFocusChange() {
     final has = _focus.hasFocus;
     if (has) {
+      _committedText = null;
       _selectAll();
     } else {
       _commit();
@@ -146,6 +152,7 @@ class _SsNumberFieldState extends State<SsNumberField> {
   /// Parses the text and applies it; invalid input reverts.
   void _commit() {
     final text = _controller.text.trim();
+    if (text == _committedText) return;
     if (text.isEmpty) {
       _controller.text = _format();
       return;
@@ -157,12 +164,13 @@ class _SsNumberFieldState extends State<SsNumberField> {
     }
     final v = _clamp(parsed);
     _controller.text = _format(v);
+    _committedText = _controller.text;
     if (widget.mixed || v != _current) _emit(v);
   }
 
   void _cancel() {
     _controller.text = _format();
-    _focus.unfocus();
+    releaseFocusToAncestor(_focus);
   }
 
   double get _modifier {
@@ -329,6 +337,8 @@ class _SsNumberFieldState extends State<SsNumberField> {
                       onEditingComplete: () {
                         _commit();
                         _selectAll();
+                        // Hand focus back so editor shortcuts work again.
+                        releaseFocusToAncestor(_focus);
                       },
                       decoration: InputDecoration.collapsed(
                         hintText: widget.mixed ? 'Mixed' : null,

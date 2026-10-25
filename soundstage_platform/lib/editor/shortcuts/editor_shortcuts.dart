@@ -14,7 +14,10 @@ import 'shortcut_map.dart';
 ///
 /// Every action stands down while a text field has focus if its key has no
 /// Cmd/Ctrl (so typing `v`, `?` or Backspace into a field never triggers a
-/// tool, the help overlay or a delete).
+/// tool, the help overlay or a delete). While a field of the editor's
+/// chrome has focus, the document and selection intents stand down even
+/// with Cmd/Ctrl (select all, undo, duplicate ...), so the field handles
+/// them natively. In-place canvas text editing keeps its own handling.
 class EditorShortcuts extends StatelessWidget {
   const EditorShortcuts({
     required this.child,
@@ -61,8 +64,14 @@ class EditorShortcutAction<T extends Intent> extends Action<T> {
   final void Function(T intent) _invoke;
 
   @override
-  bool isEnabled(T intent) =>
-      !(intentIsTextSensitive(intent) && primaryFocusIsTextInput());
+  bool isEnabled(T intent) {
+    // A chrome text field owns every document/selection chord (select all,
+    // undo, duplicate, group, arrows ...): the field edits natively.
+    if (intent is EditorIntent && primaryFocusIsChromeTextInput()) {
+      return false;
+    }
+    return !(intentIsTextSensitive(intent) && primaryFocusIsTextInput());
+  }
 
   @override
   Object? invoke(T intent) {

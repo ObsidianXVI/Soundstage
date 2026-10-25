@@ -14,6 +14,7 @@ import '../insert/canvas_drop.dart';
 import '../insert/insert_tool_layer.dart';
 import '../interaction/canvas_interaction.dart';
 import '../overlay/canvas_overlay.dart';
+import '../shortcuts/shortcut_map.dart' show reclaimShortcutFocus;
 import '../text/text_edit_controller.dart';
 import '../text/text_edit_layer.dart';
 import 'artboard.dart';
@@ -128,6 +129,9 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   }
 
   void _onDown(PointerDownEvent e) {
+    // Figma-style: a click on the canvas takes focus off any chrome text
+    // field, so Cmd+C/V and the other editor shortcuts work again.
+    reclaimShortcutFocus(e.position);
     if (_panPointer == null && _pansWith(e)) {
       setState(() => _panPointer = e.pointer);
     }

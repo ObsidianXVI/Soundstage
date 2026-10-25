@@ -171,7 +171,7 @@ void main() {
     expect(log, ['undo', 'tool:text']);
   });
 
-  testWidgets('bare-key shortcuts stand down while typing in a text field', (
+  testWidgets('shortcuts stand down while typing in a text field', (
     tester,
   ) async {
     final log = <String>[];
@@ -199,11 +199,11 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
     expect(log, isEmpty);
-    // Modifier shortcuts still work.
+    // Document chords stand down too: the field edits natively.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    expect(log, ['undo']);
+    expect(log, isEmpty);
   });
 
   testWidgets('the help dialog lists the shortcuts and closes with Escape', (

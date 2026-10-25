@@ -704,6 +704,7 @@ class _CommitFieldState extends State<_CommitField> {
           placeholder: widget.placeholder,
           semanticLabel: widget.label,
           revertOnEscape: true,
+          releaseFocusOnSubmit: true,
           onSubmitted: (_) => _commit(),
         ),
       ],

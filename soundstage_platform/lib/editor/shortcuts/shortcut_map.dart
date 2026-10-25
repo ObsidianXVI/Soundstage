@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-
+import 'package:soundstage_platform/design_system/design_system.dart'
+    show isTextInputFocus, releaseFocusToAncestor;
 import 'package:soundstage_platform/editor/core/commands/node_commands.dart'
     show ReorderDirection;
 import 'package:soundstage_platform/editor/core/editor_state.dart';
@@ -535,8 +536,26 @@ Iterable<Type> get editorIntentTypes => {
 /// True when the primary focus is inside an editable text.
 bool primaryFocusIsTextInput() {
   if (primaryFocusIsStageText()) return true;
-  final ctx = FocusManager.instance.primaryFocus?.context;
-  if (ctx == null) return false;
-  if (ctx.widget is EditableText) return true;
-  return ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  return isTextInputFocus(FocusManager.instance.primaryFocus);
+}
+
+/// True when the primary focus is a text field of the editor's chrome (an
+/// inspector field, a rename box), not the in-place text editing of the
+/// canvas, which has its own handling.
+bool primaryFocusIsChromeTextInput() {
+  if (primaryFocusIsStageText()) return false;
+  return isTextInputFocus(FocusManager.instance.primaryFocus);
+}
+
+/// Hands focus back from a chrome text field to the editor's shortcut
+/// focus (a canvas or Layers pointer down), Figma-style. Leaves in-place
+/// text editing and non-text focus alone. A pointer down at
+/// [globalPosition] inside the focused field itself (a click that moves the
+/// caret) keeps the focus.
+void reclaimShortcutFocus([Offset? globalPosition]) {
+  if (!primaryFocusIsChromeTextInput()) return;
+  final node = FocusManager.instance.primaryFocus;
+  if (node == null) return;
+  if (globalPosition != null && node.rect.contains(globalPosition)) return;
+  releaseFocusToAncestor(node);
 }

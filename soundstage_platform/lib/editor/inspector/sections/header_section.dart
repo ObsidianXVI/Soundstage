@@ -206,6 +206,7 @@ class _NameFieldState extends ConsumerState<_NameField> {
       textStyle: style,
       dense: true,
       revertOnEscape: true,
+      releaseFocusOnSubmit: true,
       selectAllOnFocus: true,
       onSubmitted: (_) => _commit(),
     );
@@ -271,6 +272,7 @@ class _AltTextState extends ConsumerState<_AltText> {
           semanticLabel: 'Alt text',
           dense: true,
           revertOnEscape: true,
+          releaseFocusOnSubmit: true,
           onSubmitted: (_) => _commit(),
         ),
       ),

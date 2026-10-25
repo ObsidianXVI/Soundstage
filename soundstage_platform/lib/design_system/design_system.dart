@@ -10,6 +10,7 @@ export 'components/color_picker.dart';
 export 'components/constraints_widget.dart';
 export 'components/dialog.dart';
 export 'components/dropdown.dart';
+export 'components/focus_release.dart';
 export 'components/icon.dart';
 export 'components/input_modality.dart';
 export 'components/interactive.dart';

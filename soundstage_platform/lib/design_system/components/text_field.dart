@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../tokens/motion.dart';
 import '../tokens/spacing.dart';
 import '../tokens/theme.dart';
+import 'focus_release.dart';
 
 /// A single-line (or multi-line) text input in the chrome's style.
 ///
@@ -26,6 +27,7 @@ class SsTextField extends StatefulWidget {
     this.semanticLabel,
     this.textStyle,
     this.revertOnEscape = false,
+    this.releaseFocusOnSubmit = false,
     this.selectAllOnFocus = false,
     this.inputFormatters,
     this.textAlign = TextAlign.start,
@@ -51,6 +53,10 @@ class SsTextField extends StatefulWidget {
   final String? semanticLabel;
   final TextStyle? textStyle;
   final bool revertOnEscape;
+
+  /// Hands focus to the nearest focusable ancestor after Enter or Escape
+  /// (editor chrome fields, so the editor's shortcuts work again).
+  final bool releaseFocusOnSubmit;
   final bool selectAllOnFocus;
   final List<TextInputFormatter>? inputFormatters;
   final TextAlign textAlign;
@@ -119,7 +125,12 @@ class _SsTextFieldState extends State<SsTextField> {
       cursorWidth: 1.5,
       inputFormatters: widget.inputFormatters,
       onChanged: widget.onChanged,
-      onSubmitted: widget.onSubmitted,
+      onSubmitted: (v) {
+        widget.onSubmitted?.call(v);
+        if (widget.releaseFocusOnSubmit && mounted) {
+          releaseFocusToAncestor(_focus);
+        }
+      },
       decoration: InputDecoration.collapsed(
         hintText: widget.placeholder,
         hintStyle: style.copyWith(color: c.textDisabled),
@@ -133,7 +144,11 @@ class _SsTextFieldState extends State<SsTextField> {
           if (event is KeyDownEvent &&
               event.logicalKey == LogicalKeyboardKey.escape) {
             _controller.text = _onFocusText;
-            _focus.unfocus();
+            if (widget.releaseFocusOnSubmit) {
+              releaseFocusToAncestor(_focus);
+            } else {
+              _focus.unfocus();
+            }
             return KeyEventResult.handled;
           }
           return KeyEventResult.ignored;

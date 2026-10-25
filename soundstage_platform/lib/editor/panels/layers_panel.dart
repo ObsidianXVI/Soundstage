@@ -10,6 +10,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../core/core.dart';
 import '../inspector/fields/field_frame.dart' show overrideColor;
+import '../shortcuts/shortcut_map.dart' show reclaimShortcutFocus;
 import 'layers_model.dart';
 
 /// The Layers panel (architecture §15): the active scene's node tree.
@@ -535,50 +536,54 @@ class _LayersPanelState extends ConsumerState<LayersPanel> {
       );
     }
     final t = context.ss;
-    return Focus(
-      focusNode: _focus,
-      onKeyEvent: _onKey,
-      child: Semantics(
-        container: true,
-        label: 'Layers',
-        child: Stack(
-          children: [
-            Positioned.fill(
-              key: _listKey,
-              child: ListView.builder(
-                controller: _scroll,
-                itemCount: _rows.length,
-                itemExtent: _rowH,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SsSpace.s2,
-                  vertical: _topPad,
-                ),
-                itemBuilder: (context, i) => _buildRow(_rows[i]),
-              ),
-            ),
-            if (_drag?.active ?? false) ...[
+    return Listener(
+      // A rename box keeps its focus; any other chrome field gives it up.
+      onPointerDown: (e) => reclaimShortcutFocus(e.position),
+      child: Focus(
+        focusNode: _focus,
+        onKeyEvent: _onKey,
+        child: Semantics(
+          container: true,
+          label: 'Layers',
+          child: Stack(
+            children: [
               Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _scroll,
-                    builder: (context, _) => CustomPaint(
-                      painter: _DropPainter(
-                        plan: _drag!.plan,
-                        scroll: _scroll.hasClients ? _scroll.offset : 0,
-                        valid: t.colors.accent,
-                        invalid: t.colors.danger,
+                key: _listKey,
+                child: ListView.builder(
+                  controller: _scroll,
+                  itemCount: _rows.length,
+                  itemExtent: _rowH,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SsSpace.s2,
+                    vertical: _topPad,
+                  ),
+                  itemBuilder: (context, i) => _buildRow(_rows[i]),
+                ),
+              ),
+              if (_drag?.active ?? false) ...[
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _scroll,
+                      builder: (context, _) => CustomPaint(
+                        painter: _DropPainter(
+                          plan: _drag!.plan,
+                          scroll: _scroll.hasClients ? _scroll.offset : 0,
+                          valid: t.colors.accent,
+                          invalid: t.colors.danger,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: _drag!.pointer.dx + 12,
-                top: _drag!.pointer.dy + 8,
-                child: IgnorePointer(child: _DragChip(label: _drag!.label)),
-              ),
+                Positioned(
+                  left: _drag!.pointer.dx + 12,
+                  top: _drag!.pointer.dy + 8,
+                  child: IgnorePointer(child: _DragChip(label: _drag!.label)),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -571,6 +571,7 @@ class _PaintHexFieldState extends ConsumerState<PaintHexField> {
           placeholder: r.mixed ? 'Mixed' : null,
           semanticLabel: 'Paint colour hex',
           revertOnEscape: true,
+          releaseFocusOnSubmit: true,
           selectAllOnFocus: true,
           textStyle: t.text.numeric.copyWith(
             color: enabled ? c.textPrimary : c.textDisabled,
