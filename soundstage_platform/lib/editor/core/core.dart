@@ -9,6 +9,7 @@ export 'commands/asset_commands.dart';
 export 'commands/audio_commands.dart';
 export 'commands/breakpoint_commands.dart';
 export 'commands/gesture_commands.dart';
+export 'commands/interaction_commands.dart';
 export 'commands/motion_commands.dart';
 export 'commands/node_commands.dart';
 export 'commands/paste_commands.dart';

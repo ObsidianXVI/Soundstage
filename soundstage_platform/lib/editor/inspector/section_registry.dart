@@ -9,6 +9,7 @@ import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
 import 'sections/grid_section.dart';
 import 'sections/header_section.dart';
+import 'sections/interactions_section.dart';
 import 'sections/layout_child_section.dart';
 import 'sections/modes_section.dart';
 import 'sections/motion_section.dart';
@@ -67,4 +68,5 @@ final List<InspectorSectionSpec> kInspectorSections = [
   textSection,
   behaviorSection,
   motionSection,
+  interactionsSection,
 ];

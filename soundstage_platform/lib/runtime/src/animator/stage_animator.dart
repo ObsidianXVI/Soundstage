@@ -475,6 +475,16 @@ class StageAnimator implements StageNodeListener {
 
   void pauseTimeline(String clockId) => timeline(clockId)?.pause();
 
+  /// Plays timeline [clockId] in the other direction.
+  void reverseTimeline(String clockId) {
+    timeline(clockId)?.reverse();
+    notifyClockChanged();
+  }
+
+  /// Called with every clock value pushed to the stage (interactions watch
+  /// clocks for `clockReach` and audio cues).
+  void Function(String clockId, double value)? onClockValue;
+
   void seekTimeline(String clockId, double seconds) {
     timeline(clockId)?.seek(seconds);
     notifyClockChanged();
@@ -535,6 +545,7 @@ class StageAnimator implements StageNodeListener {
   void _setValue(_Clock c, double v) {
     c.value = v;
     if (c.evaluatedAt == v) return;
+    onClockValue?.call(c.clock.id, v);
     c.evaluatedAt = v;
     final bindings = c.bindings;
     for (var i = 0; i < bindings.length; i++) {

@@ -36,10 +36,22 @@ class StageTimelineSource extends StageClockSource {
   @override
   double get value => timelineValue(_position, duration, clock.loop);
 
+  /// 1, or -1 after [reverse]: the direction of playback relative to the
+  /// clock's own rate.
+  double _dir = 1;
+  double get _rate => clock.rate * _dir;
+
   void play() {
     if (clock.loop == ir.TimelineLoop.none && _finished) {
-      _position = clock.rate >= 0 ? 0 : duration;
+      _position = _rate >= 0 ? 0 : duration;
     }
+    _playing = true;
+  }
+
+  /// Plays in the other direction from where the playhead is (an
+  /// interaction's "reverse timeline").
+  void reverse() {
+    _dir = -_dir;
     _playing = true;
   }
 
@@ -48,20 +60,19 @@ class StageTimelineSource extends StageClockSource {
   /// Moves the playhead to [seconds] (unwrapped).
   void seek(double seconds) => _position = seconds;
 
-  bool get _finished =>
-      clock.rate >= 0 ? _position >= duration : _position <= 0;
+  bool get _finished => _rate >= 0 ? _position >= duration : _position <= 0;
 
   @override
   void advance(double dt) {
     if (!_playing) return;
-    _position += dt * clock.rate;
+    _position += dt * _rate;
     if (clock.loop == ir.TimelineLoop.none) {
       if (_position >= duration) {
         _position = duration;
-        if (clock.rate >= 0) _playing = false;
+        if (_rate >= 0) _playing = false;
       } else if (_position <= 0) {
         _position = 0;
-        if (clock.rate < 0) _playing = false;
+        if (_rate < 0) _playing = false;
       }
     } else {
       // Keep the playhead bounded so precision never degrades.

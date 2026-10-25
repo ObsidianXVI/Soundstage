@@ -10,10 +10,14 @@ import '../animator/node_registry.dart';
 import '../animator/stage_animator.dart';
 import '../clocks/clock_source.dart';
 import '../clocks/timeline_clock.dart';
+import '../interactions/open_url.dart';
+import '../interactions/stage_interactions.dart';
 import '../media/audio.dart';
 import '../media/image_cache.dart';
+import '../render/render_stage_box.dart';
 import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
+import '../widgets/stage_behaviors.dart' show showStageLightbox;
 import '../widgets/stage_node_widget.dart';
 import '../widgets/stage_scene_view.dart';
 import 'scroll_anchor.dart';
@@ -206,13 +210,103 @@ class _StagePlayerState extends State<StagePlayer>
               ))
           .copyWith(mode: w.mode, nodes: _registry);
 
-  StageAnimator _newAnimator() => StageAnimator(
-    registry: _registry,
-    vsync: this,
-    mode: widget.mode,
-    clockOverrides: widget.clockOverrides,
-    factories: _factories,
-  )..reducedMotion = _reducedMotion;
+  StageAnimator _newAnimator() =>
+      StageAnimator(
+          registry: _registry,
+          vsync: this,
+          mode: widget.mode,
+          clockOverrides: widget.clockOverrides,
+          factories: _factories,
+        )
+        ..reducedMotion = _reducedMotion
+        ..onClockValue = _onClockValue;
+
+  // ---- Interactions (§10.3) -----------------------------------------------------
+
+  late final StageInteractions _interactions = StageInteractions(
+    StageInteractionHost(
+      playTimeline: (id) => _animator.playTimeline(id),
+      pauseTimeline: (id) => _animator.pauseTimeline(id),
+      reverseTimeline: (id) => _animator.reverseTimeline(id),
+      seekTimeline: (id, s) => _animator.seekTimeline(id, s),
+      playAudio: (id) => widget.audio?.play(id),
+      pauseAudio: (id) => widget.audio?.pause(id),
+      seekAudio: (id, s) => widget.audio?.seek(id, s),
+      setVariable: (id, v) {
+        if (_variables[id] == v || !mounted) return;
+        setState(() => _variables = {..._variables, id: v});
+      },
+      scrollToScene: (id) => _scrollToSceneStart(id),
+      openUrl: (url, {required newTab}) => openStageUrl(url, newTab: newTab),
+      openLightbox: _openLightbox,
+    ),
+  );
+
+  /// Variable values set by interactions (they override token values when
+  /// resolving, §8).
+  Map<String, ir.IrValue> _variables = const {};
+  Map<String, ir.IrValue>? _resolvedVariables;
+
+  bool get _interactive => widget.mode == StageRenderMode.play;
+
+  void _onClockValue(String clockId, double value) {
+    if (_interactive) _interactions.clock(clockId, value);
+  }
+
+  void _openLightbox(String nodeId) {
+    final n = _resolved?.nodeIndex[nodeId];
+    if (n == null || !mounted) return;
+    final c = n.node.common;
+    showStageLightbox(
+      context,
+      index: 0,
+      count: 1,
+      sizes: [Size(c.width, c.height)],
+      buildMember: (_) => stageNodeAlone(_env, n),
+    );
+  }
+
+  /// The stage nodes under [global], innermost first.
+  List<String> _nodesAt(Offset global) {
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(
+      result,
+      global,
+      View.of(context).viewId,
+    );
+    return [
+      for (final e in result.path)
+        if (e.target case final RenderStageBox b) b.nodeId,
+    ];
+  }
+
+  Offset? _downAt;
+
+  Widget _withPointerTriggers(Widget child) {
+    if (!_interactive) return child;
+    return MouseRegion(
+      opaque: false,
+      onExit: (_) => _interactions.hover(const []),
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (e) => _downAt = e.position,
+        onPointerUp: (e) {
+          final d = _downAt;
+          _downAt = null;
+          if (d == null || (e.position - d).distance > kTouchSlop) return;
+          if (_interactions.hasTapTriggers) {
+            _interactions.tap(_nodesAt(e.position));
+          }
+        },
+        onPointerHover: (e) {
+          if (_interactions.hasHoverTriggers) {
+            _interactions.hover(_nodesAt(e.position));
+          }
+        },
+        child: child,
+      ),
+    );
+  }
 
   void _attachController(StagePlayerController? c) {
     if (c == null) return;
@@ -286,7 +380,8 @@ class _StagePlayerState extends State<StagePlayer>
     final bp = ir.breakpointForWidth(doc, width);
     if (_resolved != null &&
         identical(_resolvedDoc, doc) &&
-        _resolvedBreakpoint == bp?.id) {
+        _resolvedBreakpoint == bp?.id &&
+        identical(_resolvedVariables, _variables)) {
       return false;
     }
     // Scenes may get longer or shorter: remember where the reader is, as a
@@ -294,9 +389,11 @@ class _StagePlayerState extends State<StagePlayer>
     if (_sceneIds.isNotEmpty) _anchor = _captureAnchor();
     final resolved = _resolver.resolve(
       doc,
-      ir.ResolveContext(breakpointId: bp?.id),
+      ir.ResolveContext(breakpointId: bp?.id, variableState: _variables),
     );
     _resolved = resolved;
+    _resolvedVariables = _variables;
+    if (_interactive) _interactions.load(resolved);
     _resolvedDoc = doc;
     _resolvedBreakpoint = bp?.id;
     _sceneAssets = {for (final s in resolved.scenes) s.id: sceneAssetIds(s)};
@@ -323,6 +420,7 @@ class _StagePlayerState extends State<StagePlayer>
             );
             if (widget.mode == StageRenderMode.play) {
               widget.audio?.sceneVisibilityChanged(scene.id, visible: visible);
+              _interactions.sceneVisible(scene.id, visible: visible);
             }
           },
           builder: (context, inWindow) {
@@ -567,13 +665,15 @@ class _StagePlayerState extends State<StagePlayer>
                     child: Semantics(
                       container: true,
                       textDirection: TextDirection.ltr,
-                      child: CustomScrollView(
-                        controller: _scroll,
-                        physics: widget.physics,
-                        scrollCacheExtent: ScrollCacheExtent.viewport(
-                          widget.lazyWindow,
+                      child: _withPointerTriggers(
+                        CustomScrollView(
+                          controller: _scroll,
+                          physics: widget.physics,
+                          scrollCacheExtent: ScrollCacheExtent.viewport(
+                            widget.lazyWindow,
+                          ),
+                          slivers: _slivers,
                         ),
-                        slivers: _slivers,
                       ),
                     ),
                   ),
