@@ -70,19 +70,34 @@ class _ArtboardState extends ConsumerState<Artboard>
       mode: StageRenderMode.edit,
     );
     widget.controller.previewWidths.addListener(_widthsChanged);
+    widget.controller.playheadLive.addListener(_liveChanged);
     ref.listenManual(
       editorControllerProvider.select((s) => Identity(s.playheads)),
       (_, _) => _pushPlayheads(),
     );
   }
 
+  /// Whether this artboard follows the playhead now: always, except while
+  /// it moves continuously ([CanvasController.playheadLive]) and another
+  /// artboard is the edited one (DECISIONS 26/10/26 T2.1-5: rasterising
+  /// every artboard per scrub step dominated the frame).
+  bool get _followsPlayhead =>
+      !widget.controller.playheadLive.value ||
+      ref.read(editorControllerProvider).artboardId == widget.breakpoint.id;
+
   /// Hands the shown scene's playheads to the animator (writes render
   /// objects directly) and tells the overlay the geometry may have moved.
   void _pushPlayheads() {
+    if (!_followsPlayhead) return;
     final values = ref.read(editorControllerProvider).clockValuesOf(_sceneId);
     if (identical(values, _animator.clockOverrides)) return;
     _animator.clockOverrides = values;
     widget.controller.notifyGeometry();
+  }
+
+  /// The scrub or playback stopped: catch up with the playhead.
+  void _liveChanged() {
+    if (!widget.controller.playheadLive.value) _pushPlayheads();
   }
 
   /// Each artboard registers its own info (and node registry). When one
@@ -111,12 +126,15 @@ class _ArtboardState extends ConsumerState<Artboard>
     if (!identical(old.controller, widget.controller)) {
       old.controller.previewWidths.removeListener(_widthsChanged);
       widget.controller.previewWidths.addListener(_widthsChanged);
+      old.controller.playheadLive.removeListener(_liveChanged);
+      widget.controller.playheadLive.addListener(_liveChanged);
     }
   }
 
   @override
   void dispose() {
     widget.controller.previewWidths.removeListener(_widthsChanged);
+    widget.controller.playheadLive.removeListener(_liveChanged);
     if (identical(widget.controller.artboards[_info.breakpointId], _info)) {
       widget.controller.artboards.remove(_info.breakpointId);
     }
@@ -163,10 +181,13 @@ class _ArtboardState extends ConsumerState<Artboard>
       ..designSize = Size(bp.designSize.width, bp.designSize.height);
 
     _sceneId = sceneId;
-    // Playheads first, so the reload evaluates new tracks at them.
-    _animator.clockOverrides = ref
-        .read(editorControllerProvider)
-        .clockValuesOf(sceneId);
+    // Playheads first, so the reload evaluates new tracks at them (a
+    // non-edited artboard keeps its values while the playhead is live).
+    if (_followsPlayhead) {
+      _animator.clockOverrides = ref
+          .read(editorControllerProvider)
+          .clockValuesOf(sceneId);
+    }
     if (!identical(_loaded, art.resolved)) {
       _loaded = art.resolved;
       _animator.load(art.resolved);

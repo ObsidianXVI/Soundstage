@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Easing;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soundstage_platform/editor/canvas/canvas_controller.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
 import 'package:soundstage_platform/editor/shell/editor_layout.dart';
 import 'package:soundstage_platform/editor/timeline/timeline_panel.dart';
@@ -458,5 +459,77 @@ void main() {
     }
     // The dragged lane and its group's summary.
     expect(rebuilt['_LaneKeys'], 2 * 5);
+  });
+
+  testWidgets('while scrubbing only the edited artboard follows; the others '
+      'catch up on release (T2.1-5)', (tester) async {
+    final r = await pumpTimeline(tester);
+    final canvas = r.c.read(canvasControllerProvider);
+    final edited = r.st.artboardId!;
+    final other = canvas.artboards.keys.firstWhere((id) => id != edited);
+    double opacity(String bp) =>
+        canvas.artboards[bp]!.registry['a1']!.effectiveOpacity;
+    // a1's opacity runs 0.2 → 1 over the scroll clock.
+    double at(double t) => 0.2 + 0.8 * t;
+    final g = await tester.startGesture(
+      r.onRuler(0.1),
+      kind: PointerDeviceKind.mouse,
+      buttons: kPrimaryButton,
+    );
+    await tester.pump();
+    expect(canvas.playheadLive.value, isTrue);
+    for (final t in [0.3, 0.5, 0.6]) {
+      await g.moveTo(r.onRuler(t));
+      await tester.pump();
+    }
+    expect(opacity(edited), closeTo(at(0.6), 0.01));
+    expect(opacity(other), closeTo(at(0.1), 0.01));
+    await g.up();
+    await tester.pump();
+    expect(canvas.playheadLive.value, isFalse);
+    expect(opacity(other), closeTo(at(0.6), 0.01));
+    // A single playhead change (not live) updates every artboard.
+    r.ctl.setActivePlayhead(0.25);
+    await tester.pump();
+    expect(opacity(other), closeTo(at(0.25), 0.01));
+    expect(opacity(edited), closeTo(at(0.25), 0.01));
+  });
+
+  testWidgets('playback is live for the edited artboard only', (tester) async {
+    final r = await pumpTimeline(
+      tester,
+      doc: timelineDoc(
+        extra: [
+          Track(
+            id: 'bo',
+            target: 'b1',
+            property: 'opacity',
+            clockId: 'tl',
+            keyframes: [kf('b0', 0, 0), kf('b1', 4, 1)],
+          ),
+        ],
+      ),
+    );
+    final canvas = r.c.read(canvasControllerProvider);
+    final edited = r.st.artboardId!;
+    final other = canvas.artboards.keys.firstWhere((id) => id != edited);
+    double opacity(String bp) =>
+        canvas.artboards[bp]!.registry['b1']!.effectiveOpacity;
+    r.ctl.setActiveClock('s1', 'tl');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('timeline-play')));
+    await tester.pump();
+    expect(canvas.playheadLive.value, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    final p = r.st.playhead;
+    expect(p, greaterThan(0.5));
+    expect(opacity(edited), closeTo(p / 4, 0.01));
+    expect(opacity(other), closeTo(0, 0.01));
+    // Pause: the other artboard catches up with the playhead.
+    await tester.tap(find.byKey(const ValueKey('timeline-play')));
+    await tester.pump();
+    expect(canvas.playheadLive.value, isFalse);
+    expect(opacity(other), closeTo(r.st.playhead / 4, 0.01));
   });
 }

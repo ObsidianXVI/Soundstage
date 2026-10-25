@@ -124,6 +124,11 @@ class CanvasController {
   /// or the paint going away clears it.
   final ValueNotifier<GradientEditTarget?> gradientEdit = ValueNotifier(null);
 
+  /// The playhead is moving continuously (a timeline scrub or playback):
+  /// only the edited artboard follows it live; the others catch up once
+  /// when it turns false (DECISIONS 26/10/26 T2.1-5).
+  final ValueNotifier<bool> playheadLive = ValueNotifier(false);
+
   /// Starts or stops editing [target] on the canvas.
   void toggleGradientEdit(GradientEditTarget target) =>
       gradientEdit.value = gradientEdit.value == target ? null : target;
@@ -335,6 +340,7 @@ class CanvasController {
     camera.dispose();
     previewWidths.dispose();
     gradientEdit.dispose();
+    playheadLive.dispose();
     interaction.dispose();
     _geometry.dispose();
   }

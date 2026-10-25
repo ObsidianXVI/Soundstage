@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../canvas/canvas_controller.dart';
 import '../core/commands/gesture_commands.dart';
 import '../core/commands/motion_commands.dart';
 import '../core/editor_controller.dart';
@@ -87,6 +88,7 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
 
   // Kept from initState: dispose must not use ref.
   late final TimelineController _tl = ref.read(timelineControllerProvider);
+  late final CanvasController _canvas = ref.read(canvasControllerProvider);
   EditorController get _editor => ref.read(editorControllerProvider.notifier);
 
   @override
@@ -141,6 +143,8 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
   }
 
   void _playingChanged() {
+    // Only the edited artboard follows a playing playhead (T2.1-5).
+    _canvas.playheadLive.value = _tl.playing.value;
     if (_tl.playing.value) {
       _lastTick = Duration.zero;
       if (!_ticker.isActive) _ticker.start();
@@ -560,6 +564,14 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
 
   void _selectNode(String id) => _editor.select({id});
 
+  late final CanvasController _canvas = ref.read(canvasControllerProvider);
+
+  /// A scrub drag (ruler or playhead line) is under way: only the edited
+  /// artboard follows it (T2.1-5); the others catch up when it ends.
+  void _setScrubbing(bool on) {
+    if (on || !_tl.playing.value) _canvas.playheadLive.value = on;
+  }
+
   TimelineActions get _actions =>
       TimelineActions(_editor, _tl, () => ref.read(editorControllerProvider));
 
@@ -742,7 +754,9 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     );
     if (hit == null && _onPlayheadLine(m, e.localPosition)) {
       press.scrub = true;
+      // After _scrubTo, which stops playback (and its live flag).
       _scrubTo(m, e.localPosition.dx);
+      _setScrubbing(true);
     } else if (hit != null) {
       final sel = _tl.selection.value;
       if (press.shift) {
@@ -800,7 +814,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final m = _model;
     _press = null;
     if (p == null || m == null) return;
-    if (p.scrub) return;
+    if (p.scrub) {
+      _setScrubbing(false);
+      return;
+    }
     if (!p.dragging) {
       _lastClickAt = e.timeStamp;
       _lastClickPos = e.localPosition;
@@ -832,6 +849,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final p = _press;
     _press = null;
     if (p == null) return;
+    if (p.scrub) _setScrubbing(false);
     if (p.dragging && p.hit != null && p.base != null) {
       _editor.execute(
         GestureStep(
@@ -1083,6 +1101,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                           model: m,
                           playhead: _playhead,
                           onScrub: (x) => _scrubTo(m, x),
+                          onScrubbing: _setScrubbing,
                           onWheel: (e) => _onWheel(e, ruler: true),
                         ),
                       ),
@@ -1211,12 +1230,16 @@ class _Ruler extends ConsumerWidget {
     required this.model,
     required this.playhead,
     required this.onScrub,
+    required this.onScrubbing,
     required this.onWheel,
   });
 
   final _BodyModel model;
   final _PlayheadSource playhead;
   final ValueChanged<double> onScrub;
+
+  /// A scrub drag starts (true) or ends (false).
+  final ValueChanged<bool> onScrubbing;
   final ValueChanged<PointerSignalEvent> onWheel;
 
   @override
@@ -1226,11 +1249,16 @@ class _Ruler extends ConsumerWidget {
       key: const ValueKey<String>('timeline-ruler'),
       behavior: HitTestBehavior.opaque,
       onPointerDown: (e) {
-        if (e.buttons == kPrimaryButton) onScrub(e.localPosition.dx);
+        if (e.buttons != kPrimaryButton) return;
+        // After onScrub, which stops playback (and its live flag).
+        onScrub(e.localPosition.dx);
+        onScrubbing(true);
       },
       onPointerMove: (e) {
         if (e.buttons == kPrimaryButton) onScrub(e.localPosition.dx);
       },
+      onPointerUp: (_) => onScrubbing(false),
+      onPointerCancel: (_) => onScrubbing(false),
       onPointerSignal: onWheel,
       child: CustomPaint(
         painter: _RulerPainter(
