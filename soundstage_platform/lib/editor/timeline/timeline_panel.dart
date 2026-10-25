@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -15,7 +16,9 @@ import '../core/editor_controller.dart';
 import '../core/editor_state.dart';
 import '../shortcuts/shortcut_map.dart' show primaryFocusIsTextInput;
 import 'easing_hook.dart';
+import 'media_lanes.dart';
 import 'timeline_actions.dart';
+import 'timeline_audio.dart';
 import 'timeline_math.dart';
 import 'timeline_model.dart';
 
@@ -145,11 +148,22 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
   void _playingChanged() {
     // Only the edited artboard follows a playing playhead (T2.1-5).
     _canvas.playheadLive.value = _tl.playing.value;
+    final audio = ref.read(timelineAudioProvider);
     if (_tl.playing.value) {
       _lastTick = Duration.zero;
       if (!_ticker.isActive) _ticker.start();
-    } else if (_ticker.isActive) {
-      _ticker.stop();
+      // An audio clock plays its track; the playhead follows the sound.
+      if (_active()?.clock case ir.AudioClock(:final audioTrackId)) {
+        unawaited(
+          audio.start(
+            audioTrackId,
+            ref.read(editorControllerProvider).playhead,
+          ),
+        );
+      }
+    } else {
+      audio.stop();
+      if (_ticker.isActive) _ticker.stop();
     }
   }
 
@@ -166,7 +180,12 @@ class _TimelinePanelState extends ConsumerState<TimelinePanel>
       _ => 1.0,
     };
     final st = ref.read(editorControllerProvider);
-    var t = st.playhead + dt * rate;
+    final heard = switch (a.clock) {
+      ir.AudioClock(:final audioTrackId) =>
+        ref.read(timelineAudioProvider).position(audioTrackId),
+      _ => null,
+    };
+    var t = heard ?? st.playhead + dt * rate;
     final span = a.span;
     if (t >= span.max) {
       if (_tl.loopsOn(a.clock) && span.span > 0) {
@@ -1108,6 +1127,15 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                     ],
                   ),
                 ),
+                if (clock case ir.AudioClock(:final audioTrackId))
+                  TimelineMediaLanes(
+                    key: ValueKey<String>('media:$audioTrackId'),
+                    trackId: audioTrackId,
+                    labelWidth: kTimelineLabelWidth,
+                    viewOf: (_) => _view(m),
+                    repaint: Listenable.merge([_tl.views, _playhead]),
+                    playhead: () => ref.read(editorControllerProvider).playhead,
+                  ),
                 Expanded(
                   child: m.rows.isEmpty
                       ? _EmptyLanes(clock: clock)

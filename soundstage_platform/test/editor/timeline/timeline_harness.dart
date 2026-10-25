@@ -2,9 +2,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Easing;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/core/core.dart';
+import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/editor/shell/editor_layout.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
 import 'package:soundstage_platform/editor/timeline/timeline_math.dart';
@@ -73,11 +75,13 @@ Future<TimelineRig> pumpTimeline(
   WidgetTester tester, {
   StageDocument? doc,
   Size size = const Size(1440, 900),
+  List<Override> overrides = const [],
+  EditorAssetService? assetService,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final root = ProviderContainer();
+  final root = ProviderContainer(overrides: overrides);
   addTearDown(root.dispose);
   root.read(editorLayoutProvider.notifier).toggleTimeline();
   final d = doc ?? timelineDoc();
@@ -89,7 +93,12 @@ Future<TimelineRig> pumpTimeline(
         builder: (c, child) =>
             SsScope(theme: SsThemeData.dark(), child: child!),
         home: Scaffold(
-          body: EditorShell(document: d, onBack: () {}, onPreview: () {}),
+          body: EditorShell(
+            document: d,
+            onBack: () {},
+            onPreview: () {},
+            assetService: assetService,
+          ),
         ),
       ),
     ),

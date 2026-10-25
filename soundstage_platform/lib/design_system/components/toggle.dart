@@ -73,10 +73,16 @@ class SsToggle extends StatelessWidget {
             ),
             if (label != null) ...[
               const SizedBox(width: SsSpace.s2),
-              Text(
-                label!,
-                style: t.text.body.copyWith(
-                  color: disabled ? c.textDisabled : c.textPrimary,
+              // Shrinks with an ellipsis in a narrow cell instead of
+              // overflowing it.
+              Flexible(
+                child: Text(
+                  label!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.text.body.copyWith(
+                    color: disabled ? c.textDisabled : c.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -157,10 +163,16 @@ class SsCheckbox extends StatelessWidget {
             ),
             if (label != null) ...[
               const SizedBox(width: SsSpace.s2),
-              Text(
-                label!,
-                style: t.text.body.copyWith(
-                  color: disabled ? c.textDisabled : c.textPrimary,
+              // Shrinks with an ellipsis in a narrow cell instead of
+              // overflowing it.
+              Flexible(
+                child: Text(
+                  label!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.text.body.copyWith(
+                    color: disabled ? c.textDisabled : c.textPrimary,
+                  ),
                 ),
               ),
             ],
