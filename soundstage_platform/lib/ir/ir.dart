@@ -32,6 +32,7 @@ export 'src/edit/lyrics_edits.dart';
 export 'src/edit/motion_edits.dart';
 export 'src/edit/node_edits.dart';
 export 'src/edit/scene_edits.dart';
+export 'src/edit/token_edits.dart';
 export 'src/interactions.dart';
 export 'src/lyrics/lrc.dart';
 export 'src/lyrics/lyrics_timing.dart';
