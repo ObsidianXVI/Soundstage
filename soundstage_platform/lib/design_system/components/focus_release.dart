@@ -3,7 +3,9 @@ import 'package:flutter/widgets.dart';
 /// Whether [node] is the focus node of a text input (an `EditableText`).
 bool isTextInputFocus(FocusNode? node) {
   final ctx = node?.context;
-  if (ctx == null) return false;
+  // A node whose widget just unmounted (a closing popover's field) is
+  // briefly still primary: not a text input any more.
+  if (ctx == null || !ctx.mounted) return false;
   return ctx.widget is EditableText ||
       ctx.findAncestorWidgetOfExactType<EditableText>() != null;
 }

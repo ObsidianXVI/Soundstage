@@ -5,6 +5,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import '../inspector_providers.dart';
 import '../property_writer.dart';
+import 'context_entries.dart';
 import 'keyframe_controls.dart';
 import 'token_binding.dart';
 
@@ -33,6 +34,8 @@ class FieldFrame extends ConsumerWidget {
     required this.paths,
     required this.child,
     this.keyframes = true,
+    this.bindable = true,
+    this.bindPath,
     super.key,
   });
 
@@ -40,8 +43,10 @@ class FieldFrame extends ConsumerWidget {
     required String path,
     required this.child,
     this.keyframes = true,
+    this.bindable = true,
     super.key,
-  }) : paths = [path];
+  }) : paths = [path],
+       bindPath = null;
 
   final List<String> paths;
   final Widget child;
@@ -49,6 +54,14 @@ class FieldFrame extends ConsumerWidget {
   /// Whether an animatable single-path control gets its keyframe controls
   /// beside it (off for controls that are not a row: an image preview).
   final bool keyframes;
+
+  /// Whether a single bindable path gets token binding (off for a second
+  /// control of the same value, such as the expanded colour picker).
+  final bool bindable;
+
+  /// The path a multi-path control binds (W binds `width`, not its sizing);
+  /// a single-path control binds its path.
+  final String? bindPath;
 
   static ValueSource _strongest(Iterable<ValueSource> all) {
     var best = ValueSource.own;
@@ -70,13 +83,16 @@ class FieldFrame extends ConsumerWidget {
         ref.watch(selectedNodesProvider.select((s) => valueSourceOf(s, p))),
     ];
     final source = _strongest(sources);
-    final type = paths.length == 1 ? bindableType(paths.single) : null;
+    final bind = !bindable
+        ? null
+        : bindPath ?? (paths.length == 1 ? paths.single : null);
+    final type = bind == null ? null : bindableType(bind);
     final inner = type == null
         ? child
         : BindableField(
-            path: paths.single,
+            path: bind!,
             type: type,
-            source: source,
+            source: sources[paths.indexOf(bind)],
             child: child,
           );
     final framed = source.kind == ValueSourceKind.own
@@ -133,7 +149,11 @@ class FieldFrame extends ConsumerWidget {
       behavior: HitTestBehavior.translucent,
       onPointerDown: (e) {
         if (e.buttons == kSecondaryMouseButton) {
-          showSsContextMenu(context, position: e.position, entries: entries());
+          showSsContextMenu(
+            context,
+            position: e.position,
+            entries: [...entries(), ...takeContextEntries(e)],
+          );
         }
       },
       child: Stack(

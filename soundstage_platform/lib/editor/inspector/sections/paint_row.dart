@@ -11,6 +11,7 @@ import 'package:soundstage_platform/runtime/src/paint/gradient.dart'
     show diamondMesh, gradientShader;
 
 import '../../canvas/canvas_controller.dart';
+import '../fields/context_entries.dart';
 import '../fields/field_frame.dart';
 import '../fields/props.dart';
 import '../property_writer.dart';
@@ -287,7 +288,7 @@ class PaintRow extends ConsumerWidget {
           showSsContextMenu(
             context,
             position: e.position,
-            entries: _menu(context, ref),
+            entries: [..._menu(context, ref), ...takeContextEntries(e)],
           );
         }
       },
@@ -418,6 +419,7 @@ class _ColorPickerProp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => FieldFrame.single(
     path: path,
+    bindable: false,
     child: SsColorPicker(
       key: ValueKey<String>('picker:$path'),
       color: stageColor(color),

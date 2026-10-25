@@ -141,6 +141,7 @@ class _SizeProp extends ConsumerWidget {
               : null);
     return FieldFrame(
       paths: [path, sizingPath],
+      bindPath: path,
       child: SsNumberField(
         key: ValueKey<String>('field:$path'),
         semanticLabel: semanticLabel,

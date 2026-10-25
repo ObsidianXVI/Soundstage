@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
@@ -7,6 +8,7 @@ import '../../core/core.dart';
 import '../../panels/tokens_panel.dart' show variableTypeIcon;
 import '../inspector_providers.dart';
 import '../property_writer.dart';
+import 'context_entries.dart';
 
 // Token binding in the inspector (m3.md T3.1 "Binding"). A field whose value
 // type matches a variable type gets a bind button on hover; the picker lists
@@ -79,6 +81,11 @@ class _BindableFieldState extends ConsumerState<BindableField> {
     showVariablePicker(
       context,
       anchor: box.localToGlobal(Offset.zero) & box.size,
+      collections: ref
+          .read(editorControllerProvider)
+          .document
+          .tokens
+          .collections,
       type: widget.type,
       current: widget.source.variableId,
       onPick: _bind,
@@ -118,6 +125,24 @@ class _BindableFieldState extends ConsumerState<BindableField> {
   }
 
   Widget _hoverable() {
+    // Right-click offers binding too (no hover on touch screens).
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (e) {
+        if (e.buttons != kSecondaryMouseButton) return;
+        offerContextEntries(context, e, [
+          SsMenuItem(
+            label: 'Bind to variable…',
+            icon: SsIcons.hexagon,
+            onSelected: () => _pick(context),
+          ),
+        ]);
+      },
+      child: _hoverRegion(),
+    );
+  }
+
+  Widget _hoverRegion() {
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -223,10 +248,13 @@ class BoundVariableChip extends StatelessWidget {
 }
 
 /// Opens the variable picker below [anchor]: a search field and the
-/// variables of [type] grouped by collection. [onPick] gets the id.
+/// variables of [type] in [collections], grouped by collection. [onPick]
+/// gets the id. (The popover lives in the root overlay, outside the
+/// editor's provider scope, so it gets its data rather than watching it.)
 SsPopoverHandle showVariablePicker(
   BuildContext context, {
   required Rect anchor,
+  required List<ir.VariableCollection> collections,
   required ir.VariableType type,
   required ValueChanged<String> onPick,
   String? current,
@@ -237,6 +265,7 @@ SsPopoverHandle showVariablePicker(
     anchor: anchor,
     placement: SsPlacement.belowEnd,
     builder: (_) => _VariablePicker(
+      collections: collections,
       type: type,
       current: current,
       onPick: (id) {
@@ -248,30 +277,30 @@ SsPopoverHandle showVariablePicker(
   return handle;
 }
 
-class _VariablePicker extends ConsumerStatefulWidget {
+class _VariablePicker extends StatefulWidget {
   const _VariablePicker({
+    required this.collections,
     required this.type,
     required this.onPick,
     this.current,
   });
 
+  final List<ir.VariableCollection> collections;
   final ir.VariableType type;
   final String? current;
   final ValueChanged<String> onPick;
 
   @override
-  ConsumerState<_VariablePicker> createState() => _VariablePickerState();
+  State<_VariablePicker> createState() => _VariablePickerState();
 }
 
-class _VariablePickerState extends ConsumerState<_VariablePicker> {
+class _VariablePickerState extends State<_VariablePicker> {
   String _query = '';
 
   @override
   Widget build(BuildContext context) {
     final t = context.ss;
-    final cols = ref.watch(
-      editorControllerProvider.select((s) => s.document.tokens.collections),
-    );
+    final cols = widget.collections;
     final q = _query.toLowerCase();
     final rows = <Widget>[];
     for (final c in cols) {
