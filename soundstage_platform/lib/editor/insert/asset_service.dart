@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../audio/waveform_peaks.dart';
 import '../clipboard/content_hash.dart';
 
 /// A file the author gave the editor: from the picker, a drop or the
@@ -37,6 +38,13 @@ abstract interface class EditorAssetService {
   /// the document (a clipboard reference within the same browser profile),
   /// or null.
   Future<ir.Asset?> stored(String assetId);
+
+  /// The waveform peaks of audio asset [assetId] (10 ms buckets,
+  /// m2.md "Audio lane"), or null when it is not audio, not stored, or the
+  /// browser cannot decode it. They are computed once when the file is
+  /// uploaded and stored in the asset record; an asset that lacks them gets
+  /// them computed on this first request.
+  Future<WaveformPeaks?> peaks(String assetId);
 }
 
 /// A storage or format problem, worded for the author.
@@ -57,6 +65,14 @@ final editorAssetServiceProvider = Provider<EditorAssetService>(
     'or override the provider.',
   ),
   dependencies: const [],
+);
+
+/// The waveform peaks of an audio asset, by asset id (null while none are
+/// available). The audio lane reads this; call `ref.invalidate` with the
+/// asset id after replacing the file of an asset.
+final audioPeaksProvider = FutureProvider.family<WaveformPeaks?, String>(
+  (ref, assetId) => ref.watch(editorAssetServiceProvider).peaks(assetId),
+  dependencies: [editorAssetServiceProvider],
 );
 
 /// Files that were not stored, with why (for one toast).

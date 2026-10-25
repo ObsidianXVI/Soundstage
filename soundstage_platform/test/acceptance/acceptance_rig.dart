@@ -440,7 +440,9 @@ class Rig {
       final r = box.localToGlobal(Offset.zero) & box.size;
       final vb = o.context.findRenderObject()! as RenderBox;
       final v = vb.localToGlobal(Offset.zero) & vb.size;
-      if (r.top >= v.top && r.bottom <= v.bottom) return;
+      // A margin: a field a few pixels under the viewport's top edge is
+      // not reliably hit (it sits in the scroll view's edge band).
+      if (r.top >= v.top + 24 && r.bottom <= v.bottom - 24) return;
       await Scrollable.ensureVisible(e, alignment: 0.5);
       await settleAnimations();
     }

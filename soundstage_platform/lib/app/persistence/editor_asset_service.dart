@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
 import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -48,6 +49,15 @@ class LocalEditorAssetService implements EditorAssetService {
     final rec = await _store.record(assetId);
     return rec == null ? null : _store.toAsset(rec.meta);
   }
+
+  @override
+  Future<WaveformPeaks?> peaks(String assetId) async {
+    try {
+      return await _store.peaks(assetId);
+    } on StorageFullException {
+      return null;
+    }
+  }
 }
 
 /// What the editor has when browser storage is blocked: nothing can be
@@ -81,6 +91,9 @@ class UnavailableAssetService implements EditorAssetService {
 
   @override
   Future<ir.Asset?> stored(String assetId) async => null;
+
+  @override
+  Future<WaveformPeaks?> peaks(String assetId) async => null;
 }
 
 /// The app's asset service: the IndexedDB store, or
