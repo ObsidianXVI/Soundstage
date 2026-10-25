@@ -5,6 +5,7 @@ import '../tokens/motion.dart';
 import '../tokens/spacing.dart';
 import '../tokens/theme.dart';
 import 'button.dart';
+import 'text_field.dart';
 
 /// A dialog card: title, content, and an action row.
 class SsDialog extends StatelessWidget {
@@ -129,4 +130,79 @@ Future<bool> showSsConfirm(
     ),
   );
   return r ?? false;
+}
+
+/// A one-field text dialog ("Rename collection"). Resolves to the trimmed
+/// text on confirm (Enter or the confirm button), or null on cancel or
+/// when the text is empty.
+Future<String?> showSsPrompt(
+  BuildContext context, {
+  required String title,
+  String initialValue = '',
+  String confirmLabel = 'Save',
+  String? placeholder,
+}) => showSsDialog<String>(
+  context,
+  builder: (_) => _SsPrompt(
+    title: title,
+    initialValue: initialValue,
+    confirmLabel: confirmLabel,
+    placeholder: placeholder,
+  ),
+);
+
+class _SsPrompt extends StatefulWidget {
+  const _SsPrompt({
+    required this.title,
+    required this.initialValue,
+    required this.confirmLabel,
+    this.placeholder,
+  });
+
+  final String title;
+  final String initialValue;
+  final String confirmLabel;
+  final String? placeholder;
+
+  @override
+  State<_SsPrompt> createState() => _SsPromptState();
+}
+
+class _SsPromptState extends State<_SsPrompt> {
+  late final TextEditingController _text = TextEditingController(
+    text: widget.initialValue,
+  );
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = _text.text.trim();
+    Navigator.of(context).pop(v.isEmpty ? null : v);
+  }
+
+  @override
+  Widget build(BuildContext context) => SsDialog(
+    title: widget.title,
+    width: 320,
+    content: SsTextField(
+      controller: _text,
+      autofocus: true,
+      selectAllOnFocus: true,
+      placeholder: widget.placeholder,
+      semanticLabel: widget.title,
+      onSubmitted: (_) => _submit(),
+    ),
+    actions: [
+      SsButton(label: 'Cancel', onPressed: () => Navigator.of(context).pop()),
+      SsButton(
+        label: widget.confirmLabel,
+        variant: SsButtonVariant.primary,
+        onPressed: _submit,
+      ),
+    ],
+  );
 }

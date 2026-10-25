@@ -17,6 +17,7 @@ import '../inspector/inspector.dart';
 import '../panels/assets_panel.dart';
 import '../panels/layers_panel.dart';
 import '../panels/scenes_panel.dart';
+import '../panels/tokens_panel.dart';
 import '../preview/preview_split.dart';
 import '../preview/preview_state.dart';
 import '../shortcuts/editor_shortcuts.dart';
@@ -404,6 +405,7 @@ class _LeftPanel extends ConsumerWidget {
               SsTab(id: 'scenes', label: 'Scenes'),
               SsTab(id: 'layers', label: 'Layers'),
               SsTab(id: 'assets', label: 'Assets'),
+              SsTab(id: 'tokens', label: 'Tokens'),
             ],
           ),
           Expanded(
@@ -413,6 +415,7 @@ class _LeftPanel extends ConsumerWidget {
                 LeftPanelTab.scenes => const ScenesPanel(),
                 LeftPanelTab.layers => const LayersPanel(),
                 LeftPanelTab.assets => const AssetsPanel(),
+                LeftPanelTab.tokens => const TokensPanel(),
               },
             ),
           ),

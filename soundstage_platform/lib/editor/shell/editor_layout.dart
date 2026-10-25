@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// shows the content-mode screen instead.
 const double kEditorMinWidth = 1024;
 
-enum LeftPanelTab { scenes, layers, assets }
+enum LeftPanelTab { scenes, layers, assets, tokens }
 
 const double kLeftPanelMin = 200;
 const double kLeftPanelMax = 420;
