@@ -11,7 +11,6 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
 import '../canvas/canvas_controller.dart';
-import '../overlay/canvas_overlay.dart' show OverlayPainter;
 import '../overlay/gradient_handles.dart';
 import '../overlay/interaction_model.dart';
 import '../overlay/overlay_geometry.dart';
@@ -239,7 +238,8 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
       _ctl.hover(null);
       return;
     }
-    final z = _zoneAt(p);
+    // Gradient handles win over the frame's resize and rotate zones.
+    final z = _gradientHit(p)?.handle != null ? null : _zoneAt(p);
     switch (z?.zone) {
       case ResizeZone(:final screenAngle):
         _m.setRotateCursor(null);
@@ -472,6 +472,12 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
 
   // ---- Gradient handles (T1.7b) ------------------------------------------
 
+  /// How close (screen px) a press must be to a gradient handle to grab it,
+  /// and the wider reach inside a selection-frame zone: a handle sitting at
+  /// a frame corner then wins over the corner's resize and rotate zones.
+  static const double kGradientHandleGrab = 8;
+  static const double kGradientHandleGrabInZone = 14;
+
   /// What a press at [p] hits of the gradient being edited, on the artboard
   /// under it: a handle, a colour stop, or (with [onLine]) the start → end
   /// line. Null when gradient editing is off or nothing is hit.
@@ -494,14 +500,16 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
     final paint = gradientPaintOf(box.node, target.path);
     if (paint == null) return null;
     final pts = GradientHandlePoints.of(paint.handles, o.size);
-    const slop = OverlayPainter.gradientHandleRadius + 3;
     final handles = [
       (GradientHandleKind.end, pts.end),
       (GradientHandleKind.start, pts.start),
       if (hasWidthHandle(paint.kind)) (GradientHandleKind.width, pts.width),
     ];
+    final grab = _zoneAt(p) == null
+        ? kGradientHandleGrab
+        : kGradientHandleGrabInZone;
     for (final (kind, at) in handles) {
-      if ((o.toScreen(at) - p).distance <= slop) {
+      if ((o.toScreen(at) - p).distance <= grab) {
         return (
           breakpointId: bp,
           rect: o,

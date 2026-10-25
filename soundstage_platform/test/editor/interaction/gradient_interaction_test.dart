@@ -130,4 +130,42 @@ void main() {
     final patch = h.node('a').common.breakpointOverrides['desktop']!;
     expect(patch.keys, ['fills.g.handles.end']);
   });
+
+  testWidgets('B5: a handle at a frame corner beats the rotate and resize '
+      'zones', (tester) async {
+    final h = await pumpCanvas(
+      tester,
+      doc: ir
+          .updateNode(
+            interactionDoc(),
+            'a',
+            (n) => ir.PropertyRegistry.standard.trySet(
+              n,
+              'fills',
+              const ir.IrValue.paints([
+                ir.Paint.gradient(
+                  id: 'g',
+                  kind: ir.GradientKind.radial,
+                  stops: _stops,
+                  handles: ir.GradientHandles(
+                    start: ir.StagePoint(x: 0.5, y: 0.5),
+                    end: ir.StagePoint(x: 1, y: 1),
+                  ),
+                ),
+              ]),
+            )!,
+          )
+          .document,
+    );
+    h.ctl.select({'a'});
+    h.canvas.gradientEdit.value = const GradientEditTarget('a', 'fills', 'g');
+    await tester.pump();
+    final rotation = h.node('a').common.rotation;
+    // 10 px outside the corner: inside the rotate zone, off the handle dot.
+    await h.drag(h.desk(210, 200), h.desk(180, 160));
+    expect(h.node('a').common.rotation, rotation, reason: 'did not rotate');
+    final g = _paint(h);
+    expect(g.handles.end.x, lessThan(1), reason: 'the end handle moved');
+    expect(g.handles.start, const ir.StagePoint(x: 0.5, y: 0.5));
+  });
 }
