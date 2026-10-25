@@ -45,6 +45,26 @@ class AssetActions {
     return files.isEmpty ? const [] : _insert.addToLibrary(files);
   }
 
+  /// Opens the picker for audio files, stores them (computing their
+  /// waveform peaks) and adds them to the library. The audio assets among
+  /// the files, or nothing when cancelled or refused.
+  Future<List<ir.Asset>> uploadAudio() async {
+    final files = await _ref.read(editorFilePickerProvider)(
+      accept: 'audio/*',
+      multiple: false,
+    );
+    if (files.isEmpty) return const [];
+    final assets = await _insert.addToLibrary(files);
+    final audio = [
+      for (final a in assets)
+        if (a.kind == ir.AssetKind.audio) a,
+    ];
+    if (audio.isEmpty && assets.isNotEmpty) {
+      _say('${files.first.name}: not an audio file.');
+    }
+    return audio;
+  }
+
   /// Opens the picker for one image, stores it and adds it to the library
   /// (the image fill chooser's *Upload…*). Null when cancelled or refused.
   Future<ir.Asset?> uploadImage() async {

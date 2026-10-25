@@ -4,6 +4,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../../core/core.dart';
+import 'audio_section.dart';
 import 'clocks_section.dart';
 
 // The active scene's settings, shown by the Inspector when nothing is
@@ -217,6 +218,7 @@ class SceneSettings extends ConsumerWidget {
               ],
             ),
           ),
+          AudioSection(scene: scene),
           ClocksSection(scene: scene),
         ],
       ),

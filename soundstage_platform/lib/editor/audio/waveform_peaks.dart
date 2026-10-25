@@ -73,10 +73,7 @@ class WaveformPeaks {
 /// are not a multiple of 100. Its value is the largest absolute sample of
 /// any channel, clamped to 1 and rounded to 0–255. A non-finite sample
 /// counts as silence.
-WaveformPeaks computeWaveformPeaks(
-  List<Float32List> channels,
-  int sampleRate,
-) {
+WaveformPeaks computeWaveformPeaks(List<Float32List> channels, int sampleRate) {
   if (channels.isEmpty || sampleRate <= 0) {
     return WaveformPeaks(Uint8List(0), 0);
   }
