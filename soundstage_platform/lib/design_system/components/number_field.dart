@@ -76,6 +76,12 @@ class _SsNumberFieldState extends State<SsNumberField> {
   final FocusNode _focus = FocusNode(debugLabel: 'SsNumberField');
   bool _hovered = false;
   bool _hasFocus = false;
+
+  /// Whether the text was typed since it was last committed or shown. Only
+  /// typed text commits on blur: after Enter (or a nudge) the field may stay
+  /// focused while its target changes (another node, another text range),
+  /// and the old number must not be written to the new target.
+  bool _dirty = false;
   bool _scrubbing = false;
   double _scrubStart = 0;
   double _scrubAccum = 0;
@@ -102,8 +108,9 @@ class _SsNumberFieldState extends State<SsNumberField> {
     if ((old.value != widget.value ||
             old.mixed != widget.mixed ||
             old.fractionDigits != widget.fractionDigits) &&
-        !_focus.hasFocus) {
+        (!_focus.hasFocus || !_dirty)) {
       _controller.text = _format();
+      if (_focus.hasFocus) _selectAll();
     }
   }
 
@@ -145,6 +152,11 @@ class _SsNumberFieldState extends State<SsNumberField> {
 
   /// Parses the text and applies it; invalid input reverts.
   void _commit() {
+    if (!_dirty) {
+      _controller.text = _format();
+      return;
+    }
+    _dirty = false;
     final text = _controller.text.trim();
     if (text.isEmpty) {
       _controller.text = _format();
@@ -161,6 +173,7 @@ class _SsNumberFieldState extends State<SsNumberField> {
   }
 
   void _cancel() {
+    _dirty = false;
     _controller.text = _format();
     _focus.unfocus();
   }
@@ -180,6 +193,7 @@ class _SsNumberFieldState extends State<SsNumberField> {
     );
     final base = parsed ?? _current ?? 0;
     final v = _clamp(base + dir * widget.step * _modifier);
+    _dirty = false;
     _controller.text = _format(v);
     _selectAll();
     _emit(v);
@@ -314,6 +328,7 @@ class _SsNumberFieldState extends State<SsNumberField> {
                     onKeyEvent: _onKey,
                     child: TextField(
                       controller: _controller,
+                      onChanged: (_) => _dirty = true,
                       focusNode: _focus,
                       enabled: enabled,
                       style: textStyle,
