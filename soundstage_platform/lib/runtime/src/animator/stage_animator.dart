@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
@@ -39,8 +41,14 @@ import 'text_style_tracks.dart';
 ///   immediately, so scroll-linked motion lands in the same frame as the
 ///   scroll (no one-frame lag).
 /// - **Edit mode** freezes clocks at [clockOverrides] (the editor's
-///   playhead; 0 when absent). Pointer and behaviour clocks are inert (0).
-///   The ticker never runs.
+///   playheads, one per clock; 0 when absent), with no smoothing: the
+///   playhead is the exact clock value. The ticker never runs. Changing the
+///   overrides evaluates only the clocks whose value changed and writes the
+///   render objects directly (no widget rebuild, no resolve).
+/// - **Incremental reloads.** [load] keeps the binding, and the compiled
+///   track, of every resolved track that kept its identity (the resolver
+///   memoises tracks whose source and target are unchanged), so an edit
+///   recompiles and rebinds only the tracks it touched.
 ///
 /// Nothing here calls `setState` or rebuilds widgets.
 class StageAnimator implements StageNodeListener {
@@ -70,6 +78,9 @@ class StageAnimator implements StageNodeListener {
   final List<_Clock> _clocks = [];
   final Map<String, _Clock> _byKey = {};
   final Map<String, List<_Binding>> _byTarget = {};
+
+  /// The binding of each loaded resolved track, by track identity.
+  Map<ir.Track, _Binding> _byTrack = LinkedHashMap.identity();
   final Map<String, _NodeTarget> _nodeTargets = {};
   final Map<String, List<StageBehaviorDriver>> _drivers = {};
   final Map<String, List<_Clock>> _scrollClocks = {};
@@ -80,7 +91,7 @@ class StageAnimator implements StageNodeListener {
 
   Map<String, double> _clockOverrides;
 
-  /// Edit mode: clock values by clock id (the editor's playhead).
+  /// Edit mode: clock values by clock id (the editor's playheads).
   Map<String, double> get clockOverrides => _clockOverrides;
   set clockOverrides(Map<String, double> value) {
     if (identical(value, _clockOverrides)) return;
@@ -97,6 +108,11 @@ class StageAnimator implements StageNodeListener {
 
   /// Number of compiled tracks (tests, diagnostics).
   int get trackCount => _byTarget.values.fold(0, (n, l) => n + l.length);
+
+  /// Number of tracks compiled since creation (tests: reloads recompile
+  /// only edited tracks).
+  int get compileCount => _compileCount;
+  int _compileCount = 0;
 
   /// Number of tracks whose target is currently attached.
   int get boundTrackCount {
@@ -115,17 +131,6 @@ class StageAnimator implements StageNodeListener {
   /// Clock state (timeline playheads, smoothing) survives for clocks that
   /// keep their scene, id and definition.
   void load(ir.ResolvedDocument doc) {
-    // Unbind the previous document's overrides.
-    for (final list in _byTarget.values) {
-      for (final b in list) {
-        final box = b.box;
-        if (box != null && b.slot >= 0) box.setAnimatedSlot(b.slot, double.nan);
-        b.unbindTyped();
-      }
-    }
-    for (final t in _nodeTargets.values) {
-      t.box?.nodeAnimator = null;
-    }
     _drivers.forEach((id, list) {
       final box = registry[id];
       if (box == null) return;
@@ -135,14 +140,19 @@ class StageAnimator implements StageNodeListener {
     });
     _drivers.clear();
     _byTarget.clear();
+    final previousTargets = Map.of(_nodeTargets);
     _nodeTargets.clear();
     _scrollClocks.clear();
     _sceneClocks.clear();
     _dirty.clear();
+    final previousBindings = _byTrack;
+    _byTrack = LinkedHashMap.identity();
 
     final previous = Map.of(_byKey);
     _clocks.clear();
     _byKey.clear();
+    // Nodes whose bindings changed: rebound once the new tables are built.
+    final touched = <String>{};
     for (final scene in doc.scenes) {
       for (final clock in scene.clocks) {
         final key = '${scene.id}\u0000${clock.id}';
@@ -197,16 +207,27 @@ class StageAnimator implements StageNodeListener {
       for (final track in scene.tracks) {
         final clock = _byKey['${scene.id}\u0000${track.clockId}'];
         if (clock == null) continue;
-        final compiled = CompiledTrack.compile(track, registry: properties);
-        if (compiled.match == null || compiled.keyframes.isEmpty) continue;
-        final slot = RenderStageBox.slotForPath(track.property);
-        final binding = _Binding(compiled, track.target, slot, clock);
+        var binding = previousBindings.remove(track);
+        if (binding != null && !identical(binding.clock, clock)) {
+          // Its clock was redefined: drop it (unbound below), compile anew.
+          previousBindings[track] = binding;
+          binding = null;
+        }
+        if (binding == null) {
+          final compiled = CompiledTrack.compile(track, registry: properties);
+          _compileCount++;
+          if (compiled.match == null || compiled.keyframes.isEmpty) continue;
+          final slot = RenderStageBox.slotForPath(track.property);
+          binding = _Binding(compiled, track.target, slot, clock);
+          touched.add(track.target);
+        }
+        _byTrack[track] = binding;
         clock.bindings.add(binding);
         (_byTarget[track.target] ??= []).add(binding);
-        if (slot < 0) {
-          final target = _nodeTargets[track.target] ??= _NodeTarget(
-            track.target,
-          );
+        if (binding.slot < 0) {
+          final target = _nodeTargets[track.target] ??=
+              (previousTargets.remove(track.target)?..bindings.clear()) ??
+              _NodeTarget(track.target);
           target.bindings.add(binding);
           binding.node = target;
         }
@@ -215,9 +236,31 @@ class StageAnimator implements StageNodeListener {
     for (final old in previous.values) {
       old.source.dispose();
     }
-    for (final id in {..._byTarget.keys, ..._drivers.keys}) {
+    // Unbind the tracks that are gone (edited, removed, or on a redefined
+    // clock).
+    for (final b in previousBindings.values) {
+      final box = b.box;
+      if (box != null && b.slot >= 0) box.setAnimatedSlot(b.slot, double.nan);
+      b.unbindTyped();
+      b.box = null;
+      touched.add(b.targetId);
+    }
+    // Node-level targets that lost all their bindings.
+    for (final t in previousTargets.values) {
+      if (_nodeTargets.containsKey(t.id)) continue;
+      final box = t.box;
+      if (box != null && identical(box.nodeAnimator, t.animate)) {
+        box.nodeAnimator = null;
+      }
+      t.box = null;
+    }
+    // Rebind the touched nodes; untouched nodes keep their bindings as they
+    // are. Behaviour targets always rebind (drivers are rebuilt).
+    for (final id in {...touched, ..._drivers.keys}) {
       final box = registry[id];
-      if (box != null) nodeAttached(box);
+      if (box == null) continue;
+      nodeAttached(box);
+      if (_nodeTargets.containsKey(id)) box.refreshAnimatedNode();
     }
     _flush();
     _scheduleIfActive();
@@ -235,10 +278,7 @@ class StageAnimator implements StageNodeListener {
     return c;
   }
 
-  double _frozenValue(_Clock c) => switch (c.clock) {
-    ir.PointerClock() || ir.BehaviorClock() => 0,
-    _ => _clockOverrides[c.clock.id] ?? 0,
-  };
+  double _frozenValue(_Clock c) => _clockOverrides[c.clock.id] ?? 0;
 
   // ---- Binding ------------------------------------------------------------------
 

@@ -155,6 +155,9 @@ abstract class RenderStageBox extends RenderBox {
 
   ir.Node Function(ir.Node resolved)? _nodeAnimator;
 
+  /// The node-level animated override, if any.
+  ir.Node Function(ir.Node resolved)? get nodeAnimator => _nodeAnimator;
+
   /// Sets (or clears, with null) the node-level animated override and
   /// re-renders the node through it.
   set nodeAnimator(ir.Node Function(ir.Node resolved)? value) {
