@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/foundation.dart' show mapEquals, setEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -126,7 +126,11 @@ class EditorController extends Notifier<EditorState> {
     final s = state;
     final r = command.apply(s);
     if (!r.ok || !r.changed) {
-      if (r.ok && r.selectionAfter != null) {
+      // A no-op keeps the state as it is (text editing included) unless it
+      // names another selection.
+      if (r.ok &&
+          r.selectionAfter != null &&
+          !setEquals(r.selectionAfter, s.selection)) {
         select(r.selectionAfter!);
       }
       return r;

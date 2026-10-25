@@ -189,17 +189,15 @@ class TextTargetWriter extends PropertyWriter {
       );
     }
     if (t.collapsed) {
-      final i = nodes.ids.indexOf(t.nodeId);
-      final n = i < 0 ? null : nodes.authored[i];
-      final empty =
-          n is ir.TextNode &&
-          n.content.isNotEmpty &&
-          paragraphLength(n.content[pointOf(n.content, t.start).paragraph]) ==
-              0;
-      if (!empty) {
-        session?.addPendingStyle({rel: value});
-        return null;
-      }
+      // A caret with nothing selected: the inspector styles the whole text
+      // (Figma; keyboard shortcuts set the typing style instead).
+      return StyleTextNodes(
+        [t.nodeId],
+        rel,
+        value,
+        resolved: resolved,
+        coalesceKey: key,
+      );
     }
     final rn = resolved(t.nodeId);
     return StyleTextRange(

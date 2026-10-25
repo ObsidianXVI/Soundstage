@@ -164,19 +164,20 @@ void main() {
     expect(c.read(editorControllerProvider).textEditId, 't');
   });
 
-  testWidgets('in edit mode a collapsed caret sets the typing style', (
+  testWidgets('in edit mode a collapsed caret styles the whole text', (
     tester,
   ) async {
     final c = await _pump(tester);
     final s = _edit(c, const TextSelection.collapsed(offset: 3));
     await tester.pump();
-    final before = c.read(editorControllerProvider).document;
     await typeInto(tester, 'style.fontSize', '40');
-    expect(
-      identical(c.read(editorControllerProvider).document, before),
-      isTrue,
-    );
-    expect(s.pendingStyle, {'fontSize': const ir.IrValue.number(40)});
+    expect(_t(c).style.fontSize, 40);
+    for (final p in _t(c).content) {
+      for (final span in p.spans) {
+        expect(span.style.fontSize, anyOf(isNull, 40));
+      }
+    }
+    expect(s.pendingStyle, isEmpty);
     expect(_num(tester, 'style.fontSize').value, 40);
   });
 

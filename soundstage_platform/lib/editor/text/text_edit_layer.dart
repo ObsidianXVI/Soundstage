@@ -99,6 +99,25 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
       ..onKeyEvent = _onKey
       ..addListener(_focusChanged);
     _c.camera.addListener(_decorate);
+    FocusManager.instance.addListener(_onPrimaryFocus);
+  }
+
+  bool _chromeHadFocus = false;
+
+  /// While text is being edited, a chrome text field (an inspector field)
+  /// that commits or cancels hands focus back to the text, so typing goes
+  /// on where it was (Figma).
+  void _onPrimaryFocus() {
+    final chrome = primaryFocusIsChromeTextInput();
+    final s = _session;
+    if (_chromeHadFocus && !chrome && s != null && s.alive) {
+      scheduleMicrotask(() {
+        if (mounted && identical(_session, s) && s.alive && !_focus.hasFocus) {
+          _focus.requestFocus();
+        }
+      });
+    }
+    _chromeHadFocus = chrome;
   }
 
   @override
@@ -108,6 +127,7 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
     GestureBinding.instance.pointerRouter.removeGlobalRoute(_onGlobalPointer);
     HardwareKeyboard.instance.removeHandler(_typeToStart);
     _c.camera.removeListener(_decorate);
+    FocusManager.instance.removeListener(_onPrimaryFocus);
     _focus.dispose();
     _labels.dispose();
     super.dispose();
