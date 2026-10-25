@@ -17,6 +17,8 @@ import '../inspector/inspector.dart';
 import '../panels/assets_panel.dart';
 import '../panels/layers_panel.dart';
 import '../panels/scenes_panel.dart';
+import '../preview/preview_split.dart';
+import '../preview/preview_state.dart';
 import '../shortcuts/editor_shortcuts.dart';
 import '../shortcuts/intents.dart';
 import '../shortcuts/shortcut_help.dart';
@@ -43,6 +45,7 @@ class EditorShell extends StatelessWidget {
     this.saveStatus,
     this.assetService,
     this.filePicker,
+    this.onOpenPreviewInNewTab,
     super.key,
   });
 
@@ -50,8 +53,15 @@ class EditorShell extends StatelessWidget {
   final ir.StageDocument document;
   final VoidCallback onBack;
 
-  /// Opens the player for this story (`/play/:id`).
+  /// Opens the full-window player for this story (`/play/:id`). The toolbar's
+  /// Preview button toggles the split preview instead; this is what a
+  /// Cmd/Ctrl-click falls back to when [onOpenPreviewInNewTab] is not given,
+  /// and what content mode plays with.
   final VoidCallback onPreview;
+
+  /// Opens `/play/:id` in a new browser tab (Cmd/Ctrl-click on Preview and
+  /// the preview pane's "open in new tab" control). The app supplies it.
+  final VoidCallback? onOpenPreviewInNewTab;
 
   /// Called with the new document after every change (edits, undo, redo).
   final ValueChanged<ir.StageDocument>? onDocumentChanged;
@@ -82,6 +92,7 @@ class EditorShell extends StatelessWidget {
       child: _EditorScope(
         onBack: onBack,
         onPreview: onPreview,
+        onOpenPreviewInNewTab: onOpenPreviewInNewTab,
         onDocumentChanged: onDocumentChanged,
         onSave: onSave,
         saveStatus: saveStatus,
@@ -95,6 +106,7 @@ class _EditorScope extends ConsumerWidget {
   const _EditorScope({
     required this.onBack,
     required this.onPreview,
+    required this.onOpenPreviewInNewTab,
     required this.onDocumentChanged,
     required this.onSave,
     required this.saveStatus,
@@ -102,6 +114,7 @@ class _EditorScope extends ConsumerWidget {
 
   final VoidCallback onBack;
   final VoidCallback onPreview;
+  final VoidCallback? onOpenPreviewInNewTab;
   final ValueChanged<ir.StageDocument>? onDocumentChanged;
   final VoidCallback? onSave;
   final Widget? saveStatus;
@@ -135,6 +148,7 @@ class _EditorScope extends ConsumerWidget {
             width: box.maxWidth,
             onBack: onBack,
             onPreview: onPreview,
+            onOpenPreviewInNewTab: onOpenPreviewInNewTab,
             onSave: onSave,
             saveStatus: saveStatus,
           ),
@@ -188,6 +202,7 @@ class _DockedEditor extends ConsumerWidget {
     required this.width,
     required this.onBack,
     required this.onPreview,
+    required this.onOpenPreviewInNewTab,
     required this.onSave,
     required this.saveStatus,
   });
@@ -197,6 +212,7 @@ class _DockedEditor extends ConsumerWidget {
   final double width;
   final VoidCallback onBack;
   final VoidCallback onPreview;
+  final VoidCallback? onOpenPreviewInNewTab;
   final VoidCallback? onSave;
   final Widget? saveStatus;
 
@@ -225,6 +241,18 @@ class _DockedEditor extends ConsumerWidget {
     );
 
     void help() => showShortcutHelp(context);
+
+    /// Preview toggles the split; Cmd/Ctrl-click opens the full player in a
+    /// new tab instead.
+    void preview() {
+      final keys = HardwareKeyboard.instance;
+      if (keys.isMetaPressed || keys.isControlPressed) {
+        (onOpenPreviewInNewTab ?? onPreview)();
+      } else {
+        ref.read(previewProvider.notifier).toggle();
+      }
+    }
+
     final editor = ref.read(editorControllerProvider.notifier);
     final canvas = ref.read(canvasControllerProvider);
     final clip = ref.read(clipboardActionsProvider);
@@ -246,7 +274,7 @@ class _DockedEditor extends ConsumerWidget {
             (_) => notifier.toggleTimeline(),
           ),
           PreviewIntent: EditorShortcutAction<PreviewIntent>(
-            (_) => onPreview(),
+            (_) => ref.read(previewProvider.notifier).toggle(),
           ),
           SaveIntent: EditorShortcutAction<SaveIntent>((_) => onSave?.call()),
           CopyIntent: ClipboardShortcutAction<CopyIntent>(
@@ -292,7 +320,7 @@ class _DockedEditor extends ConsumerWidget {
                 EditorToolbar(
                   title: title,
                   onBack: onBack,
-                  onPreview: onPreview,
+                  onPreview: preview,
                   onHelp: help,
                   saveStatus: saveStatus,
                 ),
@@ -313,7 +341,12 @@ class _DockedEditor extends ConsumerWidget {
                           onReset: () => notifier.setLeftWidth(264),
                         ),
                       ],
-                      const Expanded(child: EditorCanvas()),
+                      Expanded(
+                        child: PreviewSplit(
+                          canvas: const EditorCanvas(),
+                          onOpenInNewTab: onOpenPreviewInNewTab,
+                        ),
+                      ),
                       if (layout.rightOpen) ...[
                         ResizeHandle(
                           semanticLabel: 'Resize inspector',

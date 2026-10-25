@@ -353,7 +353,19 @@ class StageAudioService {
   }
 
   void _applyVolume(StageAudioTrackState s) =>
-      unawaited(s.backend.setVolume(s.track.volume * s.gain));
+      unawaited(s.backend.setVolume(_muted ? 0 : s.track.volume * s.gain));
+
+  bool _muted = false;
+
+  /// Silences every track without pausing it (the editor preview's mute).
+  bool get muted => _muted;
+  set muted(bool value) {
+    if (_muted == value) return;
+    _muted = value;
+    for (final s in _tracks.values) {
+      if (s.loaded) _applyVolume(s);
+    }
+  }
 
   /// Steps fades by [dt] seconds, and starts the end-of-track fade-out of
   /// tracks that do not loop.

@@ -219,12 +219,16 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('Preview and Back call back', (tester) async {
+  testWidgets('Preview toggles the split; Back calls back', (tester) async {
     final log = <String>[];
     await _pump(tester, const Size(1440, 900), log: log);
+    final pane = find.byKey(const ValueKey<String>('preview-pane'));
+    expect(pane, findsNothing);
     await tester.tap(find.text('Preview'));
+    await tester.pump();
+    expect(pane, findsOneWidget);
     await tester.tap(_glyph(SsIcons.arrowLeft));
-    expect(log, ['preview', 'back']);
+    expect(log, ['back']);
   });
 
   for (final size in [
