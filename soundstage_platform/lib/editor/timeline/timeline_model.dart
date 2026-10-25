@@ -30,15 +30,30 @@ final class GroupRow extends TimelineRow {
   const GroupRow(
     super.nodeId, {
     required this.name,
-    required this.trackIds,
+    required this.tracks,
     required this.collapsed,
   });
 
   final String name;
 
   /// The group's tracks, in lane order (for the summary diamonds).
-  final List<String> trackIds;
+  final List<ir.Track> tracks;
   final bool collapsed;
+
+  /// Whether [other] shows the same thing (same name, state and tracks by
+  /// identity), so the previous row object can be kept.
+  bool sameAs(GroupRow other) {
+    if (other.nodeId != nodeId ||
+        other.name != name ||
+        other.collapsed != collapsed ||
+        other.tracks.length != tracks.length) {
+      return false;
+    }
+    for (var i = 0; i < tracks.length; i++) {
+      if (!identical(other.tracks[i], tracks[i])) return false;
+    }
+    return true;
+  }
 }
 
 /// One animated property of a node: a track and its keyframes.
@@ -50,6 +65,41 @@ final class LaneRow extends TimelineRow {
   /// The registry's display name, plus the breakpoint for a
   /// breakpoint-specific track ("Opacity · Mobile").
   final String label;
+
+  /// Whether [other] shows the same thing (see [GroupRow.sameAs]).
+  bool sameAs(LaneRow other) =>
+      other.nodeId == nodeId &&
+      identical(other.track, track) &&
+      other.label == label;
+}
+
+/// [next] with every row that shows the same as a row of [previous]
+/// replaced by that previous object, so unchanged rows keep their identity
+/// (and their widgets skip rebuilding) across edits.
+List<TimelineRow> reuseTimelineRows(
+  List<TimelineRow> previous,
+  List<TimelineRow> next,
+) {
+  if (previous.isEmpty) return next;
+  final groups = <String, GroupRow>{};
+  final lanes = <String, LaneRow>{};
+  for (final r in previous) {
+    switch (r) {
+      case GroupRow():
+        groups[r.nodeId] = r;
+      case LaneRow():
+        lanes[r.track.id] = r;
+    }
+  }
+  return [
+    for (final r in next)
+      switch (r) {
+        GroupRow() =>
+          (groups[r.nodeId]?.sameAs(r) ?? false) ? groups[r.nodeId]! : r,
+        LaneRow() =>
+          (lanes[r.track.id]?.sameAs(r) ?? false) ? lanes[r.track.id]! : r,
+      },
+  ];
 }
 
 /// The name of node [id] (authored, or `<instance> / <inner>` inside an
@@ -123,7 +173,7 @@ List<TimelineRow> buildTimelineRows(
       GroupRow(
         id,
         name: timelineNodeName(index, id),
-        trackIds: [for (final t in tracks) t.id],
+        tracks: tracks,
         collapsed: closed,
       ),
     );

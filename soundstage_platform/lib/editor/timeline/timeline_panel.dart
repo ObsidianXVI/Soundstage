@@ -308,13 +308,15 @@ class _Header extends ConsumerWidget {
     final autoKey = ref.watch(
       editorControllerProvider.select((s) => s.autoKey),
     );
-    final scene = ref.watch(
-      editorControllerProvider.select((s) => s.activeScene),
-    );
+    // The scene's clocks, by value (a few): keyframe edits and scrubbing
+    // don't rebuild the header.
+    ref.watch(editorControllerProvider.select((s) => s.activeScene?.clocks));
     final clockId = ref.watch(
       editorControllerProvider.select((s) => s.activeClockId),
     );
-    final doc = ref.read(editorControllerProvider).document;
+    final st = ref.read(editorControllerProvider);
+    final doc = st.document;
+    final scene = st.activeScene;
     final clock = scene?.clocks.where((k) => k.id == clockId).firstOrNull;
     final span = scene == null || clock == null
         ? null
@@ -531,6 +533,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
 
   TimelineController get _tl => ref.read(timelineControllerProvider);
   EditorController get _editor => ref.read(editorControllerProvider.notifier);
+  final Expando<_RowTile> _tiles = Expando('timeline row tile');
+
+  void _selectNode(String id) => _editor.select({id});
+
   TimelineActions get _actions =>
       TimelineActions(_editor, _tl, () => ref.read(editorControllerProvider));
 
@@ -993,7 +999,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
           scene,
           clock,
           clockSpan(doc, scene, clock),
-          buildTimelineRows(doc, scene, clock.id, collapsed: collapsed),
+          reuseTimelineRows(
+            _model?.rows ?? const [],
+            buildTimelineRows(doc, scene, clock.id, collapsed: collapsed),
+          ),
         );
         return TapRegion(
           onTapOutside: (_) {
@@ -1057,16 +1066,23 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
           controller: _rows,
           itemExtent: kTimelineRowHeight,
           itemCount: m.rows.length,
-          itemBuilder: (context, i) => _RowTile(
-            key: ValueKey<String>(switch (m.rows[i]) {
-              GroupRow(:final nodeId) => 'group:$nodeId',
-              LaneRow(:final track) => 'lane:${track.id}',
-            }),
-            row: m.rows[i],
-            viewKey: m.viewKey,
-            onToggle: tl.toggleGroup,
-            onSelectNode: (id) => _editor.select({id}),
-          ),
+          // Tiles are kept per row object: an edit rebuilds the rows it
+          // changed only.
+          itemBuilder: (context, i) {
+            final row = m.rows[i];
+            final kept = _tiles[row];
+            if (kept != null && kept.viewKey == m.viewKey) return kept;
+            return _tiles[row] = _RowTile(
+              key: ValueKey<String>(switch (row) {
+                GroupRow(:final nodeId) => 'group:$nodeId',
+                LaneRow(:final track) => 'lane:${track.id}',
+              }),
+              row: row,
+              viewKey: m.viewKey,
+              onToggle: tl.toggleGroup,
+              onSelectNode: _selectNode,
+            );
+          },
         ),
         Positioned(
           left: kTimelineLabelWidth,
@@ -1354,7 +1370,6 @@ class _RowTile extends ConsumerWidget {
                 viewKey: viewKey,
                 timeline: tl,
                 colors: c,
-                scene: ref.read(editorControllerProvider).activeScene,
               ),
               child: const SizedBox.expand(),
             ),
@@ -1372,14 +1387,12 @@ class _LanePainter extends CustomPainter {
     required this.viewKey,
     required this.timeline,
     required this.colors,
-    required this.scene,
   }) : super(repaint: Listenable.merge([timeline.views, timeline.selection]));
 
   final TimelineRow row;
   final String viewKey;
   final TimelineController timeline;
   final SsColors colors;
-  final ir.Scene? scene;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1394,8 +1407,7 @@ class _LanePainter extends CustomPainter {
     final row = this.row;
     if (row is GroupRow) {
       final dot = Paint()..color = colors.textDisabled;
-      for (final t in scene?.tracks ?? const <ir.Track>[]) {
-        if (!row.trackIds.contains(t.id)) continue;
+      for (final t in row.tracks) {
         for (final k in t.keyframes) {
           final x = v.xOf(k.t);
           if (x < -4 || x > size.width + 4) continue;
@@ -1453,8 +1465,7 @@ class _LanePainter extends CustomPainter {
   bool shouldRepaint(_LanePainter old) =>
       !identical(old.row, row) ||
       old.viewKey != viewKey ||
-      old.colors != colors ||
-      !identical(old.scene, scene);
+      old.colors != colors;
 }
 
 /// The playhead line, the snap guide and the box-select rectangle over the

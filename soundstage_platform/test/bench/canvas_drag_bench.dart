@@ -147,7 +147,10 @@ void main() {
       final w = Stopwatch()..start();
       ctl.execute(
         SetProperty.values({
-          target: {'x': IrValue.number(520.0 + i), 'y': const IrValue.number(180)},
+          target: {
+            'x': IrValue.number(520.0 + i),
+            'y': const IrValue.number(180),
+          },
         }),
       );
       final rw = Stopwatch()..start();
