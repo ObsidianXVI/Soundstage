@@ -479,4 +479,46 @@ void main() {
       expect(_stageTop(c, 'b-root'), 0);
     });
   });
+
+  testWidgets('the overlay stays put, passes pointers through where it is '
+      'empty, and its layers take taps', (tester) async {
+    final doc = _doc([
+      _pinned('a', scrollLength: 1),
+      _pinned('b', scrollLength: 1),
+    ]).copyWith(
+      overlay: const ir.FrameNode(
+        common: ir.NodeCommon(id: 'ov', width: 800, height: 600),
+        children: [
+          ir.ShapeNode(
+            common: ir.NodeCommon(
+              id: 'badge',
+              width: 100,
+              height: 50,
+              interactions: [
+                ir.Interaction(
+                  id: 'i',
+                  trigger: ir.InteractionTrigger.tap(),
+                  actions: [ir.Action.scrollToScene(sceneId: 'b')],
+                ),
+              ],
+            ),
+            appearance: ir.Appearance(
+              fills: [ir.Paint.solid(id: 'f', color: ir.StageColor.black)],
+            ),
+          ),
+        ],
+      ),
+    );
+    final c = await _pump(tester, doc);
+    expect(c.nodes!['badge'], isNotNull);
+    // A drag on empty overlay scrolls the story.
+    await tester.dragFrom(const Offset(400, 400), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(c.scrollController!.offset, greaterThan(100));
+    expect(c.nodes!['badge']!.localToGlobal(Offset.zero), Offset.zero);
+    // The badge's tap goes to scene b.
+    await tester.tapAt(const Offset(50, 25));
+    await tester.pumpAndSettle();
+    expect(c.scrollController!.offset, 1200);
+  });
 }

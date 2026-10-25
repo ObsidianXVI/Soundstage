@@ -19,6 +19,7 @@ import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
 import '../widgets/stage_behaviors.dart' show showStageLightbox;
 import '../widgets/stage_node_widget.dart';
+import '../widgets/stage_overlay.dart';
 import '../widgets/stage_scene_view.dart';
 import 'scroll_anchor.dart';
 import 'sliver_stage_scene.dart';
@@ -675,13 +676,25 @@ class _StagePlayerState extends State<StagePlayer>
                       container: true,
                       textDirection: TextDirection.ltr,
                       child: _withPointerTriggers(
-                        CustomScrollView(
-                          controller: _scroll,
-                          physics: widget.physics,
-                          scrollCacheExtent: ScrollCacheExtent.viewport(
-                            widget.lazyWindow,
-                          ),
-                          slivers: _slivers,
+                        Stack(
+                          children: [
+                            CustomScrollView(
+                              controller: _scroll,
+                              physics: widget.physics,
+                              scrollCacheExtent: ScrollCacheExtent.viewport(
+                                widget.lazyWindow,
+                              ),
+                              slivers: _slivers,
+                            ),
+                            if (_resolved?.overlay case final overlay?)
+                              Positioned.fill(
+                                child: StageOverlayView(
+                                  root: overlay,
+                                  viewportSize: viewport,
+                                  breakpoint: _resolved!.breakpoint,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
