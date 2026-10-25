@@ -446,9 +446,10 @@ void main() {
   group('scene transitions (T3.7)', () {
     ir.StageDocument twoScenes(ir.SceneTransitionKind kind) => _doc([
       _pinned('a', scrollLength: 1),
-      _pinned('b', scrollLength: 1).copyWith(
-        transitionIn: ir.SceneTransition(kind: kind, amount: 0.5),
-      ),
+      _pinned(
+        'b',
+        scrollLength: 1,
+      ).copyWith(transitionIn: ir.SceneTransition(kind: kind, amount: 0.5)),
     ]);
 
     testWidgets('overlap: the next scene slides over the still-pinned stage', (
@@ -463,52 +464,66 @@ void main() {
       expect(_stageTop(c, 'b-root'), 0);
     });
 
-    testWidgets('crossfade: the next scene fades in at the top', (tester) async {
+    testWidgets('overlap: the outgoing scene paints only above the '
+        'incoming one (the viewport paints later slivers underneath)', (
+      tester,
+    ) async {
+      final c = await _pump(tester, twoScenes(ir.SceneTransitionKind.overlap));
+      await _scrollTo(tester, c, 600);
+      expect(_sliver(tester, 0).clipBottom, 300);
+      await _scrollTo(tester, c, 100);
+      expect(_sliver(tester, 0).clipBottom, isNull);
+    });
+
+    testWidgets('crossfade: the next scene is held at the top under the '
+        'outgoing one, which fades out', (tester) async {
       final c = await _pump(
         tester,
         twoScenes(ir.SceneTransitionKind.crossfade),
       );
       await _scrollTo(tester, c, 600);
       expect(_stageTop(c, 'b-root'), 0);
-      expect(_sliver(tester, 1).fade, 0);
+      expect(_sliver(tester, 0).fade, 1);
       await _scrollTo(tester, c, 750);
-      expect(_sliver(tester, 1).fade, closeTo(0.5, 1e-9));
+      expect(_sliver(tester, 0).fade, closeTo(0.5, 1e-9));
       expect(_stageTop(c, 'a-root'), 0);
+      expect(_stageTop(c, 'b-root'), 0);
       await _scrollTo(tester, c, 900);
-      expect(_sliver(tester, 1).fade, 1);
+      expect(_sliver(tester, 0).fade, 0);
       expect(_stageTop(c, 'b-root'), 0);
     });
   });
 
   testWidgets('the overlay stays put, passes pointers through where it is '
       'empty, and its layers take taps', (tester) async {
-    final doc = _doc([
-      _pinned('a', scrollLength: 1),
-      _pinned('b', scrollLength: 1),
-    ]).copyWith(
-      overlay: const ir.FrameNode(
-        common: ir.NodeCommon(id: 'ov', width: 800, height: 600),
-        children: [
-          ir.ShapeNode(
-            common: ir.NodeCommon(
-              id: 'badge',
-              width: 100,
-              height: 50,
-              interactions: [
-                ir.Interaction(
-                  id: 'i',
-                  trigger: ir.InteractionTrigger.tap(),
-                  actions: [ir.Action.scrollToScene(sceneId: 'b')],
+    final doc =
+        _doc([
+          _pinned('a', scrollLength: 1),
+          _pinned('b', scrollLength: 1),
+        ]).copyWith(
+          overlay: const ir.FrameNode(
+            common: ir.NodeCommon(id: 'ov', width: 800, height: 600),
+            children: [
+              ir.ShapeNode(
+                common: ir.NodeCommon(
+                  id: 'badge',
+                  width: 100,
+                  height: 50,
+                  interactions: [
+                    ir.Interaction(
+                      id: 'i',
+                      trigger: ir.InteractionTrigger.tap(),
+                      actions: [ir.Action.scrollToScene(sceneId: 'b')],
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            appearance: ir.Appearance(
-              fills: [ir.Paint.solid(id: 'f', color: ir.StageColor.black)],
-            ),
+                appearance: ir.Appearance(
+                  fills: [ir.Paint.solid(id: 'f', color: ir.StageColor.black)],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
     final c = await _pump(tester, doc);
     expect(c.nodes!['badge'], isNotNull);
     // A drag on empty overlay scrolls the story.

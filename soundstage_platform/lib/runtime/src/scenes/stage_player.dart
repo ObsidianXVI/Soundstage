@@ -414,11 +414,9 @@ class _StagePlayerState extends State<StagePlayer>
           transitionIn: i == 0
               ? const ir.SceneTransition()
               : scene.transitionIn,
-          overlapNext:
-              i + 1 < scenes.length &&
-                  scenes[i + 1].transitionIn.kind != ir.SceneTransitionKind.none
-              ? scenes[i + 1].transitionIn.amount
-              : 0,
+          nextTransition: i + 1 < scenes.length
+              ? scenes[i + 1].transitionIn
+              : const ir.SceneTransition(),
           estimatedExtent: scene.root.node.common.height,
           windowViewports: widget.lazyWindow,
           content: (scene, viewport, resolved.breakpoint),

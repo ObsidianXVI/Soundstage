@@ -98,7 +98,7 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
     this.windowViewports = 1,
     this.onLayout,
     this.transitionIn = const ir.SceneTransition(),
-    this.overlapNext = 0,
+    this.nextTransition = const ir.SceneTransition(),
   });
 
   final ir.SceneKind kind;
@@ -106,9 +106,9 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
   /// How this scene enters over the previous one (§3.2, m3.md T3.7).
   final ir.SceneTransition transitionIn;
 
-  /// The next scene's transition amount (viewport heights; 0 when it has
-  /// none): it comes in over this scene's last [overlapNext] viewports.
-  final double overlapNext;
+  /// The next scene's transition: it comes in over this scene's last
+  /// `amount` viewports.
+  final ir.SceneTransition nextTransition;
 
   /// Pinned scenes: the pin range in viewport heights.
   final double scrollLength;
@@ -142,7 +142,7 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
           onLayout: onLayout,
         )
         ..transitionIn = transitionIn
-        ..overlapNext = overlapNext;
+        ..nextTransition = nextTransition;
 
   @override
   void updateRenderObject(
@@ -156,7 +156,7 @@ class SliverStageScene extends AbstractLayoutBuilder<bool> {
       ..windowViewports = windowViewports
       ..onLayout = onLayout
       ..transitionIn = transitionIn
-      ..overlapNext = overlapNext;
+      ..nextTransition = nextTransition;
   }
 }
 
@@ -216,19 +216,34 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
     markNeedsLayout();
   }
 
-  double _overlapNext = 0;
-  set overlapNext(double value) {
-    if (value == _overlapNext) return;
-    _overlapNext = value;
+  ir.SceneTransition _nextTransition = const ir.SceneTransition();
+  set nextTransition(ir.SceneTransition value) {
+    if (value == _nextTransition) return;
+    _nextTransition = value;
     markNeedsLayout();
   }
 
-  /// The incoming crossfade's opacity (1 outside a crossfade).
+  // The viewport paints later slivers *under* earlier ones, so a transition
+  // is drawn by the outgoing scene: for a slide-over it paints only above
+  // the incoming scene's top edge; for a crossfade it fades out over the
+  // incoming scene, which is held at the viewport top (an exact linear
+  // crossfade, the incoming stage being opaque underneath).
+
+  /// This scene's opacity while the next one crossfades in (1 otherwise).
   double _fade = 1;
+
+  /// Where the next scene's top is, from this sliver's paint origin, while
+  /// it slides over this one (null otherwise).
+  double? _clipBottom;
 
   @visibleForTesting
   double get fade => _fade;
+
+  @visibleForTesting
+  double? get clipBottom => _clipBottom;
+
   final LayerHandle<OpacityLayer> _fadeLayer = LayerHandle<OpacityLayer>();
+  final LayerHandle<ClipRectLayer> _clipLayer = LayerHandle<ClipRectLayer>();
 
   bool _inWindow = false;
   double? _measuredExtent;
@@ -296,23 +311,32 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
     // last `overlapNext` viewports: this scene lays out shorter by that
     // much (the next starts earlier) but still paints its full extent
     // underneath, and a pinned stage stays pinned until it is covered.
-    final overlap = (_overlapNext * vh).clamp(0.0, extent);
+    final next = _nextTransition;
+    final overlap = next.kind == ir.SceneTransitionKind.none
+        ? 0.0
+        : (next.amount * vh).clamp(0.0, extent);
     final layoutTo = extent - overlap;
     if (overlap > 0 && _kind == ir.SceneKind.pinned) {
       final hold = math.max(vh * math.max(0.0, _scrollLength), layoutTo);
       _childPosition = s <= hold ? 0 : hold - s;
     }
-    // A crossfading scene holds its stage at the viewport top and fades in
-    // while its top travels the last `amount` viewports up to the top.
     _fade = 1;
+    _clipBottom = null;
+    if (overlap > 0) {
+      // The next scene's top, from this sliver's paint origin.
+      final nextTop = layoutTo - s;
+      if (next.kind == ir.SceneTransitionKind.crossfade) {
+        if (nextTop < overlap) _fade = (nextTop / overlap).clamp(0.0, 1.0);
+      } else if (nextTop < vh) {
+        _clipBottom = math.max(0.0, nextTop);
+      }
+    }
+    // An incoming crossfade holds its stage at the viewport top while its
+    // top travels the last `amount` viewports up to it.
     final t = _transitionIn;
     if (t.kind == ir.SceneTransitionKind.crossfade && t.amount > 0 && s <= 0) {
       final top = vh - c.remainingPaintExtent;
-      final span = t.amount * vh;
-      if (top > 0) {
-        _childPosition = -top;
-        _fade = (1 - top / span).clamp(0.0, 1.0);
-      }
+      if (top > 0 && top <= t.amount * vh) _childPosition = -top;
     }
 
     final paintExtent = calculatePaintOffset(c, from: 0, to: extent);
@@ -361,6 +385,23 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    final clip = _clipBottom;
+    if (clip != null) {
+      _fadeLayer.layer = null;
+      if (clip <= 0) {
+        _clipLayer.layer = null;
+        return;
+      }
+      _clipLayer.layer = context.pushClipRect(
+        needsCompositing,
+        offset,
+        Rect.fromLTWH(0, 0, constraints.crossAxisExtent, clip),
+        super.paint,
+        oldLayer: _clipLayer.layer,
+      );
+      return;
+    }
+    _clipLayer.layer = null;
     if (_fade >= 1) {
       _fadeLayer.layer = null;
       super.paint(context, offset);
@@ -381,6 +422,7 @@ class RenderSliverStageScene extends RenderSliverSingleBoxAdapter
   @override
   void dispose() {
     _fadeLayer.layer = null;
+    _clipLayer.layer = null;
     super.dispose();
   }
 }
