@@ -92,6 +92,34 @@ class StageAnimator implements StageNodeListener {
     _flush();
   }
 
+  bool _reducedMotion = false;
+
+  /// `prefers-reduced-motion`: clock smoothing is off (scroll-driven
+  /// tracks still map straight to the scroll position) and `autoplay` /
+  /// `sceneEnter` timelines jump to their end state instead of playing.
+  /// Audio is unaffected. Ignored in edit mode, where clocks are frozen.
+  bool get reducedMotion => _reducedMotion;
+  set reducedMotion(bool value) {
+    if (value == _reducedMotion) return;
+    _reducedMotion = value;
+    if (mode == StageRenderMode.edit) return;
+    for (final c in _clocks) {
+      _applyReducedMotion(c);
+      if (!value) {
+        final visible = _sceneVisible[c.sceneId];
+        if (visible != null) c.source.sceneVisibilityChanged(visible: visible);
+      }
+    }
+    tick(0);
+    _scheduleIfActive();
+  }
+
+  void _applyReducedMotion(_Clock c) {
+    c.smoother.smoothing = _reducedMotion ? 0 : _Clock._smoothingOf(c.clock);
+    c.source.reducedMotionChanged(reduced: _reducedMotion);
+    c.pending = true;
+  }
+
   /// Whether the ticker is running (tests).
   bool get isTicking => _ticker.isActive;
 
@@ -230,6 +258,10 @@ class StageAnimator implements StageNodeListener {
       factories: factories,
     );
     final c = _Clock(sceneId, clock, source);
+    if (_reducedMotion && mode != StageRenderMode.edit) {
+      c.smoother.smoothing = 0;
+      source.reducedMotionChanged(reduced: true);
+    }
     c.value = mode == StageRenderMode.edit ? _frozenValue(c) : source.value;
     c.smoother.reset(c.value);
     return c;

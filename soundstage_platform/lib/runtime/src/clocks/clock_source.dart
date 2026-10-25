@@ -29,6 +29,12 @@ abstract class StageClockSource {
   /// Called when the scene the clock belongs to becomes visible or not.
   void sceneVisibilityChanged({required bool visible}) {}
 
+  /// The reader asked for reduced motion (`prefers-reduced-motion`): sources
+  /// that play by themselves settle on their end state instead of playing,
+  /// and start again when it is switched off. Scroll, pointer and audio
+  /// sources are unaffected.
+  void reducedMotionChanged({required bool reduced}) {}
+
   void dispose() {}
 }
 
