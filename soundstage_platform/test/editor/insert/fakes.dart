@@ -86,7 +86,7 @@ class FakeAssetService implements EditorAssetService {
   int peaksRequests = 0;
 
   @override
-  Future<WaveformPeaks?> peaks(String assetId) async {
+  Future<WaveformPeaks?> peaks(String assetId, {String? uri}) async {
     peaksRequests++;
     return peaksById[assetId];
   }

@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
 import 'package:soundstage_platform/editor/insert/asset_service.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
+import 'package:soundstage_platform/runtime/runtime.dart' show bundledAssetPath;
 
 import 'local_asset_store.dart';
 import 'platform.dart' as platform;
@@ -51,14 +53,29 @@ class LocalEditorAssetService implements EditorAssetService {
   }
 
   @override
-  Future<WaveformPeaks?> peaks(String assetId) async {
+  Future<WaveformPeaks?> peaks(String assetId, {String? uri}) async {
     try {
-      return await _store.peaks(assetId);
+      final stored = await _store.peaks(assetId);
+      if (stored != null) return stored;
     } on StorageFullException {
       return null;
     }
+    // Bundled demo audio is not in the store: decode it once per session.
+    final path = uri == null ? null : bundledAssetPath(uri);
+    if (path == null) return null;
+    return _bundledPeaks.putIfAbsent(path, () async {
+      try {
+        final data = await rootBundle.load(path);
+        return platform.decodePeaksInBrowser(data.buffer.asUint8List());
+      } on Object {
+        return null;
+      }
+    });
   }
 }
+
+/// Peaks of bundled audio, by asset path (decoded once per session).
+final Map<String, Future<WaveformPeaks?>> _bundledPeaks = {};
 
 /// What the editor has when browser storage is blocked: nothing can be
 /// stored, and the UI says why.
@@ -93,7 +110,7 @@ class UnavailableAssetService implements EditorAssetService {
   Future<ir.Asset?> stored(String assetId) async => null;
 
   @override
-  Future<WaveformPeaks?> peaks(String assetId) async => null;
+  Future<WaveformPeaks?> peaks(String assetId, {String? uri}) async => null;
 }
 
 /// The app's asset service: the IndexedDB store, or

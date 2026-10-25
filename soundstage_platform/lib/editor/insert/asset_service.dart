@@ -5,6 +5,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../audio/waveform_peaks.dart';
 import '../clipboard/content_hash.dart';
+import '../core/editor_controller.dart';
 
 /// A file the author gave the editor: from the picker, a drop or the
 /// clipboard.
@@ -44,7 +45,10 @@ abstract interface class EditorAssetService {
   /// browser cannot decode it. They are computed once when the file is
   /// uploaded and stored in the asset record; an asset that lacks them gets
   /// them computed on this first request.
-  Future<WaveformPeaks?> peaks(String assetId);
+  ///
+  /// [uri] is the asset's URI in the document: assets that are not in the
+  /// store (bundled `asset://` demo audio) are decoded from it.
+  Future<WaveformPeaks?> peaks(String assetId, {String? uri});
 }
 
 /// A storage or format problem, worded for the author.
@@ -71,8 +75,13 @@ final editorAssetServiceProvider = Provider<EditorAssetService>(
 /// available). The audio lane reads this; call `ref.invalidate` with the
 /// asset id after replacing the file of an asset.
 final audioPeaksProvider = FutureProvider.family<WaveformPeaks?, String>(
-  (ref, assetId) => ref.watch(editorAssetServiceProvider).peaks(assetId),
-  dependencies: [editorAssetServiceProvider],
+  (ref, assetId) => ref
+      .watch(editorAssetServiceProvider)
+      .peaks(
+        assetId,
+        uri: ref.read(editorControllerProvider).document.assets[assetId]?.uri,
+      ),
+  dependencies: [editorAssetServiceProvider, editorControllerProvider],
 );
 
 /// Files that were not stored, with why (for one toast).
