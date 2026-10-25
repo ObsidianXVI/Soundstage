@@ -5,6 +5,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import '../inspector_providers.dart';
 import '../property_writer.dart';
+import 'keyframe_controls.dart';
 
 /// The override hint colour (Figma's purple), per theme. The chrome has a
 /// single accent hue; overrides get their own so they read at a glance.
@@ -27,13 +28,26 @@ Color _sourceColor(BuildContext context, ValueSource s) =>
 /// among them is shown, and reset resets every overridden one. A plain value
 /// (the node's own) draws nothing and costs one provider read.
 class FieldFrame extends ConsumerWidget {
-  const FieldFrame({required this.paths, required this.child, super.key});
+  const FieldFrame({
+    required this.paths,
+    required this.child,
+    this.keyframes = true,
+    super.key,
+  });
 
-  FieldFrame.single({required String path, required this.child, super.key})
-    : paths = [path];
+  FieldFrame.single({
+    required String path,
+    required this.child,
+    this.keyframes = true,
+    super.key,
+  }) : paths = [path];
 
   final List<String> paths;
   final Widget child;
+
+  /// Whether an animatable single-path control gets its keyframe controls
+  /// beside it (off for controls that are not a row: an image preview).
+  final bool keyframes;
 
   static ValueSource _strongest(Iterable<ValueSource> all) {
     var best = ValueSource.own;
@@ -55,8 +69,37 @@ class FieldFrame extends ConsumerWidget {
         ref.watch(selectedNodesProvider.select((s) => valueSourceOf(s, p))),
     ];
     final source = _strongest(sources);
-    if (source.kind == ValueSourceKind.own) return child;
+    final framed = source.kind == ValueSourceKind.own
+        ? child
+        : _framed(context, scope, source, sources);
+    // Each animatable row gets its keyframe controls (m2.md "Inspector").
+    if (!keyframes ||
+        paths.length != 1 ||
+        !showsKeyframeControls(paths.single)) {
+      return framed;
+    }
+    // Shrink-wraps in rows that don't bound the width; narrow cells (two
+    // columns at the inspector's narrowest) get the toggle without ‹ ›.
+    return LayoutBuilder(
+      builder: (context, box) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: framed),
+          KeyframeControls(
+            path: paths.single,
+            compact: box.maxWidth < kKeyframeControlsFullWidth,
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _framed(
+    BuildContext context,
+    InspectorScope scope,
+    ValueSource source,
+    List<ValueSource> sources,
+  ) {
     final color = _sourceColor(context, source);
     void reset() => scope.writer.resetAll([
       for (var i = 0; i < paths.length; i++)

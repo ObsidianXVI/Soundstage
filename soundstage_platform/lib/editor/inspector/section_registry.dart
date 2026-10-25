@@ -8,6 +8,7 @@ import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
 import 'sections/header_section.dart';
 import 'sections/layout_child_section.dart';
+import 'sections/motion_section.dart';
 import 'sections/shape_section.dart';
 import 'sections/stroke_section.dart';
 import 'sections/text_section.dart';
@@ -58,4 +59,5 @@ final List<InspectorSectionSpec> kInspectorSections = [
   strokeSection,
   effectsSection,
   textSection,
+  motionSection,
 ];

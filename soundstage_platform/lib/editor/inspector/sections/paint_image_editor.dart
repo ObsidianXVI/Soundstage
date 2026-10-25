@@ -759,6 +759,7 @@ class _PaintImagePreviewState extends ConsumerState<PaintImagePreview> {
               );
         return Center(
           child: FieldFrame(
+            keyframes: false,
             paths: _isCrop
                 ? [
                     for (final f in ['x', 'y', 'width', 'height'])
