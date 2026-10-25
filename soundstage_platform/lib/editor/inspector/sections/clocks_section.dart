@@ -17,16 +17,6 @@ class ClocksSection extends ConsumerWidget {
 
   final ir.Scene scene;
 
-  /// The selected frame of [scene] when exactly one frame is selected.
-  static String? selectedFrame(EditorState s, ir.Scene scene) {
-    if (s.selection.length != 1) return null;
-    final id = s.selection.first;
-    for (final f in sceneFrames(scene)) {
-      if (f.id == id) return id;
-    }
-    return null;
-  }
-
   Future<void> _add(BuildContext context, WidgetRef ref) async {
     final state = ref.read(editorControllerProvider);
     final gen = ir.IdGenerator.forDocument(state.document);
@@ -34,7 +24,6 @@ class ClocksSection extends ConsumerWidget {
       context,
       ids: [gen.next(), gen.next()],
       frames: sceneFrames(scene),
-      selectedFrameId: selectedFrame(state, scene),
     );
     if (clocks == null || clocks.isEmpty) return;
     ref
@@ -82,6 +71,24 @@ class ClocksSection extends ConsumerWidget {
     );
   }
 }
+
+String _nameOf(ir.Clock c) => switch (c) {
+  ir.SceneScrollClock(:final name) ||
+  ir.TimelineClock(:final name) ||
+  ir.AudioClock(:final name) ||
+  ir.PointerClock(:final name) => name,
+  ir.BehaviorClock() => '',
+};
+
+/// [c] with its label set (a behaviour clock's `name` is its value name, not
+/// a label, and is left alone).
+ir.Clock _withName(ir.Clock c, String name) => switch (c) {
+  ir.SceneScrollClock() => c.copyWith(name: name),
+  ir.TimelineClock() => c.copyWith(name: name),
+  ir.AudioClock() => c.copyWith(name: name),
+  ir.PointerClock() => c.copyWith(name: name),
+  ir.BehaviorClock() => c,
+};
 
 class _ClockRow extends ConsumerWidget {
   const _ClockRow({
@@ -131,8 +138,21 @@ class _ClockRow extends ConsumerWidget {
 
     void smoothing(double v) => change((x) => x.copyWith(smoothing: v));
 
+    final nameField = ClockField(
+      'Name',
+      SsTextField(
+        key: ValueKey('name-${clockLabel(self, frameNames)}'),
+        semanticLabel: 'Clock name',
+        initialValue: _nameOf(self),
+        placeholder: clockLabel(_withName(self, ''), frameNames),
+        releaseFocusOnSubmit: true,
+        onSubmitted: (v) => change((x) => _withName(x, v.trim())),
+      ),
+    );
+
     final fields = switch (self) {
       ir.SceneScrollClock() => [
+        nameField,
         SmoothingField(
           value: self.smoothing,
           onChangeStart: ctl.beginGesture,
@@ -141,19 +161,7 @@ class _ClockRow extends ConsumerWidget {
         ),
       ],
       ir.TimelineClock() => [
-        ClockField(
-          'Name',
-          SsTextField(
-            key: ValueKey('name-${self.name}'),
-            semanticLabel: 'Clock name',
-            initialValue: self.name,
-            placeholder: 'Timeline',
-            releaseFocusOnSubmit: true,
-            onSubmitted: (v) => change(
-              (x) => x is ir.TimelineClock ? x.copyWith(name: v.trim()) : x,
-            ),
-          ),
-        ),
+        nameField,
         TimelineFields(
           clock: self,
           onChangeStart: ctl.beginGesture,
@@ -169,14 +177,11 @@ class _ClockRow extends ConsumerWidget {
         _PastEnd(scene: scene, clock: self),
       ],
       ir.PointerClock() => [
+        nameField,
         PointerFields(
           frameId: self.frameId,
           axis: self.axis,
           frames: sceneFrames(scene),
-          selectedFrameId: ClocksSection.selectedFrame(
-            ref.watch(editorControllerProvider),
-            scene,
-          ),
           onFrame: (f) =>
               change((x) => x is ir.PointerClock ? x.copyWith(frameId: f) : x),
           onAxis: (a) =>

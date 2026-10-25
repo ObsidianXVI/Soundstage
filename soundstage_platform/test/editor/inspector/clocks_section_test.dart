@@ -142,7 +142,7 @@ void main() {
       expect(_in('time1', find.text('used by 2 tracks')), findsOneWidget);
       expect(_in('point1', find.text('used by 0 tracks')), findsOneWidget);
       expect(_in('time1', find.text('Intro')), findsWidgets);
-      expect(_in('scroll1', find.text('Scene scroll')), findsOneWidget);
+      expect(_in('scroll1', find.text('Scene scroll')), findsWidgets);
     });
 
     testWidgets("the scene's scroll clock cannot be deleted", (tester) async {
@@ -245,11 +245,7 @@ void main() {
       );
       expect((_clock(c, 'point1') as ir.PointerClock).axis, ir.PointerAxis.y);
 
-      await _tapAndSettle(
-        tester,
-        _in('point1', find.byType(SsDropdown<String>)),
-      );
-      await _tapAndSettle(tester, find.text('f1').last);
+      await _tapAndSettle(tester, _in('point1', find.text('f1')));
       expect((_clock(c, 'point1') as ir.PointerClock).frameId, 'f1');
 
       await _type(tester, _numField('point1', 'Smoothing'), '1');
@@ -258,17 +254,68 @@ void main() {
       expect(identical(c.doc, before), isTrue);
     });
 
-    testWidgets('"Use selection" binds a pointer clock to the selected frame', (
+    testWidgets('the frame picker lists frames in layer order and searches', (
       tester,
     ) async {
       final c = await _pump(tester);
-      final useSelection = _in('point1', _button('Use selection'));
-      expect(tester.widget<SsButton>(useSelection).onPressed, isNull);
-      c.ctl.select({'f1'});
+      Iterable<String> shown() => [
+        for (final w in tester.widgetList<SsInteractive>(
+          _in(
+            'point1',
+            find.byWidgetPredicate(
+              (w) => w is SsInteractive && w.key.toString().contains('frame-'),
+            ),
+          ),
+        ))
+          (w.key! as ValueKey).value as String,
+      ];
+      // Topmost first: f2 is above f1 in paint order.
+      expect(shown(), ['frame-root', 'frame-f2', 'frame-f1']);
+      expect(find.text('Use selection'), findsNothing);
+
+      final search = _in(
+        'point1',
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (w) => w is SsTextField && w.semanticLabel == 'Search frames',
+          ),
+          matching: find.byType(EditableText),
+        ),
+      );
+      await tester.enterText(search, 'f1');
       await tester.pump();
-      expect(tester.widget<SsButton>(useSelection).onPressed, isNotNull);
-      await _tapAndSettle(tester, useSelection);
-      expect((_clock(c, 'point1') as ir.PointerClock).frameId, 'f1');
+      expect(shown(), ['frame-f1']);
+      await tester.enterText(search, 'zzz');
+      await tester.pump();
+      expect(find.text('No frames match.'), findsOneWidget);
+      expect((_clock(c, 'point1') as ir.PointerClock).frameId, 'f2');
+    });
+
+    testWidgets('the scroll and pointer clocks can be renamed', (tester) async {
+      final c = await _pump(tester);
+      final before = c.doc;
+      for (final (id, name) in [
+        ('scroll1', 'Main scroll'),
+        ('point1', 'Hover'),
+      ]) {
+        final f = _in(id, find.byType(EditableText)).first;
+        await tester.tap(f);
+        await tester.enterText(f, name);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(_in(id, find.text(name)), findsWidgets);
+      }
+      expect((_clock(c, 'scroll1') as ir.SceneScrollClock).name, 'Main scroll');
+      expect((_clock(c, 'point1') as ir.PointerClock).name, 'Hover');
+      // Clearing the name restores the derived label.
+      final f = _in('scroll1', find.byType(EditableText)).first;
+      await tester.tap(f);
+      await tester.enterText(f, '');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(_in('scroll1', find.text('Scene scroll')), findsWidgets);
+      while (c.ctl.undo()) {}
+      expect(identical(c.doc, before), isTrue);
     });
   });
 
@@ -338,19 +385,6 @@ void main() {
       expect(added.axis, ir.PointerAxis.y);
       expect(added.frameId, 'root');
       expect(_scene(c).clocks, hasLength(5));
-    });
-
-    testWidgets('a pointer clock preselects the selected frame', (
-      tester,
-    ) async {
-      final c = await _pump(tester);
-      c.ctl.select({'f2'});
-      await tester.pump();
-      await openDialog(tester);
-      await tester.tap(inDialog(find.text('Pointer')));
-      await tester.pump();
-      await _tapAndSettle(tester, inDialog(_button('Add clock')));
-      expect((_scene(c).clocks.last as ir.PointerClock).frameId, 'f2');
     });
 
     testWidgets('both axes make two clocks in one undo step', (tester) async {
@@ -427,6 +461,9 @@ void main() {
       expect(s.clocks.map((x) => x.id), isNot(contains('time1')));
       expect(s.tracks.map((t) => t.clockId), everyElement('scroll1'));
       expect(s.tracks, hasLength(3));
+      // Timeline times (0-2 s) are remapped onto the scroll range 0-1.
+      expect(s.tracks[1].keyframes.map((k) => k.t), [0, 0.5, 1.5]);
+      expect(s.tracks[2].keyframes.map((k) => k.t), [0, 2]);
       _expectUndoRedo(c, before);
     });
 

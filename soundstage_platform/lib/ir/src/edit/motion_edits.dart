@@ -158,7 +158,9 @@ EditResult removeTrack(StageDocument doc, String sceneId, String trackId) =>
     removeTracks(doc, sceneId, [trackId]);
 
 /// Moves the tracks [trackIds] of scene [sceneId] onto clock [clockId] (a
-/// clock of the same scene). Keyframe times are kept as they are.
+/// clock of the same scene). Moving to a clock of another kind remaps
+/// keyframe times linearly from the source clock's range to the target's
+/// (see [clockTimeRange]); the same kind keeps them as they are.
 EditResult moveTracksToClock(
   StageDocument doc,
   String sceneId,
@@ -174,12 +176,19 @@ EditResult moveTracksToClock(
     if (_trackIndex(scene, id, diags) == null) return null;
   }
   var changed = false;
+  final target = scene.clocks.firstWhere((c) => c.id == clockId);
   final tracks = [
     for (final t in scene.tracks)
       if (ids.contains(t.id) && t.clockId != clockId)
         () {
           changed = true;
-          return t.copyWith(clockId: clockId);
+          final from = scene.clocks.where((c) => c.id == t.clockId);
+          return _retime(
+            doc,
+            t.copyWith(clockId: clockId),
+            from.isEmpty ? null : from.first,
+            target,
+          );
         }()
       else
         t,
@@ -501,7 +510,17 @@ EditResult removeClock(
         diags.add(_missingClock(to, scene.id));
         return null;
       }
-      final out = _rebindClock(scene.copyWith(clocks: clocks), clockId, to);
+      final target = clocks.firstWhere((c) => c.id == to);
+      var out = _rebindClock(scene.copyWith(clocks: clocks), clockId, to);
+      out = out.copyWith(
+        tracks: [
+          for (final t in out.tracks)
+            if (scene.tracks.any((o) => o.id == t.id && o.clockId == clockId))
+              _retime(doc, t, clock, target)
+            else
+              t,
+        ],
+      );
       if (_referencesClock(doc, clockId, exceptScene: scene.id) ||
           _sceneReferencesClock(out, clockId)) {
         diags.add(_dangling(clockId));
@@ -918,6 +937,41 @@ bool _hasOtherOwnScrollClock(Scene scene, String exceptId) => scene.clocks.any(
 );
 
 /// [scene] with its tracks and text reveals on clock [from] moved to [to].
+/// The time range of [clock] a track's keyframes span: scroll 0–1, timeline
+/// 0–duration, pointer −1…1, audio 0–track length. Null when it has none (a
+/// behaviour clock, or an audio clock whose track length is unknown).
+({double start, double end})? clockTimeRange(StageDocument doc, Clock clock) =>
+    switch (clock) {
+      SceneScrollClock() => (start: 0, end: 1),
+      TimelineClock(:final duration) => (start: 0, end: duration),
+      PointerClock() => (start: -1, end: 1),
+      AudioClock(:final audioTrackId) => () {
+        for (final a in doc.audioTracks) {
+          if (a.id != audioTrackId) continue;
+          final d = doc.assets[a.assetId]?.duration;
+          return d != null && d > 0 ? (start: 0.0, end: d) : null;
+        }
+        return null;
+      }(),
+      BehaviorClock() => null,
+    };
+
+/// [track] with its keyframe times mapped linearly from the range of [from]
+/// to that of [to] when the clocks are of different kinds.
+Track _retime(StageDocument doc, Track track, Clock? from, Clock to) {
+  if (from == null || from.runtimeType == to.runtimeType) return track;
+  final a = clockTimeRange(doc, from);
+  final b = clockTimeRange(doc, to);
+  if (a == null || b == null || a.end == a.start) return track;
+  final k = (b.end - b.start) / (a.end - a.start);
+  return track.copyWith(
+    keyframes: [
+      for (final kf in track.keyframes)
+        kf.copyWith(t: b.start + (kf.t - a.start) * k),
+    ],
+  );
+}
+
 Scene _rebindClock(Scene scene, String from, String to) {
   var tracksChanged = false;
   final tracks = [

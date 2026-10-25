@@ -29,26 +29,16 @@ Future<List<ir.Clock>?> showAddClockDialog(
   BuildContext context, {
   required List<String> ids,
   required List<FrameChoice> frames,
-  required String? selectedFrameId,
 }) => showSsDialog<List<ir.Clock>>(
   context,
-  builder: (ctx) => _AddClockDialog(
-    ids: ids,
-    frames: frames,
-    selectedFrameId: selectedFrameId,
-  ),
+  builder: (ctx) => _AddClockDialog(ids: ids, frames: frames),
 );
 
 class _AddClockDialog extends StatefulWidget {
-  const _AddClockDialog({
-    required this.ids,
-    required this.frames,
-    required this.selectedFrameId,
-  });
+  const _AddClockDialog({required this.ids, required this.frames});
 
   final List<String> ids;
   final List<FrameChoice> frames;
-  final String? selectedFrameId;
 
   @override
   State<_AddClockDialog> createState() => _AddClockDialogState();
@@ -61,9 +51,7 @@ class _AddClockDialogState extends State<_AddClockDialog> {
     duration: 5,
     name: 'Timeline',
   );
-  late String _frame =
-      widget.selectedFrameId ??
-      (widget.frames.isEmpty ? '' : widget.frames.first.id);
+  late String _frame = widget.frames.isEmpty ? '' : widget.frames.first.id;
   ir.PointerAxis _axis = ir.PointerAxis.x;
   bool _both = false;
 
@@ -119,7 +107,6 @@ class _AddClockDialogState extends State<_AddClockDialog> {
               frameId: _frame,
               axis: _axis,
               frames: widget.frames,
-              selectedFrameId: widget.selectedFrameId,
               onFrame: (f) => setState(() => _frame = f),
               onAxis: (a) => setState(() => _axis = a),
             ),
