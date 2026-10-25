@@ -119,7 +119,8 @@ class RenderStageFrame extends RenderStageBox
   void adoptChild(RenderObject child) {
     super.adoptChild(child);
     if (child is RenderStageBox &&
-        blendNeedsIsolation(child.node.effectiveBlendMode)) {
+        (blendNeedsIsolation(child.node.effectiveBlendMode) ||
+            child.common.mask != ir.MaskMode.none)) {
       childBlendChanged();
     }
   }
@@ -128,7 +129,8 @@ class RenderStageFrame extends RenderStageBox
   void dropChild(RenderObject child) {
     super.dropChild(child);
     if (child is RenderStageBox &&
-        blendNeedsIsolation(child.node.effectiveBlendMode)) {
+        (blendNeedsIsolation(child.node.effectiveBlendMode) ||
+            child.common.mask != ir.MaskMode.none)) {
       childBlendChanged();
     }
   }
@@ -429,10 +431,15 @@ class RenderStageFrame extends RenderStageBox
     // An explicit `normal` frame is an isolated group: it matters when a
     // child blends (a `passThrough` frame lets children blend with the
     // backdrop instead).
-    if (node.effectiveBlendMode != ir.BlendMode.normal) return false;
+    if (node.effectiveBlendMode != ir.BlendMode.normal && !_hasMaskChild) {
+      return false;
+    }
     var child = firstChild;
     while (child != null) {
-      if (blendNeedsIsolation(child.node.effectiveBlendMode)) return true;
+      if (blendNeedsIsolation(child.node.effectiveBlendMode) ||
+          child.common.mask != ir.MaskMode.none) {
+        return true;
+      }
       child = (child.parentData! as StageParentData).nextSibling;
     }
     return false;
@@ -513,11 +520,62 @@ class RenderStageFrame extends RenderStageBox
       if (c.common.visible) (c.parentData! as StageParentData).offset & c.size,
   ];
 
+  bool get _hasMaskChild {
+    var child = firstChild;
+    while (child != null) {
+      if (child.common.mask != ir.MaskMode.none) return true;
+      child = (child.parentData! as StageParentData).nextSibling;
+    }
+    return false;
+  }
+
+  /// Turns a mask's luminance into alpha (§4.2 `mask: luminance`).
+  static const ColorFilter _luminanceToAlpha = ColorFilter.matrix([
+    0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0,
+  ]);
+
   void _paintChildren(PaintingContext context, Offset offset) {
     final o = offset + _contentOffset;
-    for (final child in _paintOrdered) {
+    final order = _paintOrdered;
+    var i = 0;
+    while (i < order.length) {
+      final child = order[i];
       final pd = child.parentData! as StageParentData;
+      final mask = child.common.mask;
+      if (mask == ir.MaskMode.none || !child.common.visible) {
+        context.paintChild(child, o + pd.offset);
+        i++;
+        continue;
+      }
+      // §4.2: a mask masks the siblings above it in the same parent, up to
+      // the next mask; the mask itself does not show. The frame isolates
+      // (isolatesBlend), so all of them paint into this one picture.
+      var end = i + 1;
+      while (end < order.length && order[end].common.mask == ir.MaskMode.none) {
+        end++;
+      }
+      final canvas = context.canvas;
+      canvas.saveLayer(null, Paint());
+      for (var k = i + 1; k < end; k++) {
+        final c = order[k];
+        context.paintChild(c, o + (c.parentData! as StageParentData).offset);
+      }
+      context.canvas.saveLayer(
+        null,
+        Paint()
+          ..blendMode = BlendMode.dstIn
+          ..colorFilter = mask == ir.MaskMode.luminance
+              ? _luminanceToAlpha
+              : null,
+      );
       context.paintChild(child, o + pd.offset);
+      context.canvas
+        ..restore()
+        ..restore();
+      i = end;
     }
   }
 

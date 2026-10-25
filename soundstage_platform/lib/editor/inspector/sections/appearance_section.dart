@@ -60,6 +60,28 @@ class _AppearanceBody extends ConsumerWidget {
               max: 100,
             ),
           ),
+        // §4.2: a mask hides the layers above it (in the same parent)
+        // outside its shape (alpha) or by its brightness (luminance).
+        const LabelRow(
+          label: 'Use as mask',
+          child: EnumProp(
+            path: 'mask',
+            semanticLabel: 'Use as mask',
+            options: [
+              EnumOption('none', 'Off'),
+              EnumOption(
+                'alpha',
+                'Shape',
+                tooltip: 'Layers above show only inside this one',
+              ),
+              EnumOption(
+                'luminance',
+                'Light',
+                tooltip: 'Layers above show where this one is light',
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

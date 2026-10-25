@@ -124,7 +124,8 @@ abstract class RenderStageBox extends RenderBox {
     if (!identical(old.common, value.common) && _semanticsChanged(old, value)) {
       markSubtreeSemantics();
     }
-    if (old.effectiveBlendMode != value.effectiveBlendMode) {
+    if (old.effectiveBlendMode != value.effectiveBlendMode ||
+        old.common.mask != value.common.mask) {
       final p = parent;
       if (p is RenderStageBox) p.childBlendChanged();
     }
