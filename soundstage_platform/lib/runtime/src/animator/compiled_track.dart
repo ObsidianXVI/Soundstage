@@ -478,7 +478,8 @@ TrackValueKind _kindOf(ir.IrValueType t) => switch (t) {
   ir.IrValueType.any => TrackValueKind.boxed,
   ir.IrValueType.boolean ||
   ir.IrValueType.string ||
-  ir.IrValueType.enumValue => TrackValueKind.step,
+  ir.IrValueType.enumValue ||
+  ir.IrValueType.gridTracks => TrackValueKind.step,
 };
 
 /// Whether two keyframe variants interpolate (the oracle's `lerpIrValue`).

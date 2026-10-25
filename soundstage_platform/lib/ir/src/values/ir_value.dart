@@ -78,6 +78,11 @@ sealed class IrValue with _$IrValue {
   @FreezedUnionValue('numbers')
   const factory IrValue.numbers(List<double> value) = NumbersValue;
 
+  /// Grid row or column tracks (§4.5), so a grid's columns can differ per
+  /// breakpoint.
+  @FreezedUnionValue('gridTracks')
+  const factory IrValue.gridTracks(List<GridTrack> value) = GridTracksValue;
+
   /// A reference to a token variable (§8). Also the alias form of a
   /// variable's value.
   @FreezedUnionValue('tokenRef')

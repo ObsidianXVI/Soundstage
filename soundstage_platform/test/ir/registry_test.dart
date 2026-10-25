@@ -110,6 +110,9 @@ List<IrValue> _samples(PropertyDescriptor d, Map<String, String> params) {
       IrValue.boolean(false),
     ],
     IrValueType.string => const [IrValue.string('abc')],
+    IrValueType.gridTracks => const [
+      IrValue.gridTracks([GridTrack.fixed(40), GridTrack.flex(2)]),
+    ],
     IrValueType.enumValue => [
       for (final e in d.enumValues!) IrValue.enumValue(e),
     ],

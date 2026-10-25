@@ -11,6 +11,7 @@ import '../paint/appearance_painter.dart';
 import '../paint/blend.dart';
 import 'layout/auto_layout.dart';
 import 'layout/constraints.dart';
+import 'layout/grid_layout.dart';
 import 'render_stage_box.dart';
 
 /// The device pixel ratio used to pick image variants.
@@ -73,19 +74,23 @@ class RenderStageFrame extends RenderStageBox
     markNeedsLayout();
   }
 
-  /// The auto layout in effect; grid frames lay out as free until M3.
+  /// The auto layout in effect; a grid takes precedence (§4.5).
   ir.AutoLayout? get _autoLayout =>
       frame.grid == null ? frame.autoLayout : null;
 
-  // `hug` means "hug the auto-layout content", so without auto layout it is
+  /// Whether the children are laid out (auto layout or grid) rather than
+  /// placed freely.
+  bool get _laysOut => frame.grid != null || frame.autoLayout != null;
+
+  // `hug` means "hug the laid-out content", so in a free frame it is
   // treated as fixed. Sizing is per axis and comes only from `layoutChild`.
   @override
   bool get hugsWidth =>
-      _autoLayout != null && layoutChild.horizontalSizing == ir.Sizing.hug;
+      _laysOut && layoutChild.horizontalSizing == ir.Sizing.hug;
 
   @override
   bool get hugsHeight =>
-      _autoLayout != null && layoutChild.verticalSizing == ir.Sizing.hug;
+      _laysOut && layoutChild.verticalSizing == ir.Sizing.hug;
 
   @override
   bool get supportsAppearanceOverrides => true;
@@ -171,6 +176,7 @@ class RenderStageFrame extends RenderStageBox
   StageFrameLayout computeFrameLayout(BoxConstraints constraints) {
     final children = getChildrenAsList();
     final al = _autoLayout;
+    final grid = frame.grid;
     final lc = layoutChild;
     final stored = storedSize;
     final double? w = constraints.hasTightWidth
@@ -185,7 +191,7 @@ class RenderStageFrame extends RenderStageBox
         _item(
           child,
           inFlow:
-              al != null &&
+              (al != null || grid != null) &&
               child.common.visible &&
               child.layoutChild.positioning == ir.Positioning.auto,
         ),
@@ -194,7 +200,20 @@ class RenderStageFrame extends RenderStageBox
     Size size;
     List<Rect?> boxes;
     List<int> paintOrder;
-    if (al != null) {
+    if (grid != null) {
+      final res = computeGridLayout(
+        layout: grid,
+        children: [
+          for (var i = 0; i < children.length; i++)
+            GridLayoutChild(items[i], children[i].layoutChild.grid),
+        ],
+        width: w,
+        height: h,
+      );
+      size = constraints.constrain(res.size);
+      boxes = res.boxes;
+      paintOrder = res.paintOrder;
+    } else if (al != null) {
       final res = computeAutoLayout(
         layout: al,
         children: items,
@@ -233,7 +252,7 @@ class RenderStageFrame extends RenderStageBox
                   child.storedSize.height,
                 ));
       all.add(placed);
-      final counts = al != null ? items[i].inFlow : c.visible;
+      final counts = al != null || grid != null ? items[i].inFlow : c.visible;
       forBaseline.add(counts ? placed : null);
     }
     return StageFrameLayout(

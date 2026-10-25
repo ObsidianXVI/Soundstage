@@ -37,6 +37,7 @@ enum IrValueType {
   lineHeight,
   letterSpacing,
   numbers,
+  gridTracks,
 
   /// Any value (component prop values, embed inputs).
   any,

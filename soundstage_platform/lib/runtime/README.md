@@ -43,7 +43,7 @@ Pure functions with no render objects, so they can be unit-tested (`test/runtime
     the node is sized from its stored geometry. It paints an error box in `StageRenderMode.edit`
     and nothing in `play`, and only edit mode can hit it. Placeholders behave the same way. The
     `debugStageFaultInjector` hook makes tests throw on demand.
-- `RenderStageFrame`: free, auto-layout, or grid frames (grid lays out as free until M3). The
+- `RenderStageFrame`: free, auto-layout, or grid frames (`layout/grid_layout.dart`: fixed/flex/hug tracks, explicit and auto placement, spans, implicit hug tracks, cell alignment). The
   reference size for children's constraints is the frame's stored size, or `referenceSize` (a
   scene root passes `StageSceneView.referenceSizeFor`). It paints fills, then children (clipped
   when `clipContent`), then the stroke.
@@ -206,8 +206,8 @@ These are choices the spec left open, made to be Figma-consistent. The ones mark
 
 1. **Per-axis sizing.** A node's size mode on each axis comes only from
    `layoutChild.horizontalSizing`/`verticalSizing` (fixed | hug | fill). `fill` applies only inside
-   an auto-layout parent. `hug` on a frame means "hug the auto-layout content", so a frame
-   without auto layout (or a grid frame, until M3) treats `hug` as `fixed`. Text also hugs
+   an auto-layout parent (in a grid parent it stretches across the cell). `hug` on a frame means
+   "hug the laid-out content", so a free frame (no auto layout, no grid) treats `hug` as `fixed`. Text also hugs
    according to `autoResize` (`widthAndHeight`: both axes; `height`: height). Shapes never hug.
 2. **Direction flips keep sizing.** Because sizing is per axis rather than relative to the
    direction, a breakpoint patch that flips `autoLayout.direction` keeps each axis's mode (the

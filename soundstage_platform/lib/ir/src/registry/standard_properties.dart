@@ -617,6 +617,22 @@ void _frameProps(_Builder b) {
     ),
   );
   b.add(
+    'grid.columns',
+    _frame,
+    grid.leaf(
+      field(gridTracksC, (g) => g.columns, (g, v) => g.copyWith(columns: v)),
+    ),
+    inv: _layout,
+    animatable: false,
+  );
+  b.add(
+    'grid.rows',
+    _frame,
+    grid.leaf(field(gridTracksC, (g) => g.rows, (g, v) => g.copyWith(rows: v))),
+    inv: _layout,
+    animatable: false,
+  );
+  b.add(
     'grid.columnGap',
     _frame,
     grid.leaf(

@@ -275,6 +275,12 @@ final Codec<List<double>> numbersC = Codec<List<double>>(
   continuous: true,
 );
 
+final Codec<List<GridTrack>> gridTracksC = Codec<List<GridTrack>>(
+  IrValueType.gridTracks,
+  IrValue.gridTracks,
+  (v) => v is GridTracksValue ? v.value : null,
+);
+
 /// Any concrete value (component prop values, embed inputs). Interpolated
 /// by the value's own type.
 final Codec<IrValue> anyC = Codec<IrValue>(
