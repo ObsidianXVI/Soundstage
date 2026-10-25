@@ -6,6 +6,7 @@ import '../render/render_stage_lyrics.dart';
 import '../render/render_stage_shape.dart';
 import '../render/render_stage_text.dart';
 import '../render/stage_environment.dart';
+import 'stage_behaviors.dart';
 
 /// Provides the [StageEnvironment] to every stage widget below it.
 class StageScope extends InheritedWidget {
@@ -91,6 +92,15 @@ class StageNodeWidget extends StatelessWidget {
     final env = StageScope.of(context);
     final boundary = repaintBoundaryIds.contains(node.id);
     return switch (node.node) {
+      final ir.FrameNode frame
+          when env.mode == StageRenderMode.play &&
+              _interactive(frame.behavior) =>
+        _BehaviorFrame(
+          node: node,
+          referenceSize: referenceSize,
+          boundary: boundary,
+          repaintBoundaryIds: repaintBoundaryIds,
+        ),
       final ir.FrameNode frame => StageFrameWidget(
         node: frame,
         environment: env,
@@ -126,6 +136,101 @@ class StageNodeWidget extends StatelessWidget {
         repaintBoundary: boundary,
       ),
     };
+  }
+}
+
+bool _interactive(ir.Behavior? b) =>
+    b is ir.CarouselBehavior ||
+    b is ir.MarqueeBehavior ||
+    b is ir.LightboxBehavior;
+
+/// A frame with a play-mode behaviour (stage_behaviors.dart). Stateful so
+/// the key that reaches its render object survives rebuilds.
+class _BehaviorFrame extends StatefulWidget {
+  const _BehaviorFrame({
+    required this.node,
+    required this.referenceSize,
+    required this.boundary,
+    required this.repaintBoundaryIds,
+  });
+
+  final ir.ResolvedNode node;
+  final Size? referenceSize;
+  final bool boundary;
+  final Set<String> repaintBoundaryIds;
+
+  @override
+  State<_BehaviorFrame> createState() => _BehaviorFrameState();
+}
+
+class _BehaviorFrameState extends State<_BehaviorFrame> {
+  final GlobalKey _frameKey = GlobalKey(debugLabel: 'behavior frame');
+
+  @override
+  Widget build(BuildContext context) {
+    final env = StageScope.of(context);
+    final node = widget.node;
+    final frame = node.node as ir.FrameNode;
+    final members = [
+      for (final c in node.children)
+        if (c.node.common.visible) c,
+    ];
+    return wrapStageBehavior(
+      behavior: frame.behavior,
+      frameKey: _frameKey,
+      memberCount: members.length,
+      // A member alone in a bare frame of its size (its own stored place
+      // and constraints do not apply there), under this stage's scope.
+      buildMember: (i) {
+        final m = members[i];
+        final c = m.node.common;
+        final alone = m.copyWith(
+          node: m.node.copyWith(
+            common: c.copyWith(
+              x: 0,
+              y: 0,
+              rotation: 0,
+              layoutChild: const ir.LayoutChild(),
+            ),
+          ),
+        );
+        // Not in the player's node registry: the copy must not take the
+        // original's track bindings.
+        final copyEnv = StageEnvironment(
+          mode: env.mode,
+          fonts: env.fonts,
+          media: env.media,
+          painter: env.painter,
+          audioTracks: env.audioTracks,
+        );
+        return StageScope(
+          environment: copyEnv,
+          child: StageFrameWidget(
+            node: ir.FrameNode(
+              common: ir.NodeCommon(
+                id: '${node.id}#lightbox',
+                width: c.width,
+                height: c.height,
+              ),
+            ),
+            environment: copyEnv,
+            children: [StageNodeWidget.forChild(alone, const {})],
+          ),
+        );
+      },
+      child: StageFrameWidget(
+        key: _frameKey,
+        node: frame,
+        environment: env,
+        referenceSize: widget.referenceSize,
+        repaintBoundary: widget.boundary,
+        placeholder: node.isPlaceholder,
+        children: [
+          for (final child in node.children)
+            StageNodeWidget.forChild(child, widget.repaintBoundaryIds),
+        ],
+      ),
+    );
   }
 }
 

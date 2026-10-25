@@ -158,6 +158,19 @@ class BehaviorSectionBody extends ConsumerWidget {
               scene: scene,
               doc: doc,
             ),
+            final ir.CarouselBehavior b => _CarouselFields(
+              frameId: frame!.id,
+              behavior: b,
+            ),
+            final ir.MarqueeBehavior b => _MarqueeFields(
+              frameId: frame!.id,
+              behavior: b,
+            ),
+            ir.LightboxBehavior() => Text(
+              'In the published story, tapping an item in this frame shows '
+              'it full screen.',
+              style: t.text.caption.copyWith(color: t.colors.textSecondary),
+            ),
             _ => Text(
               'This behaviour is edited in a later milestone. It can be '
               'removed here.',
@@ -191,7 +204,7 @@ class _Setup extends ConsumerWidget {
           : SetBehavior(
               node.id,
               b,
-              label: b is ir.LyricsBehavior ? 'Add lyrics' : 'Add text reveal',
+              label: 'Add ${_behaviorName(b).toLowerCase()}',
             ),
     );
     return Column(
@@ -239,6 +252,207 @@ class _Setup extends ConsumerWidget {
               style: t.text.caption.copyWith(color: t.colors.textDisabled),
             ),
           ),
+        if (node is ir.FrameNode) ...[
+          const SizedBox(height: SsSpace.s3),
+          Text(
+            'Or move its children as a whole:',
+            style: t.text.caption.copyWith(color: t.colors.textSecondary),
+          ),
+          const SizedBox(height: SsSpace.s2),
+          Wrap(
+            spacing: SsSpace.s2,
+            runSpacing: SsSpace.s1,
+            children: [
+              SsButton(
+                label: 'Carousel',
+                icon: SsIcons.moveHorizontal,
+                onPressed: () => add(const ir.Behavior.carousel()),
+              ),
+              SsButton(
+                label: 'Marquee',
+                icon: SsIcons.arrowLeftRight,
+                onPressed: () => add(const ir.Behavior.marquee()),
+              ),
+              SsButton(
+                label: 'Lightbox',
+                icon: SsIcons.maximize,
+                onPressed: () => add(const ir.Behavior.lightbox()),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ---- Carousel and marquee --------------------------------------------------------
+
+Widget _row(BuildContext context, String label, Widget control) => Padding(
+  padding: const EdgeInsets.only(bottom: SsSpace.s2),
+  child: Row(
+    children: [
+      SizedBox(
+        width: 72,
+        child: Text(
+          label,
+          style: context.ss.text.small.copyWith(
+            color: context.ss.colors.textSecondary,
+          ),
+        ),
+      ),
+      Expanded(child: control),
+    ],
+  ),
+);
+
+class _CarouselFields extends ConsumerWidget {
+  const _CarouselFields({required this.frameId, required this.behavior});
+
+  final String frameId;
+  final ir.CarouselBehavior behavior;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ctl = ref.read(editorControllerProvider.notifier);
+    final b = behavior;
+    void set(ir.CarouselBehavior next, {String? coalesce}) =>
+        ctl.execute(SetBehavior(frameId, next, label: 'Change carousel'));
+    return Column(
+      key: const ValueKey<String>('carousel-fields'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _row(
+          context,
+          'Direction',
+          SsSegmented<ir.LayoutDirection>(
+            semanticLabel: 'Carousel direction',
+            expand: true,
+            selected: b.axis,
+            onChanged: (v) => set(b.copyWith(axis: v)),
+            segments: const [
+              SsSegment(value: ir.LayoutDirection.horizontal, label: 'Across'),
+              SsSegment(value: ir.LayoutDirection.vertical, label: 'Down'),
+            ],
+          ),
+        ),
+        _row(
+          context,
+          'Swipe',
+          SsSegmented<ir.CarouselPhysics>(
+            semanticLabel: 'Carousel swipe',
+            expand: true,
+            selected: b.physics,
+            onChanged: (v) => set(b.copyWith(physics: v)),
+            segments: const [
+              SsSegment(value: ir.CarouselPhysics.paged, label: 'One item'),
+              SsSegment(value: ir.CarouselPhysics.free, label: 'Free'),
+            ],
+          ),
+        ),
+        _row(
+          context,
+          'Autoplay',
+          SsNumberField(
+            semanticLabel: 'Autoplay seconds (0 = off)',
+            value: b.autoplay,
+            unit: 's',
+            min: 0,
+            step: 0.5,
+            onChangeStart: ctl.beginGesture,
+            onChangeEnd: ctl.endGesture,
+            onChanged: (v) => set(b.copyWith(autoplay: v)),
+          ),
+        ),
+        _row(
+          context,
+          'Peek',
+          SsNumberField(
+            semanticLabel: 'Peek of the previous item',
+            value: b.peek,
+            unit: 'px',
+            min: 0,
+            onChangeStart: ctl.beginGesture,
+            onChangeEnd: ctl.endGesture,
+            onChanged: (v) => set(b.copyWith(peek: v)),
+          ),
+        ),
+        SsToggle(
+          label: 'Snap to items',
+          value: b.snap,
+          onChanged: (v) => set(b.copyWith(snap: v)),
+        ),
+        SsToggle(
+          label: 'Loop',
+          value: b.loop,
+          onChanged: (v) => set(b.copyWith(loop: v)),
+        ),
+      ],
+    );
+  }
+}
+
+class _MarqueeFields extends ConsumerWidget {
+  const _MarqueeFields({required this.frameId, required this.behavior});
+
+  final String frameId;
+  final ir.MarqueeBehavior behavior;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ctl = ref.read(editorControllerProvider.notifier);
+    final b = behavior;
+    void set(ir.MarqueeBehavior next) =>
+        ctl.execute(SetBehavior(frameId, next, label: 'Change marquee'));
+    return Column(
+      key: const ValueKey<String>('marquee-fields'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _row(
+          context,
+          'Speed',
+          SsNumberField(
+            semanticLabel: 'Marquee speed',
+            value: b.speed,
+            unit: 'px/s',
+            min: 1,
+            onChangeStart: ctl.beginGesture,
+            onChangeEnd: ctl.endGesture,
+            onChanged: (v) => set(b.copyWith(speed: v)),
+          ),
+        ),
+        _row(
+          context,
+          'Towards',
+          SsSegmented<ir.MarqueeDirection>(
+            semanticLabel: 'Marquee direction',
+            expand: true,
+            selected: b.direction,
+            onChanged: (v) => set(b.copyWith(direction: v)),
+            segments: const [
+              SsSegment(
+                value: ir.MarqueeDirection.left,
+                icon: SsIcons.arrowLeft,
+                semanticLabel: 'Left',
+              ),
+              SsSegment(
+                value: ir.MarqueeDirection.right,
+                icon: SsIcons.arrowRight,
+                semanticLabel: 'Right',
+              ),
+              SsSegment(
+                value: ir.MarqueeDirection.up,
+                icon: SsIcons.arrowUp,
+                semanticLabel: 'Up',
+              ),
+              SsSegment(
+                value: ir.MarqueeDirection.down,
+                icon: SsIcons.arrowDown,
+                semanticLabel: 'Down',
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

@@ -134,7 +134,13 @@ class RenderStageFrame extends RenderStageBox
   }
 
   @override
-  bool get clipsHitTesting => frame.clipContent;
+  bool get clipsHitTesting => _clips;
+
+  /// Carousels and marquees always clip: their content runs past the frame.
+  bool get _clips =>
+      frame.clipContent ||
+      frame.behavior is ir.CarouselBehavior ||
+      frame.behavior is ir.MarqueeBehavior;
 
   @override
   StageInvalidation invalidationFor(ir.Node old, ir.Node next) {
@@ -154,7 +160,8 @@ class RenderStageFrame extends RenderStageBox
             : StageInvalidation.layout,
       );
     }
-    if (old.clipContent != next.clipContent) {
+    if (old.clipContent != next.clipContent ||
+        !identical(old.behavior, next.behavior)) {
       i = maxInvalidation(i, StageInvalidation.paint);
     }
     return i;
@@ -459,7 +466,7 @@ class RenderStageFrame extends RenderStageBox
       overrides: o,
       composited: !inBlendGroup,
       paintChildren: (ctx, off) {
-        if (frame.clipContent) {
+        if (_clips) {
           _layers.pushOutlineClip(
             needsCompositing,
             ctx,
@@ -475,10 +482,42 @@ class RenderStageFrame extends RenderStageBox
     );
   }
 
+  // ---- Behaviour scrolling (Carousel, Marquee) --------------------------------
+
+  Offset _contentOffset = Offset.zero;
+
+  /// Shifts the children as a whole (a carousel's pan, a marquee's run),
+  /// without layout: paint, hit testing and paint transforms follow it.
+  Offset get contentOffset => _contentOffset;
+  set contentOffset(Offset value) {
+    if (value == _contentOffset) return;
+    _contentOffset = value;
+    markNeedsPaint();
+  }
+
+  /// Receives the pointer events that hit this frame or its children (a
+  /// play-mode behaviour feeds them to its gesture recognizers: wrapping the
+  /// frame in gesture widgets would put non-stage render objects between
+  /// stage frames).
+  void Function(PointerEvent event)? onBehaviorPointer;
+
+  @override
+  void handleEvent(PointerEvent event, covariant BoxHitTestEntry entry) {
+    onBehaviorPointer?.call(event);
+  }
+
+  /// The laid-out boxes of the visible children, in child order, in the
+  /// frame's coordinates (before [contentOffset]).
+  List<Rect> get childBoxes => [
+    for (final c in getChildrenAsList())
+      if (c.common.visible) (c.parentData! as StageParentData).offset & c.size,
+  ];
+
   void _paintChildren(PaintingContext context, Offset offset) {
+    final o = offset + _contentOffset;
     for (final child in _paintOrdered) {
       final pd = child.parentData! as StageParentData;
-      context.paintChild(child, offset + pd.offset);
+      context.paintChild(child, o + pd.offset);
     }
   }
 
@@ -488,7 +527,7 @@ class RenderStageFrame extends RenderStageBox
       final child = _paintOrdered[i];
       final pd = child.parentData! as StageParentData;
       final hit = result.addWithPaintOffset(
-        offset: pd.offset,
+        offset: pd.offset + _contentOffset,
         position: position,
         hitTest: (r, p) => child.hitTest(r, position: p),
       );
@@ -500,9 +539,8 @@ class RenderStageFrame extends RenderStageBox
   @override
   void applyPaintTransform(RenderStageBox child, Matrix4 transform) {
     final pd = child.parentData! as StageParentData;
-    transform.multiply(
-      Matrix4.translationValues(pd.offset.dx, pd.offset.dy, 0),
-    );
+    final o = pd.offset + _contentOffset;
+    transform.multiply(Matrix4.translationValues(o.dx, o.dy, 0));
     final t = child.paintTransform;
     if (t != null) transform.multiply(t);
   }
