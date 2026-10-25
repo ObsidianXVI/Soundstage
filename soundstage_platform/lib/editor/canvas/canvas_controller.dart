@@ -146,6 +146,10 @@ class CanvasController {
   /// Whether the initial zoom-to-fit happened.
   bool framed = false;
 
+  /// The full editor's camera while content mode borrows the canvas state:
+  /// the full editor's canvas takes it back when it mounts again.
+  CanvasCamera? savedEditorCamera;
+
   AnimationController? _anim;
   CanvasCamera? _from, _to;
   Offset _focal = Offset.zero;

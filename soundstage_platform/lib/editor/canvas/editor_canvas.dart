@@ -70,6 +70,14 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
     super.initState();
     _c.attachTicker(this);
     HardwareKeyboard.instance.addHandler(_onKey);
+    // Back from content mode: the camera this editor had before it.
+    final saved = _c.savedEditorCamera;
+    if (saved != null) {
+      _c.savedEditorCamera = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _c.setCamera(saved);
+      });
+    }
     // Auto-sized text is measured with this surface's fonts.
     _sizer = stageTextMeasurer(() => _env?.fonts ?? StageFontTable.none);
     _editor = ref.read(editorControllerProvider.notifier)

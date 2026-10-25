@@ -683,6 +683,101 @@ void main() {
     expect(r.canvas.overlay.rectFor('h1', 'mobile'), isNotNull);
   });
 
+  testWidgets('R2: an image replaced in content mode shows on the full '
+      "editor's Mobile artboard after the round trip; the camera comes back", (
+    tester,
+  ) async {
+    // fig: img1 on both; mobile patch img2 (as "This breakpoint: Mobile").
+    final doc = ir
+        .updateNode(
+          _doc(),
+          'fig',
+          (n) => n.copyWith(
+            common: n.common.copyWith(
+              breakpointOverrides: {
+                'mobile': {'fills.p1.assetId': const ir.IrValue.string('img2')},
+              },
+            ),
+          ),
+        )
+        .document;
+    final withImg2 = doc.copyWith(
+      assets: {
+        ...doc.assets,
+        'img2': doc.assets['img1']!.copyWith(id: 'img2', uri: 'local://img2'),
+      },
+    );
+    final r = await _pump(
+      tester,
+      const Size(1600, 1000),
+      document: withImg2,
+      pick: [
+        (
+          name: 'new.jpg',
+          bytes: FakeAssetService.png(40, 20),
+          mime: 'image/jpeg',
+        ),
+      ],
+    );
+    ir.ImagePaint shown(String bp) {
+      final n =
+          r.canvas.artboards[bp]!.scene!.root.children
+                  .firstWhere((c) => c.id == 'fig')
+                  .node
+              as ir.FrameNode;
+      return n.appearance.fills.whereType<ir.ImagePaint>().single;
+    }
+
+    expect(shown('mobile').assetId, 'img2');
+    final camera = r.canvas.camera.value;
+
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pump();
+    await tester.pump();
+    await r.tapNode('fig');
+    await tester.tap(find.text('Replace image'));
+    await r.settle();
+    await r.settle();
+    expect(
+      r.node('fig').common.breakpointOverrides['mobile']!['fills.p1.assetId'],
+      const ir.IrValue.string('asset1'),
+    );
+
+    tester.view.physicalSize = const Size(1600, 1000);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(r.canvas.artboards['mobile']!.effectiveBreakpointId, 'mobile');
+    expect(shown('mobile').assetId, 'asset1');
+    expect(shown('desktop').assetId, 'img1');
+    // The editor's own camera, so both artboards are where they were (with
+    // content mode's camera the Desktop artboard filled the view, R2).
+    expect(r.canvas.camera.value, camera, reason: "the editor's own camera");
+    final view = tester.getRect(find.byType(EditorCanvas));
+    final mobileOnScreen = r.canvas.camera.value
+        .rectToScreen(r.canvas.artboards['mobile']!.worldRect)
+        .shift(view.topLeft);
+    expect(view.inflate(1).contains(mobileOnScreen.topLeft), isTrue);
+    expect(view.inflate(1).contains(mobileOnScreen.bottomRight), isTrue);
+  });
+
+  testWidgets('opened in content mode, then widened: the full editor frames '
+      'both artboards', (tester) async {
+    final r = await _pump(tester, const Size(390, 844));
+    tester.view.physicalSize = const Size(1600, 1000);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    final view = tester.getRect(find.byType(EditorCanvas));
+    for (final bp in ['desktop', 'mobile']) {
+      final rect = r.canvas.camera.value
+          .rectToScreen(r.canvas.artboards[bp]!.worldRect)
+          .shift(view.topLeft);
+      expect(view.inflate(1).contains(rect.topLeft), isTrue, reason: bp);
+      expect(view.inflate(1).contains(rect.bottomRight), isTrue, reason: bp);
+    }
+  });
+
   group('layout', () {
     for (final size in [
       const Size(320, 568),

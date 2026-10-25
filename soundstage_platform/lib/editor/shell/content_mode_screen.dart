@@ -98,6 +98,11 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
   void initState() {
     super.initState();
     _c = ref.read(canvasControllerProvider);
+    // The full editor's camera, given back when the window widens again
+    // (R2: with content mode's camera the Desktop artboard filled the view
+    // where Mobile had been). None when the editor opened straight into
+    // content mode: the full editor then frames its artboards.
+    if (_c.framed) _c.savedEditorCamera = _c.camera.value;
     // Auto-sized text is measured with this surface's fonts.
     _sizer = stageTextMeasurer(() => _env?.fonts ?? StageFontTable.none);
     _editor = ref.read(editorControllerProvider.notifier)
@@ -109,8 +114,6 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
     if (identical(_editor.textMeasurer, _sizer)) _editor.textMeasurer = null;
     _images.clear();
     _keys.dispose();
-    // The desktop editor frames its artboards once: let it do so again.
-    _c.framed = false;
     super.dispose();
   }
 
