@@ -66,6 +66,11 @@ abstract class HistoryStatus with _$HistoryStatus {
 ///   (`sceneId → clockId → value`, in the clock's units). A clock without
 ///   one sits at 0 ([playheadOf]). Playheads are view state: changing one is
 ///   not an undoable edit.
+/// - `selectedAudioTrackId`: the audio track selected in the Scene
+///   settings' Audio list or the audio lane, shown by the inspector's Audio
+///   view. It is a separate notion from [selection] (audio tracks are not
+///   nodes): selecting a node, or changing scene, clears it, and so does
+///   removing the track.
 /// - `activeClocks`: the clock the timeline shows per scene
 ///   (`sceneId → clockId`); see [activeClockOf].
 /// - `revision`: a number identifying the document version (never reused,
@@ -78,6 +83,7 @@ abstract class EditorState with _$EditorState {
     @Default(<String>{}) Set<String> selection,
     String? selectionContext,
     String? textEditId,
+    String? selectedAudioTrackId,
     String? hoverId,
     String? activeSceneId,
     String? editingBreakpointId,

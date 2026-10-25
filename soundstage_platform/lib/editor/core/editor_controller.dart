@@ -133,6 +133,9 @@ class EditorController extends Notifier<EditorState> {
           !setEquals(r.selectionAfter, s.selection)) {
         select(r.selectionAfter!);
       }
+      if (r.ok && r.audioTrackAfter != null) {
+        selectAudioTrack(r.audioTrackAfter);
+      }
       return r;
     }
     // Auto-sized text keeps its stored size in line with its measured size
@@ -158,6 +161,12 @@ class EditorController extends Notifier<EditorState> {
         (index.sceneIndexOf(s.activeSceneId ?? '') != null
             ? s.activeSceneId
             : (doc.scenes.isEmpty ? null : doc.scenes.first.id));
+    final audio = _audioSelectionAfter(
+      r,
+      doc,
+      selection,
+      s.selectedAudioTrackId,
+    );
     final context = r.selectionAfter != null
         ? _contextFor(index, selection, s.selectionContext)
         : (s.selectionContext != null && index.contains(s.selectionContext!)
@@ -182,6 +191,7 @@ class EditorController extends Notifier<EditorState> {
       selection: selection,
       selectionContext: context,
       activeSceneId: scene,
+      selectedAudioTrackId: audio,
       textEditId: selection.contains(s.textEditId) ? s.textEditId : null,
       hoverId: s.hoverId != null && index.contains(s.hoverId!.split('/').first)
           ? s.hoverId
@@ -237,6 +247,28 @@ class EditorController extends Notifier<EditorState> {
     state = state.copyWith(
       selection: ids,
       selectionContext: context ?? _contextFor(index, ids, null),
+      selectedAudioTrackId: ids.isEmpty ? state.selectedAudioTrackId : null,
+      textEditId: null,
+    );
+  }
+
+  /// Selects audio track [trackId] (null clears it). The node selection is
+  /// cleared, so the inspector shows the track's Audio view; an unknown id
+  /// selects nothing.
+  void selectAudioTrack(String? trackId) {
+    final known =
+        trackId != null &&
+        state.document.audioTracks.any((t) => t.id == trackId);
+    if (!known) {
+      if (state.selectedAudioTrackId != null) {
+        state = state.copyWith(selectedAudioTrackId: null);
+      }
+      return;
+    }
+    state = state.copyWith(
+      selectedAudioTrackId: trackId,
+      selection: const {},
+      selectionContext: null,
       textEditId: null,
     );
   }
@@ -249,6 +281,9 @@ class EditorController extends Notifier<EditorState> {
     state = state.copyWith(
       selection: s.selection,
       selectionContext: s.context,
+      selectedAudioTrackId: s.selection.isEmpty
+          ? state.selectedAudioTrackId
+          : null,
       textEditId: s.textEditId,
     );
     if (starts) events.requestTextEdit(s.textEditId!, state.artboardId);
@@ -335,6 +370,7 @@ class EditorController extends Notifier<EditorState> {
       activeSceneId: sceneId,
       selection: const {},
       selectionContext: null,
+      selectedAudioTrackId: null,
       textEditId: null,
       hoverId: null,
     );
@@ -500,11 +536,32 @@ class EditorController extends Notifier<EditorState> {
       selection: snap.selection,
       selectionContext: snap.selectionContext,
       activeSceneId: snap.activeSceneId,
+      selectedAudioTrackId:
+          snap.selection.isEmpty &&
+              snap.document.audioTracks.any(
+                (t) => t.id == state.selectedAudioTrackId,
+              )
+          ? state.selectedAudioTrackId
+          : null,
       textEditId: null,
       hoverId: null,
       history: _status(),
     );
     return true;
+  }
+
+  /// The audio selection after command result [r]: the track it asks for,
+  /// else the current one while it exists and no node is selected.
+  static String? _audioSelectionAfter(
+    CommandResult r,
+    ir.StageDocument doc,
+    Set<String> selection,
+    String? current,
+  ) {
+    final want = r.audioTrackAfter;
+    if (want != null && doc.audioTracks.any((t) => t.id == want)) return want;
+    if (selection.isNotEmpty) return null;
+    return doc.audioTracks.any((t) => t.id == current) ? current : null;
   }
 
   HistoryStatus _status() => HistoryStatus(
