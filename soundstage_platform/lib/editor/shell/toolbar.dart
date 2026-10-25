@@ -62,6 +62,9 @@ class EditorToolbar extends ConsumerWidget {
     final history = ref.watch(
       editorControllerProvider.select((s) => s.history),
     );
+    final autoKey = ref.watch(
+      editorControllerProvider.select((s) => s.autoKey),
+    );
     // The breakpoint "This breakpoint" writes to: the one in effect on the
     // edited artboard (its free width may fall in another's range).
     final bpName = ref.watch(
@@ -193,6 +196,18 @@ class EditorToolbar extends ConsumerWidget {
             semanticLabel: 'Keyboard shortcuts',
             shortcut: shortcutLabel('help'),
             onPressed: onHelp,
+          ),
+          const SizedBox(width: SsSpace.s1),
+          SsIconButton(
+            key: const ValueKey<String>('toolbar-autokey'),
+            icon: SsIcons.timer,
+            semanticLabel: autoKey ? 'Auto-key on' : 'Auto-key',
+            tooltip: autoKey
+                ? 'Auto-key is on: changes to properties write keyframes'
+                : 'Auto-key: changes to properties write keyframes',
+            selected: autoKey,
+            selectedColor: c.danger,
+            onPressed: () => editor.setAutoKey(!autoKey),
           ),
           const SizedBox(width: SsSpace.s1),
           SsButton(

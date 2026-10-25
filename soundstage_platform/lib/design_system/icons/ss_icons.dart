@@ -95,6 +95,7 @@ abstract final class SsIcons {
   static const IconData component = IconData(0xe2ad, fontFamily: fontFamily);
   static const IconData copy = IconData(0xe09e, fontFamily: fontFamily);
   static const IconData crop = IconData(0xe0ab, fontFamily: fontFamily);
+  static const IconData diamond = IconData(0xe2d2, fontFamily: fontFamily);
   static const IconData droplet = IconData(0xe0b4, fontFamily: fontFamily);
   static const IconData ellipsis = IconData(0xe0b6, fontFamily: fontFamily);
   static const IconData ellipsisVertical = IconData(
@@ -169,6 +170,7 @@ abstract final class SsIcons {
   static const IconData play = IconData(0xe13c, fontFamily: fontFamily);
   static const IconData plus = IconData(0xe13d, fontFamily: fontFamily);
   static const IconData redo2 = IconData(0xe2a0, fontFamily: fontFamily);
+  static const IconData repeat = IconData(0xe146, fontFamily: fontFamily);
   static const IconData replace = IconData(0xe3db, fontFamily: fontFamily);
   static const IconData rotateCcw = IconData(0xe148, fontFamily: fontFamily);
   static const IconData rotateCw = IconData(0xe149, fontFamily: fontFamily);
@@ -198,6 +200,7 @@ abstract final class SsIcons {
   static const IconData sun = IconData(0xe178, fontFamily: fontFamily);
   static const IconData superscript = IconData(0xe25e, fontFamily: fontFamily);
   static const IconData tablet = IconData(0xe17e, fontFamily: fontFamily);
+  static const IconData timer = IconData(0xe1e0, fontFamily: fontFamily);
   static const IconData trash2 = IconData(0xe18e, fontFamily: fontFamily);
   static const IconData triangleAlert = IconData(
     0xe193,

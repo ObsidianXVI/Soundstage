@@ -127,6 +127,7 @@ class SsIconButton extends StatelessWidget {
     required this.semanticLabel,
     this.onPressed,
     this.selected = false,
+    this.selectedColor,
     this.size = SsSpace.hitTarget,
     this.iconSize = 16,
     this.tooltip,
@@ -142,6 +143,10 @@ class SsIconButton extends StatelessWidget {
 
   /// A toggled-on tool (selected-tool, panel open).
   final bool selected;
+
+  /// The hue of the toggled-on state instead of the accent (auto-key's
+  /// red): the icon in it, over a light wash of it.
+  final Color? selectedColor;
   final double size;
   final double iconSize;
 
@@ -169,8 +174,9 @@ class SsIconButton extends StatelessWidget {
         autofocus: autofocus,
         builder: (context, s) {
           final disabled = s.contains(WidgetState.disabled);
+          final tint = selectedColor;
           final bg = selected
-              ? c.selection
+              ? (tint == null ? c.selection : tint.withValues(alpha: 0.18))
               : s.contains(WidgetState.pressed)
               ? c.pressedLayer
               : s.contains(WidgetState.hovered)
@@ -179,7 +185,7 @@ class SsIconButton extends StatelessWidget {
           final fg = disabled
               ? c.textDisabled
               : selected
-              ? c.accentText
+              ? (selectedColor ?? c.accentText)
               : c.textSecondary;
           return SsFocusRing(
             visible: s.contains(WidgetState.focused),

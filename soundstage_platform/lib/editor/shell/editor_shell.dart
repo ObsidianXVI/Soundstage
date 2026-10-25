@@ -20,6 +20,7 @@ import '../panels/scenes_panel.dart';
 import '../shortcuts/editor_shortcuts.dart';
 import '../shortcuts/intents.dart';
 import '../shortcuts/shortcut_help.dart';
+import '../timeline/timeline_panel.dart';
 import 'content_mode_screen.dart';
 import 'editor_layout.dart';
 import 'resize_handle.dart';
@@ -223,6 +224,10 @@ class _DockedEditor extends ConsumerWidget {
       kRightPanelMin,
       math.min(kRightPanelMax, maxRight),
     );
+    final timelineH = clampTimelineHeight(
+      layout.timelineHeight,
+      MediaQuery.sizeOf(context).height,
+    );
 
     void help() => showShortcutHelp(context);
     final editor = ref.read(editorControllerProvider.notifier);
@@ -331,46 +336,18 @@ class _DockedEditor extends ConsumerWidget {
                     ],
                   ),
                 ),
-                _TimelineStrip(open: layout.timelineOpen),
+                TimelinePanel(
+                  open: layout.timelineOpen,
+                  height: timelineH,
+                  onToggle: notifier.toggleTimeline,
+                  onResize: (d) => notifier.setTimelineHeight(
+                    timelineH - d,
+                    available: MediaQuery.sizeOf(context).height,
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.ss;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(SsSpace.s6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SsIcon(icon, size: 24, color: t.colors.textDisabled),
-            const SizedBox(height: SsSpace.s3),
-            Text(title, style: t.text.bodyStrong, textAlign: TextAlign.center),
-            const SizedBox(height: SsSpace.s1),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: t.text.small.copyWith(color: t.colors.textSecondary),
-            ),
-          ],
         ),
       ),
     );
@@ -413,65 +390,6 @@ class _LeftPanel extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TimelineStrip extends ConsumerWidget {
-  const _TimelineStrip({required this.open});
-
-  final bool open;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = context.ss;
-    final c = t.colors;
-    final notifier = ref.read(editorLayoutProvider.notifier);
-    return AnimatedSize(
-      duration: SsMotion.base,
-      curve: SsMotion.easeOut,
-      alignment: Alignment.topCenter,
-      child: Container(
-        height: open ? 200 : 32,
-        decoration: BoxDecoration(
-          color: c.surface1,
-          border: Border(top: BorderSide(color: c.borderSubtle)),
-        ),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 31,
-              child: Row(
-                children: [
-                  const SizedBox(width: SsSpace.s3),
-                  Text('Timeline', style: t.text.bodyStrong),
-                  const SizedBox(width: SsSpace.s2),
-                  Text('Motion editing arrives in M2', style: t.text.caption),
-                  const Spacer(),
-                  SsIconButton(
-                    icon: open ? SsIcons.chevronDown : SsIcons.chevronUp,
-                    semanticLabel: open
-                        ? 'Collapse timeline'
-                        : 'Expand timeline',
-                    size: 24,
-                    iconSize: 14,
-                    onPressed: notifier.toggleTimeline,
-                  ),
-                  const SizedBox(width: SsSpace.s1),
-                ],
-              ),
-            ),
-            if (open)
-              const Expanded(
-                child: _EmptyState(
-                  icon: SsIcons.audioLines,
-                  title: 'Timeline',
-                  body: 'Keyframes and clips will be edited here.',
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

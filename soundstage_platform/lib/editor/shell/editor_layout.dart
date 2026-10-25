@@ -17,6 +17,22 @@ const double kRightPanelMax = 480;
 /// Narrowest the canvas may get when panels are widened.
 const double kCanvasMinWidth = 360;
 
+/// The expanded timeline's height range, and the canvas height it leaves
+/// at least (with the 44 px toolbar).
+const double kTimelineMinHeight = 120;
+const double kTimelineMaxHeight = 640;
+const double kTimelineDefaultHeight = 240;
+const double kCanvasMinHeight = 200;
+
+/// [height] clamped for a window [windowHeight] tall.
+double clampTimelineHeight(double height, double windowHeight) {
+  final max = math.max(
+    kTimelineMinHeight,
+    math.min(kTimelineMaxHeight, windowHeight - 44 - kCanvasMinHeight),
+  );
+  return height.clamp(kTimelineMinHeight, max);
+}
+
 /// Panel sizes and toggles. Lives in the root provider scope, so it is
 /// remembered for the session (across route changes), not across reloads.
 /// The edit scope and the tool are editor state (`EditorController`).
@@ -28,6 +44,7 @@ class EditorLayoutState {
     this.leftOpen = true,
     this.rightOpen = true,
     this.timelineOpen = false,
+    this.timelineHeight = kTimelineDefaultHeight,
     this.leftTab = LeftPanelTab.scenes,
   });
 
@@ -36,6 +53,9 @@ class EditorLayoutState {
   final bool leftOpen;
   final bool rightOpen;
   final bool timelineOpen;
+
+  /// The expanded timeline's height (its top edge drags).
+  final double timelineHeight;
   final LeftPanelTab leftTab;
 
   EditorLayoutState copyWith({
@@ -44,6 +64,7 @@ class EditorLayoutState {
     bool? leftOpen,
     bool? rightOpen,
     bool? timelineOpen,
+    double? timelineHeight,
     LeftPanelTab? leftTab,
   }) => EditorLayoutState(
     leftWidth: leftWidth ?? this.leftWidth,
@@ -51,6 +72,7 @@ class EditorLayoutState {
     leftOpen: leftOpen ?? this.leftOpen,
     rightOpen: rightOpen ?? this.rightOpen,
     timelineOpen: timelineOpen ?? this.timelineOpen,
+    timelineHeight: timelineHeight ?? this.timelineHeight,
     leftTab: leftTab ?? this.leftTab,
   );
 }
@@ -92,6 +114,15 @@ class EditorLayoutNotifier extends Notifier<EditorLayoutState> {
   void toggleTimeline() =>
       state = state.copyWith(timelineOpen: !state.timelineOpen);
   void setLeftTab(LeftPanelTab t) => state = state.copyWith(leftTab: t);
+
+  /// The expanded timeline's height, clamped (see [clampTimelineHeight]
+  /// for a window [available] tall).
+  void setTimelineHeight(double h, {double? available}) =>
+      state = state.copyWith(
+        timelineHeight: available == null
+            ? h.clamp(kTimelineMinHeight, kTimelineMaxHeight)
+            : clampTimelineHeight(h, available),
+      );
 }
 
 final editorLayoutProvider =
