@@ -203,7 +203,7 @@ class OverlayPainter extends CustomPainter {
   static int debugPaintCount = 0;
 
   /// Gap between an artboard and its label, in screen pixels.
-  static const double labelGap = 6;
+  static const double labelGap = OverlayGeometry.labelGap;
 
   /// Gap between the selection and its size label.
   static const double sizeLabelGap = 8;
