@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
 import '../core/core.dart';
-import '../panels/scenes_panel.dart';
 import 'inspector_providers.dart';
 import 'property_writer.dart';
 import 'section_registry.dart';
+import 'sections/scene_settings.dart';
 
 export 'fields/field_frame.dart';
 export 'fields/props.dart';
