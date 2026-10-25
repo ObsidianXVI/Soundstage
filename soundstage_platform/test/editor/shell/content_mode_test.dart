@@ -222,7 +222,11 @@ Future<_Rig> _pump(
   await tester.pump();
   await tester.pump();
   final container = ProviderScope.containerOf(
-    tester.element(find.byType(ContentModeScreen)),
+    tester.element(
+      find.byType(ContentModeScreen).evaluate().isNotEmpty
+          ? find.byType(ContentModeScreen)
+          : find.byType(EditorCanvas),
+    ),
   );
   return _Rig(tester, container, service, docs, picked);
 }
@@ -409,6 +413,62 @@ void main() {
       expect(r.docs, isNotEmpty);
     });
 
+    testWidgets('Replace image writes the mobile patch when mobile shows '
+        'its own image; desktop keeps its image', (tester) async {
+      final doc = ir
+          .updateNode(
+            _doc(),
+            'fig',
+            (n) => n.copyWith(
+              common: n.common.copyWith(
+                breakpointOverrides: {
+                  'mobile': {
+                    'fills.p1.assetId': const ir.IrValue.string('img2'),
+                  },
+                },
+              ),
+            ),
+          )
+          .document;
+      final withImg2 = doc.copyWith(
+        assets: {
+          ...doc.assets,
+          'img2': doc.assets['img1']!.copyWith(id: 'img2', uri: 'local://img2'),
+        },
+      );
+      final r = await _pump(
+        tester,
+        const Size(390, 844),
+        document: withImg2,
+        pick: [
+          (
+            name: 'new.jpg',
+            bytes: FakeAssetService.png(40, 20),
+            mime: 'image/jpeg',
+          ),
+        ],
+      );
+      await r.tapNode('fig');
+      await tester.tap(find.text('Replace image'));
+      await r.settle();
+      await r.settle();
+      final fig = r.node('fig') as ir.FrameNode;
+      expect((fig.appearance.fills.single as ir.ImagePaint).assetId, 'img1');
+      expect(fig.common.breakpointOverrides['mobile'], {
+        'fills.p1.assetId': const ir.IrValue.string('asset1'),
+      });
+      expect(r.st.history.undoLabel, 'Replace image');
+      r.ctl.undo();
+      await tester.pump();
+      expect(
+        (r
+            .node('fig')
+            .common
+            .breakpointOverrides['mobile']!['fills.p1.assetId']),
+        const ir.IrValue.string('img2'),
+      );
+    });
+
     testWidgets('alt text is edited on the figure', (tester) async {
       final r = await _pump(tester, const Size(390, 844));
       await r.tapNode('fig');
@@ -445,13 +505,182 @@ void main() {
       await r.settle();
       await r.settle();
       expect(r.picked, contains('audio/*'));
-      expect(r.st.document.assets['aud1']!.byteSize, 5);
+      // A new asset; only this track points at it; the old file stays.
+      final track = r.st.document.audioTracks.single;
+      expect(track.assetId, isNot('aud1'));
+      expect(r.st.document.assets[track.assetId]!.name, 'storm.mp3');
+      expect(r.st.document.assets['aud1']!.byteSize, isNot(5));
+      expect(r.st.history.undoLabel, 'Replace sound');
+      r.ctl.undo();
+      await tester.pump();
+      expect(r.st.document.audioTracks.single.assetId, 'aud1');
       await tester.tap(_label('Edit text: Hello world'));
       await tester.pump();
       await tester.pump();
       expect(r.st.textEditId, 'h1');
+      // The caret is at the end, not a select-all (B11b).
+      expect(
+        r.layer.session!.selection,
+        const TextSelection.collapsed(offset: 11),
+      );
+      await r.typeDelta('!');
+      expect(r.textOf('h1'), 'Hello world!');
       expect(find.byKey(const ValueKey<String>('content-list')), findsNothing);
     });
+  });
+
+  group('taps on awkward stories (B3)', () {
+    /// A text wider than the 400 px artboard, and an image frame nested in
+    /// a frame filled with a radial gradient, low on a tall scene.
+    ir.StageDocument awkward() => ir.updateScene(_doc(), 's1', (s) {
+      final root = s.root;
+      return s.copyWith(
+        kind: ir.SceneKind.flow,
+        root: root.copyWith(
+          common: root.common.copyWith(height: 1600),
+          children: [
+            ...root.children,
+            const ir.TextNode(
+              common: ir.NodeCommon(
+                id: 'wide',
+                name: 'wide',
+                x: 20,
+                y: 420,
+                width: 1318,
+                height: 30,
+              ),
+              style: ir.TextStyleOverride(fontSize: 16),
+              content: [
+                ir.Paragraph(spans: [ir.Span(text: 'A very wide line')]),
+              ],
+            ),
+            const ir.FrameNode(
+              common: ir.NodeCommon(
+                id: 'grad',
+                name: 'grad',
+                x: 20,
+                y: 1200,
+                width: 300,
+                height: 220,
+              ),
+              appearance: ir.Appearance(
+                fills: [
+                  ir.Paint.gradient(
+                    id: 'g',
+                    kind: ir.GradientKind.radial,
+                    stops: [
+                      ir.ColorStop(
+                        position: 0,
+                        color: ir.StageColor(r: 1, g: 0, b: 0),
+                      ),
+                      ir.ColorStop(
+                        position: 1,
+                        color: ir.StageColor(r: 0, g: 0, b: 1),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              children: [
+                ir.FrameNode(
+                  common: ir.NodeCommon(
+                    id: 'pic',
+                    name: 'pic',
+                    x: 20,
+                    y: 20,
+                    width: 200,
+                    height: 150,
+                  ),
+                  appearance: ir.Appearance(
+                    fills: [ir.Paint.image(id: 'pi', assetId: 'img1')],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }).document;
+
+    /// A visible point of [id] on the surface (inside the artboard).
+    Offset visible(_Rig r, String id) {
+      final surface = r.tester.getRect(
+        find.byKey(const ValueKey<String>('content-surface')),
+      );
+      final b = r.canvas.overlay
+          .rectFor(id, 'mobile')!
+          .bounds
+          .shift(surface.topLeft);
+      return b.intersect(surface).center;
+    }
+
+    Future<void> scroll(_Rig r, double dy) async {
+      final surface = r.tester.getRect(
+        find.byKey(const ValueKey<String>('content-surface')),
+      );
+      // From the left margin, clear of the texts.
+      await r.tester.dragFrom(
+        Offset(surface.left + 6, surface.center.dy),
+        Offset(0, dy),
+      );
+      await r.tester.pump();
+    }
+
+    testWidgets('a nested image in a gradient frame opens its panel', (
+      tester,
+    ) async {
+      final r = await _pump(tester, const Size(390, 844), document: awkward());
+      await scroll(r, -700);
+      expect(r.canvas.overlay.rectFor('pic', 'mobile'), isNotNull);
+      await tester.tapAt(visible(r, 'pic'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Replace image'), findsOneWidget);
+    });
+
+    testWidgets('a text wider than the artboard starts editing; another '
+        'slot can be tapped next', (tester) async {
+      final r = await _pump(tester, const Size(390, 844), document: awkward());
+      await tester.tapAt(visible(r, 'wide'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, 'wide');
+      await scroll(r, -700);
+      await tester.tapAt(visible(r, 'pic'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, isNull);
+      expect(find.text('Replace image'), findsOneWidget);
+      await scroll(r, 700);
+      await tester.tapAt(visible(r, 'wide'));
+      await tester.pump();
+      await tester.pump();
+      expect(r.st.textEditId, 'wide');
+    });
+  });
+
+  testWidgets('after the full editor narrows to content mode, taps still '
+      'reach text and images (B3)', (tester) async {
+    final r = await _pump(tester, const Size(1600, 1000));
+    expect(find.byType(EditorCanvas), findsOneWidget);
+    expect(r.canvas.artboards.keys, containsAll(['desktop', 'mobile']));
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(ContentModeScreen), findsOneWidget);
+    await r.tapNode('h1');
+    expect(r.st.textEditId, 'h1');
+    await r.tapNode('fig');
+    expect(find.text('Replace image'), findsOneWidget);
+    // And back to the full editor: its artboards have geometry again.
+    tester.view.physicalSize = const Size(1600, 1000);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(EditorCanvas), findsOneWidget);
+    expect(r.canvas.overlay.rectFor('h1', 'desktop'), isNotNull);
+    expect(r.canvas.overlay.rectFor('h1', 'mobile'), isNotNull);
   });
 
   group('layout', () {

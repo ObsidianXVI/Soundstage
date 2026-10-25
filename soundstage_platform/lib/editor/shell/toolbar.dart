@@ -38,9 +38,9 @@ class EditorToolbar extends ConsumerWidget {
     (EditorTool.move, SsIcons.mousePointer2, 'Move', 'toolMove'),
     (EditorTool.frame, SsIcons.frame, 'Frame', 'toolFrame'),
     (EditorTool.text, SsIcons.type, 'Text', 'toolText'),
-    (EditorTool.rectangle, SsIcons.square, 'Rectangle', 'toolRectangle'),
-    (EditorTool.ellipse, SsIcons.circle, 'Ellipse', 'toolEllipse'),
-    (EditorTool.line, SsIcons.minus, 'Line', 'toolLine'),
+  ];
+
+  static const _after = <(EditorTool, IconData, String, String)>[
     (EditorTool.image, SsIcons.imagePlus, 'Image', 'toolImage'),
     (EditorTool.hand, SsIcons.hand, 'Hand', 'toolHand'),
   ];
@@ -102,6 +102,15 @@ class EditorToolbar extends ConsumerWidget {
           ),
           const _Divider(),
           for (final (t, icon, label, id) in _tools)
+            SsIconButton(
+              icon: icon,
+              semanticLabel: label,
+              shortcut: shortcutLabel(id),
+              selected: tool == t,
+              onPressed: () => editor.setTool(t),
+            ),
+          ShapeToolButton(tool: tool, onSelect: editor.setTool),
+          for (final (t, icon, label, id) in _after)
             SsIconButton(
               icon: icon,
               semanticLabel: label,
@@ -251,6 +260,89 @@ class _ZoomReadout extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// The shape tools (Figma's shape menu): the button holds the last shape
+/// tool used (a click picks it again; R, O and L still pick theirs), and
+/// the chevron opens the menu of all five.
+class ShapeToolButton extends StatefulWidget {
+  const ShapeToolButton({
+    required this.tool,
+    required this.onSelect,
+    super.key,
+  });
+
+  final EditorTool tool;
+  final ValueChanged<EditorTool> onSelect;
+
+  /// The shape tools in menu order: tool, icon, label, shortcut id.
+  static const shapes = <(EditorTool, IconData, String, String)>[
+    (EditorTool.rectangle, SsIcons.square, 'Rectangle', 'toolRectangle'),
+    (EditorTool.line, SsIcons.minus, 'Line', 'toolLine'),
+    (EditorTool.ellipse, SsIcons.circle, 'Ellipse', 'toolEllipse'),
+    (EditorTool.polygon, SsIcons.hexagon, 'Polygon', 'toolPolygon'),
+    (EditorTool.star, SsIcons.star, 'Star', 'toolStar'),
+  ];
+
+  @override
+  State<ShapeToolButton> createState() => _ShapeToolButtonState();
+}
+
+class _ShapeToolButtonState extends State<ShapeToolButton> {
+  EditorTool _last = EditorTool.rectangle;
+
+  @override
+  void didUpdateWidget(ShapeToolButton old) {
+    super.didUpdateWidget(old);
+    if (ShapeToolButton.shapes.any((e) => e.$1 == widget.tool)) {
+      _last = widget.tool;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ShapeToolButton.shapes.firstWhere((e) => e.$1 == _last);
+    final active = ShapeToolButton.shapes.any((e) => e.$1 == widget.tool);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SsIconButton(
+          key: const ValueKey<String>('tool-shape'),
+          icon: current.$2,
+          semanticLabel: current.$3,
+          shortcut: shortcutLabel(current.$4),
+          selected: active,
+          onPressed: () => widget.onSelect(current.$1),
+        ),
+        Builder(
+          builder: (anchor) => SsIconButton(
+            key: const ValueKey<String>('tool-shape-menu'),
+            icon: SsIcons.chevronDown,
+            semanticLabel: 'Shape tools',
+            tooltip: 'Shape tools',
+            size: 16,
+            iconSize: 12,
+            onPressed: () => showSsMenu(
+              anchor,
+              anchor: ssGlobalRect(anchor),
+              placement: SsPlacement.belowStart,
+              minWidth: 180,
+              entries: [
+                for (final (t, icon, label, id) in ShapeToolButton.shapes)
+                  SsMenuItem(
+                    label: label,
+                    icon: icon,
+                    shortcut: shortcutLabel(id),
+                    checked: widget.tool == t,
+                    onSelected: () => widget.onSelect(t),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

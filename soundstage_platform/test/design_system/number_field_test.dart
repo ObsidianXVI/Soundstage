@@ -206,4 +206,39 @@ void main() {
     expect(find.bySemanticsLabel('X'), findsWidgets);
     handle.dispose();
   });
+
+  testWidgets('after Enter, a new value while still focused shows; blur '
+      'does not write the old number to the new target', (tester) async {
+    final log = <double>[];
+    late StateSetter set;
+    double? value = 100;
+    await pumpChrome(
+      tester,
+      StatefulBuilder(
+        builder: (context, s) {
+          set = s;
+          return _field(value: value, log: log);
+        },
+      ),
+    );
+    await tester.tap(textFieldIn(SsNumberField));
+    await tester.pump();
+    await _type(tester, '32');
+    expect(log, [32]);
+    // The target changes (another selection) while the field has focus.
+    set(() => value = 0);
+    await tester.pump();
+    expect(_text(tester), '0');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(log, [32], reason: 'no stale write on blur');
+
+    // Typed but not committed: blur still commits.
+    await tester.tap(textFieldIn(SsNumberField));
+    await tester.pump();
+    await tester.enterText(textFieldIn(SsNumberField), '7');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(log, [32, 7]);
+  });
 }

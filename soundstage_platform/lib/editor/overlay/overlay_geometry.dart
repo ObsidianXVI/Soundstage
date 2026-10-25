@@ -113,6 +113,34 @@ class OverlayGeometry {
     return null;
   }
 
+  /// The artboard (breakpoint id) whose name label is under [screen], or
+  /// null. The label sits [labelGap] above the artboard's top edge; its
+  /// band ([labelBand] tall) spans the artboard's width (at least
+  /// [minLabelWidth] screen pixels), like the label the overlay paints.
+  String? artboardLabelAt(Offset screen) {
+    final cam = canvas.camera.value;
+    for (final a in canvas.artboards.values.toList().reversed) {
+      final r = cam.rectToScreen(a.worldRect);
+      final band = Rect.fromLTRB(
+        r.left,
+        r.top - labelGap - labelBand,
+        r.left + (r.width < minLabelWidth ? minLabelWidth : r.width),
+        r.top,
+      );
+      if (band.contains(screen)) return a.breakpointId;
+    }
+    return null;
+  }
+
+  /// Gap between an artboard and its name label, in screen pixels.
+  static const double labelGap = 6;
+
+  /// The clickable height of an artboard's name label, in screen pixels.
+  static const double labelBand = 18;
+
+  /// The narrowest clickable label, in screen pixels.
+  static const double minLabelWidth = 120;
+
   /// Every node under [screen], topmost first (later siblings and their
   /// descendants before earlier ones, children before their parent), on the
   /// artboard under the point. This is the hit list the selection rules

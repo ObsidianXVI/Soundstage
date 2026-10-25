@@ -149,8 +149,10 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
     final typed = _typeStart;
     _typeStart = null;
     final down = _lastDown;
+    var placed = false;
     if (typed != null) {
       session.selection = TextSelection.collapsed(offset: session.text.length);
+      placed = true;
     } else if (down != null) {
       final local = _nodeLocal(_toLayer(down.global), id, bp);
       final box = _box(id, bp);
@@ -169,7 +171,13 @@ class TextEditLayerState extends ConsumerState<TextEditLayer> {
         }
         _lastClickTime = down.time;
         _lastClickAt = _toLayer(down.global);
+        placed = true;
       }
+    }
+    if (!placed && widget.contentOnly) {
+      // Opened from the content list (no tap on the text): the caret goes
+      // to the end, so the first keystroke adds rather than replaces.
+      session.selection = TextSelection.collapsed(offset: session.text.length);
     }
     _session = session;
     session.addListener(_onSession);

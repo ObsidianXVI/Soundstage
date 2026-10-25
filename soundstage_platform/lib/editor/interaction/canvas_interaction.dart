@@ -325,6 +325,18 @@ class CanvasInteractionState extends ConsumerState<CanvasInteraction> {
 
     if (_gradientPress(p, mods)) return;
 
+    // The artboard's name label selects the scene root (Figma: clicking a
+    // top-level frame's title), the one way to reach the root's fills, clip
+    // and auto layout on the canvas.
+    if (_g.artboardLabelAt(p) case final labelBp?) {
+      final rootId = _c.artboards[labelBp]?.scene?.root.id;
+      if (rootId != null) {
+        _ctl.setEditingBreakpoint(labelBp);
+        _ctl.select({rootId});
+        return;
+      }
+    }
+
     final z = _zoneAt(p);
     if (z != null) {
       _ctl.setEditingBreakpoint(z.breakpointId);

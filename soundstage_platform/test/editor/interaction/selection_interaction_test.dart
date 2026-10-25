@@ -157,4 +157,25 @@ void main() {
       unawaited(sub.cancel());
     });
   });
+
+  group('the artboard label', () {
+    testWidgets('a click on it selects the scene root on that artboard; a '
+        'click inside the artboard never does', (tester) async {
+      final h = await pumpCanvas(tester);
+      // Above the desktop artboard's top-left corner, on the label.
+      await h.click(h.desk(10, -10));
+      expect(h.st.selection, {'root'});
+      expect(h.st.breakpointId, 'desktop');
+      // The mobile artboard's label.
+      await h.click(h.mob(10, -10));
+      expect(h.st.selection, {'root'});
+      expect(h.st.breakpointId, 'mobile');
+      // Empty space inside the artboard clears the selection.
+      await h.click(h.desk(900, 300));
+      expect(h.st.selection, isEmpty);
+      // Far above the label: nothing.
+      await h.click(h.desk(10, -40));
+      expect(h.st.selection, isEmpty);
+    });
+  });
 }

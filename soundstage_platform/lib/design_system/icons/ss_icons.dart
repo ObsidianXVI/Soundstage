@@ -125,6 +125,7 @@ abstract final class SsIcons {
   );
   static const IconData gripVertical = IconData(0xe0eb, fontFamily: fontFamily);
   static const IconData hand = IconData(0xe1d7, fontFamily: fontFamily);
+  static const IconData hexagon = IconData(0xe0f3, fontFamily: fontFamily);
   static const IconData image = IconData(0xe0f6, fontFamily: fontFamily);
   static const IconData imagePlus = IconData(0xe1f7, fontFamily: fontFamily);
   static const IconData imageUp = IconData(0xe5cb, fontFamily: fontFamily);
@@ -188,6 +189,7 @@ abstract final class SsIcons {
     0xe648,
     fontFamily: fontFamily,
   );
+  static const IconData star = IconData(0xe176, fontFamily: fontFamily);
   static const IconData strikethrough = IconData(
     0xe177,
     fontFamily: fontFamily,

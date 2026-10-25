@@ -237,6 +237,38 @@ class AssetActions {
     return files.isEmpty ? false : replaceFile(assetId, files.first);
   }
 
+  /// Picks an audio file and makes it the sound of track [trackId] only
+  /// (content mode's *Replace*): the file becomes a new asset and the track
+  /// points at it, so other tracks that share the old asset keep it. The
+  /// old asset stays until the unused-asset clean-up. One undo step.
+  ///
+  /// Unlike [pickAndReplace] (the Assets panel's *Replace file…*, which
+  /// swaps the file behind an asset everywhere it is used).
+  Future<bool> pickAndReplaceTrack(String trackId) async {
+    final track = _state.document.audioTracks
+        .where((t) => t.id == trackId)
+        .firstOrNull;
+    if (track == null) return false;
+    final files = await _ref.read(editorFilePickerProvider)(accept: 'audio/*');
+    if (files.isEmpty) return false;
+    final file = files.first;
+    final mime = mimeOfFile(file);
+    if (mime == null || mediaKindForMime(mime) != ir.AssetKind.audio) {
+      _say('${file.name}: choose an audio file.');
+      return false;
+    }
+    final anchor = _ctl.history.lastEntry;
+    final assets = await _insert.addToLibrary([file]);
+    if (assets.isEmpty) return false;
+    final r = _ctl.execute(SetAudioTrackAsset(trackId, assets.first.id));
+    if (!r.ok) {
+      _say(r.diagnostics.map((d) => d.message).join('\n'));
+      return false;
+    }
+    _ctl.squashHistoryAfter(anchor, 'Replace sound');
+    return true;
+  }
+
   /// Deletes [assetId] if nothing uses it. Returns the places that use it
   /// instead when something does (the asset stays).
   List<AssetUsage> delete(String assetId) {
