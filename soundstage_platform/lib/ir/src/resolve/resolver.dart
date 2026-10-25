@@ -629,6 +629,10 @@ class _Memo {
   /// Resolved tracks by source track (identity, weak).
   Expando<_TrackMemo> tracks = Expando<_TrackMemo>('resolvedTrack');
 
+  /// The last document node index and the resolved roots it was built from.
+  Map<String, ResolvedNode>? nodeIndex;
+  List<ResolvedNode> indexRoots = const [];
+
   /// Mode variants kept per node (oldest dropped first).
   static const int maxModeEntries = 4;
 
@@ -653,6 +657,8 @@ class _Memo {
     if (!isValidFor(doc, ctx)) {
       nodes = Expando<List<_MemoEntry>>('resolved');
       tracks = Expando<_TrackMemo>('resolvedTrack');
+      nodeIndex = null;
+      indexRoots = const [];
     }
     _doc = doc;
     _ctx = ctx;
@@ -804,11 +810,24 @@ class _Pass {
     final overlay = doc.overlay == null
         ? null
         : _resolveNode(doc.overlay!, _Scope(prefix: '', modes: baseModes));
-    final index = <String, ResolvedNode>{};
-    for (final s in scenes) {
-      _index(s.root, index);
+    // The document index is rebuilt only when a root changed (a motion-only
+    // edit keeps every resolved root).
+    final roots = [for (final s in scenes) s.root, ?overlay];
+    var index = memo.nodeIndex;
+    final last = memo.indexRoots;
+    var same = index != null && last.length == roots.length;
+    for (var i = 0; same && i < roots.length; i++) {
+      same = identical(last[i], roots[i]);
     }
-    if (overlay != null) _index(overlay, index);
+    if (!same || index == null) {
+      index = <String, ResolvedNode>{};
+      for (final r in roots) {
+        _index(r, index);
+      }
+      memo
+        ..nodeIndex = index
+        ..indexRoots = roots;
+    }
     return ResolvedDocument(
       breakpoint: breakpoint,
       scenes: scenes,
@@ -858,6 +877,16 @@ class _Pass {
       if (b.primary) return b;
     }
     return bps.first;
+  }
+
+  /// Node indexes of resolved scene roots (a reused root reuses its index).
+  static final Expando<Map<String, ResolvedNode>> _sceneIndexes =
+      Expando<Map<String, ResolvedNode>>('sceneIndex');
+
+  static Map<String, ResolvedNode> _indexOf(ResolvedNode root) {
+    final out = <String, ResolvedNode>{};
+    _index(root, out);
+    return out;
   }
 
   static void _index(ResolvedNode n, Map<String, ResolvedNode> out) {
@@ -1038,8 +1067,7 @@ class _Pass {
   ResolvedScene _resolveScene(Scene scene, Map<String, String> baseModes) {
     final modes = _withOverrides(baseModes, scene.modeOverrides, scene.id);
     final root = _resolveNode(scene.root, _Scope(prefix: '', modes: modes));
-    final index = <String, ResolvedNode>{};
-    _index(root, index);
+    final index = _sceneIndexes[root] ??= _indexOf(root);
     // Tracks that apply at the active breakpoint. A breakpoint-specific
     // track wins over an all-breakpoints track on the same target and
     // property (m2.md "Tracks and breakpoints"); the runtime evaluates
