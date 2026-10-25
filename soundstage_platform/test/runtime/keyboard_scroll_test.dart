@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,22 +46,17 @@ void main() {
     (LogicalKeyboardKey.space, 'Space'),
     (LogicalKeyboardKey.arrowDown, 'ArrowDown'),
   ]) {
-    // Space and the arrows are default scroll shortcuts on the web only;
-    // PageDown is one everywhere.
-    testWidgets(
-      '$name scrolls the story',
-      skip: !kIsWeb && key != LogicalKeyboardKey.pageDown,
-      (tester) async {
-        tester.view
-          ..physicalSize = const Size(800, 600)
-          ..devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        final c = await pump(tester);
-        expect(c.scrollController!.offset, 0);
-        await tester.sendKeyEvent(key);
-        await tester.pumpAndSettle();
-        expect(c.scrollController!.offset, greaterThan(20), reason: name);
-      },
-    );
+    // The player handles these keys itself (T2.7), on every platform.
+    testWidgets('$name scrolls the story', (tester) async {
+      tester.view
+        ..physicalSize = const Size(800, 600)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final c = await pump(tester);
+      expect(c.scrollController!.offset, 0);
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(c.scrollController!.offset, greaterThan(20), reason: name);
+    });
   }
 }

@@ -74,9 +74,32 @@ class StageTimelineSource extends StageClockSource {
     }
   }
 
+  bool _reduced = false;
+
+  /// Reduced motion (see [StageClockSource.reducedMotionChanged]): the
+  /// `autoplay` and `sceneEnter` triggers jump to the end state and stay
+  /// there (a `loop` or `pingPong` timeline has no end: it rests at its
+  /// start). `interaction` timelines wait for [play] as before. Switching
+  /// it off restarts an `autoplay` timeline; a `sceneEnter` one starts the
+  /// next time its scene becomes visible.
+  @override
+  void reducedMotionChanged({required bool reduced}) {
+    if (reduced == _reduced) return;
+    _reduced = reduced;
+    if (clock.trigger == ir.TimelineTrigger.interaction) return;
+    if (reduced) {
+      _playing = false;
+      _position = clock.loop == ir.TimelineLoop.none
+          ? (clock.rate >= 0 ? duration : 0)
+          : 0;
+    } else if (clock.trigger == ir.TimelineTrigger.autoplay) {
+      play();
+    }
+  }
+
   @override
   void sceneVisibilityChanged({required bool visible}) {
-    if (clock.trigger != ir.TimelineTrigger.sceneEnter) return;
+    if (clock.trigger != ir.TimelineTrigger.sceneEnter || _reduced) return;
     if (visible) {
       play();
     } else {

@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -151,6 +154,10 @@ class _StagePlayerState extends State<StagePlayer>
   Map<String, Set<String>> _sceneAssets = const {};
   bool _jumped = false;
 
+  /// `MediaQuery.disableAnimations`: the platform's reduced-motion setting
+  /// (`prefers-reduced-motion` on the web).
+  bool _reducedMotion = false;
+
   @override
   void initState() {
     super.initState();
@@ -161,6 +168,16 @@ class _StagePlayerState extends State<StagePlayer>
   }
 
   void _audioChanged() => _animator.notifyClockChanged();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (reduced == _reducedMotion) return;
+    _reducedMotion = reduced;
+    _animator.reducedMotion = reduced;
+    _scroll.smoothing = reduced ? null : widget.wheelSmoothing;
+  }
 
   StageClockFactories get _factories {
     final f = widget.clockFactories;
@@ -184,7 +201,7 @@ class _StagePlayerState extends State<StagePlayer>
     mode: widget.mode,
     clockOverrides: widget.clockOverrides,
     factories: _factories,
-  );
+  )..reducedMotion = _reducedMotion;
 
   void _attachController(StagePlayerController? c) {
     if (c == null) return;
@@ -207,7 +224,7 @@ class _StagePlayerState extends State<StagePlayer>
   @override
   void didUpdateWidget(StagePlayer old) {
     super.didUpdateWidget(old);
-    _scroll.smoothing = widget.wheelSmoothing;
+    _scroll.smoothing = _reducedMotion ? null : widget.wheelSmoothing;
     final envChanged =
         !identical(old.environment, widget.environment) ||
         old.mode != widget.mode ||
@@ -293,7 +310,15 @@ class _StagePlayerState extends State<StagePlayer>
           },
           builder: (context, inWindow) {
             _sceneWindowChanged(scene.id, inWindow, viewport.width);
-            if (!inWindow) return const SizedBox.shrink();
+            if (!inWindow) {
+              // Keeps the scene's landmark while its stage is not built.
+              return widget.mode == StageRenderMode.edit
+                  ? const SizedBox.shrink()
+                  : stageSceneLandmark(
+                      scene.name,
+                      child: const SizedBox.shrink(),
+                    );
+            }
             return StageSceneView(
               key: ValueKey<String>(scene.id),
               scene: scene,
@@ -322,6 +347,83 @@ class _StagePlayerState extends State<StagePlayer>
     for (final id in _sceneAssets[sceneId] ?? const <String>{}) {
       if (!keep.contains(id)) media.releaseAsset(id);
     }
+  }
+
+  // ---- Keyboard (T2.7) ----------------------------------------------------------
+
+  /// Scroll offsets where each scene starts, in order.
+  List<double> _sceneStarts() {
+    final resolved = _resolved;
+    if (resolved == null) return const [];
+    return [
+      for (final scene in resolved.scenes)
+        if (_sceneKeys[scene.id]?.currentContext?.findRenderObject()
+            case final RenderSliver sliver when sliver.attached)
+          sliver.constraints.precedingScrollExtent,
+    ];
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent || !_scroll.hasClients) {
+      return KeyEventResult.ignored;
+    }
+    final k = event.logicalKey;
+    final keys = HardwareKeyboard.instance;
+    // Browser and OS shortcuts (history, zoom, tab switching) stay theirs.
+    if (keys.isControlPressed || keys.isMetaPressed || keys.isAltPressed) {
+      return KeyEventResult.ignored;
+    }
+    final shift = keys.isShiftPressed;
+    final int direction;
+    final bool toEdge;
+    if (k == LogicalKeyboardKey.pageDown ||
+        k == LogicalKeyboardKey.arrowDown ||
+        (k == LogicalKeyboardKey.space && !shift)) {
+      direction = 1;
+      toEdge = false;
+    } else if (k == LogicalKeyboardKey.pageUp ||
+        k == LogicalKeyboardKey.arrowUp ||
+        (k == LogicalKeyboardKey.space && shift)) {
+      direction = -1;
+      toEdge = false;
+    } else if (k == LogicalKeyboardKey.home) {
+      direction = -1;
+      toEdge = true;
+    } else if (k == LogicalKeyboardKey.end) {
+      direction = 1;
+      toEdge = true;
+    } else {
+      return KeyEventResult.ignored;
+    }
+    if (shift && k != LogicalKeyboardKey.space) return KeyEventResult.ignored;
+    final p = _scroll.position;
+    final target = toEdge
+        ? (direction < 0 ? p.minScrollExtent : p.maxScrollExtent)
+        : keyboardScrollTarget(
+            offset: p.pixels,
+            viewport: p.viewportDimension,
+            min: p.minScrollExtent,
+            max: p.maxScrollExtent,
+            sceneStarts: _sceneStarts(),
+            direction: direction,
+          );
+    if (target == p.pixels) return KeyEventResult.handled;
+    if (_reducedMotion) {
+      _scroll.jumpTo(target);
+    } else {
+      final viewports = (target - p.pixels).abs() / p.viewportDimension;
+      _scroll.animateTo(
+        target,
+        duration: Duration(
+          milliseconds: (260 + 120 * math.sqrt(viewports)).round().clamp(
+            260,
+            700,
+          ),
+        ),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+    return KeyEventResult.handled;
   }
 
   void _maybeJumpToInitialScene() {
@@ -372,13 +474,20 @@ class _StagePlayerState extends State<StagePlayer>
                   child: Focus(
                     focusNode: _focus,
                     autofocus: true,
-                    child: CustomScrollView(
-                      controller: _scroll,
-                      physics: widget.physics,
-                      scrollCacheExtent: ScrollCacheExtent.viewport(
-                        widget.lazyWindow,
+                    onKeyEvent: _onKey,
+                    // A text direction up the semantics tree makes the
+                    // scenes (siblings in the scroll view) read in order.
+                    child: Semantics(
+                      container: true,
+                      textDirection: TextDirection.ltr,
+                      child: CustomScrollView(
+                        controller: _scroll,
+                        physics: widget.physics,
+                        scrollCacheExtent: ScrollCacheExtent.viewport(
+                          widget.lazyWindow,
+                        ),
+                        slivers: _slivers,
                       ),
-                      slivers: _slivers,
                     ),
                   ),
                 ),
@@ -451,4 +560,33 @@ Set<String> sceneFontFamilyIds(ir.ResolvedScene scene) {
 
   visit(scene.root);
   return out;
+}
+
+/// Where a keyboard move from [offset] ends: a viewport on in [direction]
+/// (1 down, -1 up), but never past a scene start it would cross, so every
+/// scene start is reachable by keyboard and a long scene is crossed one
+/// viewport at a time. Clamped to [min]…[max].
+double keyboardScrollTarget({
+  required double offset,
+  required double viewport,
+  required double min,
+  required double max,
+  required List<double> sceneStarts,
+  required int direction,
+}) {
+  const eps = 0.5;
+  if (direction > 0) {
+    final raw = offset + viewport;
+    var target = raw;
+    for (final s in sceneStarts) {
+      if (s > offset + eps && s <= raw && s < target) target = s;
+    }
+    return target.clamp(min, max);
+  }
+  final raw = offset - viewport;
+  var target = raw;
+  for (final s in sceneStarts) {
+    if (s < offset - eps && s >= raw && s > target) target = s;
+  }
+  return target.clamp(min, max);
 }

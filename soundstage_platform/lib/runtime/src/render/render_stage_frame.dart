@@ -339,7 +339,11 @@ class RenderStageFrame extends RenderStageBox
       final child = children[i];
       final box = l.boxes[i];
       child.layout(BoxConstraints.tight(box.size));
-      (child.parentData! as StageParentData).offset = box.topLeft;
+      final pd = child.parentData! as StageParentData;
+      if (pd.offset != box.topLeft) {
+        pd.offset = box.topLeft;
+        child.markSubtreeSemantics(); // reading order follows position
+      }
       if (child.common.visible) {
         bottom = math.max(bottom, rotatedBottom(box, child.common.rotation));
       }

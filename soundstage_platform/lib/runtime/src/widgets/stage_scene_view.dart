@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/semantics.dart' show SemanticsRole;
 import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
@@ -82,7 +83,7 @@ class _StageSceneViewState extends State<StageSceneView> {
     final env = StageScope.of(context);
     final scene = widget.scene;
     final root = scene.root;
-    return StageSceneBox(
+    final stage = StageSceneBox(
       kind: scene.kind,
       viewportSize: widget.viewportSize,
       background: scene.background,
@@ -97,8 +98,23 @@ class _StageSceneViewState extends State<StageSceneView> {
         repaintBoundaryIds: _boundaryIds(),
       ),
     );
+    return env.mode == StageRenderMode.edit
+        ? stage
+        : stageSceneLandmark(scene.name, child: stage);
   }
 }
+
+/// The screen-reader landmark of one scene, labelled by the scene's name
+/// (nameless scenes get a plain group). Invisible: it adds nothing to the
+/// story. The scene's text and figures nest inside it (see
+/// `render/stage_semantics.dart`).
+Widget stageSceneLandmark(String name, {required Widget child}) => Semantics(
+  container: true,
+  explicitChildNodes: true,
+  role: name.isEmpty ? null : SemanticsRole.region,
+  label: name.isEmpty ? null : name,
+  child: child,
+);
 
 /// The render-object widget of [RenderStageScene].
 class StageSceneBox extends SingleChildRenderObjectWidget {

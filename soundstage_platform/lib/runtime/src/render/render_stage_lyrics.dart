@@ -178,7 +178,13 @@ class RenderStageLyrics extends RenderStageBox
   ir.TextStyle _inactiveStyle = const ir.TextStyle();
   ir.TextStyle _activeStyle = const ir.TextStyle();
 
+  /// The whole transcript, one line per lyric line (not only the active
+  /// one). Time never changes it, so nothing is announced per line.
+  @override
+  String? get semanticsText => _lyrics?.lines.map((l) => l.text).join('\n');
+
   void _reset() {
+    markNeedsSemanticsUpdate();
     for (final l in _lines ?? const <_Line>[]) {
       l.dispose();
     }
