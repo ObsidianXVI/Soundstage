@@ -6,6 +6,7 @@ library;
 export 'command.dart';
 export 'commands/align_commands.dart';
 export 'commands/asset_commands.dart';
+export 'commands/audio_commands.dart';
 export 'commands/breakpoint_commands.dart';
 export 'commands/gesture_commands.dart';
 export 'commands/motion_commands.dart';

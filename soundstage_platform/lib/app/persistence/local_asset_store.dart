@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:soundstage_platform/editor/audio/waveform_peaks.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart' show LocalAssetLoader;
 
@@ -21,6 +22,9 @@ class BrowserAssetAnalyzer implements AssetAnalyzer {
   Future<AssetAnalysis> analyze(Uint8List bytes, String mime) =>
       platform.analyzeInBrowser(bytes, mime);
 }
+
+/// Decodes audio into waveform peaks (null when it cannot).
+typedef PeaksDecoder = Future<WaveformPeaks?> Function(Uint8List bytes);
 
 /// Creates and revokes browser object URLs.
 abstract interface class ObjectUrlFactory {
@@ -110,9 +114,11 @@ class LocalAssetStore implements LocalAssetLoader {
     this._db, {
     AssetAnalyzer? analyzer,
     ObjectUrlFactory? urls,
+    PeaksDecoder? peaksDecoder,
     DateTime Function()? now,
     ir.IdGenerator? ids,
   }) : _analyzer = analyzer ?? const BrowserAssetAnalyzer(),
+       _decodePeaks = peaksDecoder ?? platform.decodePeaksInBrowser,
        _urls = urls ?? const BrowserObjectUrls(),
        _now = now ?? DateTime.now,
        _ids = ids ?? ir.IdGenerator();
@@ -120,6 +126,7 @@ class LocalAssetStore implements LocalAssetLoader {
   final StoryDatabase _db;
   final AssetAnalyzer _analyzer;
   final ObjectUrlFactory _urls;
+  final PeaksDecoder _decodePeaks;
   final DateTime Function() _now;
   final ir.IdGenerator _ids;
 
@@ -136,6 +143,7 @@ class LocalAssetStore implements LocalAssetLoader {
       throw UnsupportedAssetException('"$mime" is not a supported media type.');
     }
     final analysis = await _analyzer.analyze(bytes, mime);
+    final peaks = kind == ir.AssetKind.audio ? await _peaksOf(bytes) : null;
     final id = await _freshId();
     final meta = AssetMeta(
       id: id,
@@ -145,8 +153,9 @@ class LocalAssetStore implements LocalAssetLoader {
       name: name,
       width: analysis.width,
       height: analysis.height,
-      duration: analysis.duration,
+      duration: analysis.duration ?? peaks?.duration,
       dominantColor: analysis.dominantColor,
+      peaks: peaks?.data,
     );
     await _db.putAsset(AssetRecord(meta, bytes));
     return toAsset(meta);
@@ -169,6 +178,9 @@ class LocalAssetStore implements LocalAssetLoader {
       throw UnsupportedAssetException('"$mime" is not a supported media type.');
     }
     final analysis = await _analyzer.analyze(bytes, mime);
+    final peaks = assetKindForMime(mime) == ir.AssetKind.audio
+        ? await _peaksOf(bytes)
+        : null;
     final meta = AssetMeta(
       id: assetId,
       mime: mime,
@@ -177,9 +189,11 @@ class LocalAssetStore implements LocalAssetLoader {
       name: name ?? old.meta.name,
       width: analysis.width,
       height: analysis.height,
-      duration: analysis.duration,
+      duration: analysis.duration ?? peaks?.duration,
       dominantColor: analysis.dominantColor,
+      peaks: peaks?.data,
     );
+    _peaksCache.remove(assetId)?.ignore();
     await _db.putAsset(AssetRecord(meta, bytes));
     return toAsset(meta);
   }
@@ -202,6 +216,54 @@ class LocalAssetStore implements LocalAssetLoader {
     );
     await _db.putAsset(AssetRecord(meta, bytes));
     return asset.copyWith(uri: 'local://${asset.id}', byteSize: bytes.length);
+  }
+
+  /// Decoding failures (an undecodable file, too little memory) mean "no
+  /// peaks yet", never a failed upload: the file still plays.
+  Future<WaveformPeaks?> _peaksOf(Uint8List bytes) async {
+    try {
+      return await _decodePeaks(bytes);
+    } on Object {
+      return null;
+    }
+  }
+
+  final Map<String, Future<WaveformPeaks?>> _peaksCache = {};
+
+  /// The waveform peaks of audio asset [assetId]: read from its record, or
+  /// computed now and stored when it has none (an asset uploaded before
+  /// peaks existed, imported, or whose decode failed). Null for a missing
+  /// or non-audio asset and for audio that cannot be decoded. Concurrent
+  /// callers share one decode.
+  Future<WaveformPeaks?> peaks(String assetId) => _peaksCache.putIfAbsent(
+    assetId,
+    () => _loadPeaks(assetId).then((p) {
+      if (p == null) _peaksCache.remove(assetId);
+      return p;
+    }),
+  );
+
+  Future<WaveformPeaks?> _loadPeaks(String assetId) async {
+    final rec = await _db.getAsset(assetId);
+    if (rec == null || assetKindForMime(rec.meta.mime) != ir.AssetKind.audio) {
+      return null;
+    }
+    final have = rec.meta.peaks;
+    if (have != null) {
+      return WaveformPeaks(
+        have,
+        rec.meta.duration ?? have.length * kPeakBucketSeconds,
+      );
+    }
+    final computed = await _peaksOf(rec.bytes);
+    if (computed == null) return null;
+    await _db.putAsset(
+      AssetRecord(
+        rec.meta.withPeaks(computed.data, duration: computed.duration),
+        rec.bytes,
+      ),
+    );
+    return WaveformPeaks(computed.data, rec.meta.duration ?? computed.duration);
   }
 
   Future<String> _freshId() async {

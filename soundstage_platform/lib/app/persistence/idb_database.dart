@@ -26,7 +26,8 @@ const int kIdbVersion = 1;
 /// - `revisions`: key `[storyId, rev]`, plus index `byStory` on
 ///   `[storyId, savedAt, size]` so a listing is a key-only cursor and never
 ///   reads a document.
-/// - `assets`: key `assetId`; the file is a `Blob`.
+/// - `assets`: key `assetId`; the file is a `Blob`; audio rows also hold
+///   `peaks`, a `Uint8Array` of waveform peaks (10 ms buckets).
 ///
 /// Every public method is a single transaction. Code inside a transaction
 /// never awaits, so it cannot outlive the transaction's active window.
@@ -329,6 +330,7 @@ class IndexedDbStoryDatabase implements StoryDatabase {
     height: _int(o, 'height'),
     duration: (_p(o, 'duration') as JSNumber?)?.toDartDouble,
     dominantColor: _int(o, 'dominantColor'),
+    peaks: (_p(o, 'peaks') as JSUint8Array?)?.toDart,
   );
 
   @override
@@ -352,6 +354,7 @@ class IndexedDbStoryDatabase implements StoryDatabase {
             'height': m.height?.toJS,
             'duration': m.duration?.toJS,
             'dominantColor': m.dominantColor?.toJS,
+            'peaks': m.peaks?.toJS,
           }),
         );
   });

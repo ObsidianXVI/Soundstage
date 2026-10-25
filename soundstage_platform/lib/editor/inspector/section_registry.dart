@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'inspector_providers.dart';
 import 'sections/appearance_section.dart';
 import 'sections/auto_layout_section.dart';
+import 'sections/behavior_section.dart';
 import 'sections/effects_section.dart';
 import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
@@ -59,5 +60,6 @@ final List<InspectorSectionSpec> kInspectorSections = [
   strokeSection,
   effectsSection,
   textSection,
+  behaviorSection,
   motionSection,
 ];
