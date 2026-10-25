@@ -2,6 +2,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../command.dart';
 import '../editor_state.dart';
+import 'motion_commands.dart';
 
 // Property writes (architecture §15 "SetProperty routing") and resets.
 
@@ -17,12 +18,11 @@ enum WriteTarget {
   breakpointPatch,
 }
 
-/// The routing decision for writing to [nodeId] in [state] (§15):
+/// The static routing decision for writing to [nodeId] in [state] (§15),
+/// once the motion routing ([writeAnimated]) has passed:
 ///
-/// 1. (M2) auto-key on and the property animatable → a keyframe at the
-///    playhead. Not built in M1: writes route as below.
-/// 2. Inside an instance (`<instanceId>/<innerPath>`) → instance override.
-/// 3. Else by the effective edit scope: *Both* → base, *This breakpoint* →
+/// 1. Inside an instance (`<instanceId>/<innerPath>`) → instance override.
+/// 2. Else by the effective edit scope: *Both* → base, *This breakpoint* →
 ///    a patch on the edited artboard's breakpoint.
 WriteTarget routeFor(EditorState state, String nodeId) {
   if (nodeId.contains('/')) return WriteTarget.instanceOverride;
@@ -31,7 +31,9 @@ WriteTarget routeFor(EditorState state, String nodeId) {
       : WriteTarget.breakpointPatch;
 }
 
-/// Writes [value] at [path] on [nodeId] as routed by [routeFor].
+/// Writes [value] at [path] on [nodeId]: through [writeAnimated] when the
+/// property is (or, with auto-key, becomes) animated, else as routed by
+/// [routeFor]. [ids] makes new track and keyframe ids (tests).
 ir.EditResult writeProperty(
   EditorState state,
   ir.StageDocument doc,
@@ -39,14 +41,9 @@ ir.EditResult writeProperty(
   String path,
   ir.IrValue value, {
   ir.PropertyRegistry? registry,
+  ir.IdGenerator? ids,
 }) {
   final reg = registry ?? ir.PropertyRegistry.standard;
-  // ---- M2: auto-key ------------------------------------------------------
-  // if (state.autoKey && (reg.lookup(path)?.descriptor.animatable ?? false))
-  //   → write a keyframe at `state.playhead` on the node's track for `path`
-  //     (AddKeyframe, §15.1). Until the timeline lands, writes fall through
-  //     to the routing below.
-  // ------------------------------------------------------------------------
   if (reg.lookup(path) == null) {
     return ir.EditResult(
       document: doc,
@@ -61,6 +58,16 @@ ir.EditResult writeProperty(
       ],
     );
   }
+  final animated = writeAnimated(
+    state,
+    doc,
+    nodeId,
+    path,
+    value,
+    registry: reg,
+    ids: ids,
+  );
+  if (animated != null) return animated;
   if (_isNoOp(state, doc, nodeId, path, value, reg)) {
     return ir.EditResult(document: doc, changed: false);
   }
@@ -108,6 +115,152 @@ ir.EditResult writeProperty(
         registry: reg,
       );
   }
+}
+
+// ---- Motion routing (m2.md "Writing values while animated") -------------------
+
+/// The track of [scene] that animates [path] of [nodeId] at breakpoint
+/// [breakpointId]: a breakpoint-specific track wins over an all-breakpoints
+/// one (as in the resolver and runtime). Null when none applies.
+ir.Track? animatingTrack(
+  ir.Scene scene,
+  String nodeId,
+  String path,
+  String? breakpointId,
+) {
+  ir.Track? all;
+  for (final t in scene.tracks) {
+    if (t.target != nodeId || t.property != path) continue;
+    final only = t.breakpoints;
+    if (only == null) {
+      all ??= t;
+    } else if (breakpointId != null && only.contains(breakpointId)) {
+      return t;
+    }
+  }
+  return all;
+}
+
+/// The motion part of the `SetProperty` routing, or null when the write is
+/// static (then [routeFor] decides):
+///
+/// 1. The property has a track that applies at the edited artboard's
+///    breakpoint ([animatingTrack]) → the keyframe at the playhead of that
+///    track's clock is written or replaced, whether or not auto-key is on
+///    (After Effects behaviour).
+/// 2. Else, auto-key on and the property animatable → a new track on the
+///    scene's active clock, following the edit scope (*Both* → all
+///    breakpoints, *This breakpoint* → the edited breakpoint only), with a
+///    keyframe at the playhead. When the playhead is not at the clock's
+///    start (−1 for a pointer clock, else 0), a keyframe at the start holds
+///    the previous static value, so the change animates rather than jumps.
+///    Writing the static value itself creates nothing.
+///
+/// Nodes in the document overlay have no tracks.
+ir.EditResult? writeAnimated(
+  EditorState state,
+  ir.StageDocument doc,
+  String nodeId,
+  String path,
+  ir.IrValue value, {
+  ir.PropertyRegistry? registry,
+  ir.IdGenerator? ids,
+}) {
+  final reg = registry ?? ir.PropertyRegistry.standard;
+  final index = ir.DocumentIndex.of(doc);
+  final loc = index.locate(nodeId.split('/').first);
+  final si = loc?.sceneIndex;
+  if (si == null) return null;
+  final scene = doc.scenes[si];
+  final bp = state.breakpointId;
+  final track = animatingTrack(scene, nodeId, path, bp);
+  if (track != null) {
+    return ir.writeKeyframeAt(
+      doc,
+      scene.id,
+      track.id,
+      t: state.playheadOf(scene.id, track.clockId),
+      value: value,
+      newId: freshMotionId({for (final k in track.keyframes) k.id}, ids),
+      registry: reg,
+    );
+  }
+  if (!state.autoKey) return null;
+  final match = reg.lookup(path);
+  if (match == null || !match.descriptor.animatable) return null;
+  final thisBreakpoint = state.effectiveScope == EditScope.thisBreakpoint;
+  if (thisBreakpoint && bp == null) return null;
+  final clockId = state.activeClockOf(scene.id);
+  if (clockId == null) return null;
+  final clock = scene.clocks.firstWhere((c) => c.id == clockId);
+  final t = state.playheadOf(scene.id, clockId);
+  final old = staticValueAt(doc, nodeId, path, bp, registry: reg);
+  if (old == value) return null;
+  final start = clock is ir.PointerClock ? -1.0 : 0.0;
+  final used = <String>{};
+  String next() {
+    final id = freshMotionId(used, ids);
+    used.add(id);
+    return id;
+  }
+
+  return ir.addTrack(
+    doc,
+    scene.id,
+    ir.Track(
+      id: freshMotionId(trackIdsOf(doc, scene.id), ids),
+      target: nodeId,
+      property: path,
+      clockId: clockId,
+      breakpoints: thisBreakpoint ? [bp!] : null,
+      keyframes: [
+        if (old != null && (t - start).abs() > ir.kKeyframeTimeEpsilon)
+          ir.Keyframe(id: next(), t: start, value: old),
+        ir.Keyframe(id: next(), t: t, value: value),
+      ],
+    ),
+    registry: reg,
+  );
+}
+
+/// The static (unanimated) value of [path] on [nodeId] at [breakpointId]:
+/// for an authored node without a token binding on the path, its base with
+/// the breakpoint chain's patches applied; otherwise (instance inner
+/// nodes, bindings, inherited text styles) through `Resolver.explain`,
+/// which resolves the node's scene once.
+ir.IrValue? staticValueAt(
+  ir.StageDocument doc,
+  String nodeId,
+  String path,
+  String? breakpointId, {
+  ir.PropertyRegistry? registry,
+}) {
+  final reg = registry ?? ir.PropertyRegistry.standard;
+  bool overlaps(String k) =>
+      k == path || k.startsWith('$path.') || path.startsWith('$k.');
+  if (!nodeId.contains('/')) {
+    final n = ir.DocumentIndex.of(doc).node(nodeId);
+    if (n != null && !n.common.bindings.keys.any(overlaps)) {
+      var seen = n;
+      if (breakpointId != null) {
+        for (final b
+            in ir.breakpointChain(doc.breakpoints, breakpointId).chain) {
+          final p = n.common.breakpointOverrides[b.id];
+          if (p != null) seen = ir.applyPatch(seen, p);
+        }
+      }
+      final v = reg.get(seen, path);
+      if (v != null && v is! ir.NoneValue) return v;
+    }
+  }
+  return ir.Resolver(registry: reg)
+      .explain(
+        doc,
+        nodeId,
+        ir.PropertyPath(path),
+        ir.ResolveContext(breakpointId: breakpointId),
+      )
+      .finalValue;
 }
 
 /// Whether writing [value] would leave [nodeId] as it is (so equal-value
@@ -219,12 +372,20 @@ ir.EditResult clearInstanceOverride(
 /// applies per node; nodes where the property doesn't apply are skipped
 /// with a warning.
 class SetProperty extends EditCommand {
-  SetProperty(Iterable<String> nodeIds, String path, ir.IrValue value)
-    : writes = {
-        for (final id in nodeIds) id: {path: value},
-      };
+  SetProperty(
+    Iterable<String> nodeIds,
+    String path,
+    ir.IrValue value, {
+    this.ids,
+  }) : writes = {
+         for (final id in nodeIds) id: {path: value},
+       };
 
-  SetProperty.values(this.writes);
+  SetProperty.values(this.writes, {this.ids});
+
+  /// Makes new track and keyframe ids for animated writes (tests; default:
+  /// random).
+  final ir.IdGenerator? ids;
 
   /// Node id → (path → value), applied in order.
   final Map<String, Map<String, ir.IrValue>> writes;
@@ -249,7 +410,7 @@ class SetProperty extends EditCommand {
       final diags = <ir.IrDiagnostic>[];
       var changed = false;
       for (final MapEntry(key: path, :value) in writes[id]!.entries) {
-        final w = writeProperty(state, current, id, path, value);
+        final w = writeProperty(state, current, id, path, value, ids: ids);
         if (!w.ok) return w.copyWith(document: doc, changed: false);
         current = w.document;
         changed |= w.changed;

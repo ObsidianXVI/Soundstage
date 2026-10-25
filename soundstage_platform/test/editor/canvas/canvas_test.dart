@@ -265,7 +265,7 @@ void main() {
       RenderStageBox a1(String bp) => h.canvas.artboards[bp]!.registry['a1']!;
       expect(a1('desktop').effectiveOpacity, closeTo(0.25, 1e-9));
       expect(a1('mobile').effectiveOpacity, closeTo(0.25, 1e-9));
-      h.ctl.setPlayhead('s1', 1);
+      h.ctl.setPlayhead('s1', 'clk1', 1);
       await tester.pump();
       expect(a1('desktop').effectiveOpacity, closeTo(1, 1e-9));
       expect(a1('mobile').effectiveOpacity, closeTo(1, 1e-9));

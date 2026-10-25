@@ -358,10 +358,37 @@ class EditorController extends Notifier<EditorState> {
 
   void setTool(EditorTool tool) => state = state.copyWith(tool: tool);
 
-  void setPlayhead(String sceneId, double t) =>
-      state = state.copyWith(playheads: {...state.playheads, sceneId: t});
+  /// Moves the playhead of clock [clockId] of scene [sceneId] to [t] (clock
+  /// units). Not an undoable edit: the document is untouched, so the canvas
+  /// re-evaluates its tracks without a resolve or a widget rebuild.
+  void setPlayhead(String sceneId, String clockId, double t) {
+    final scene = state.playheads[sceneId];
+    if (scene != null && scene[clockId] == t) return;
+    state = state.copyWith(
+      playheads: {
+        ...state.playheads,
+        sceneId: {...?scene, clockId: t},
+      },
+    );
+  }
 
-  /// Auto-key (M2: no effect on writes in M1).
+  /// Moves the active scene's active clock to [t] (see
+  /// [EditorState.activeClockId]).
+  void setActivePlayhead(double t) {
+    final scene = state.activeSceneId;
+    final clock = state.activeClockId;
+    if (scene != null && clock != null) setPlayhead(scene, clock, t);
+  }
+
+  /// Shows clock [clockId] of scene [sceneId] in the timeline.
+  void setActiveClock(String sceneId, String clockId) {
+    if (state.activeClocks[sceneId] == clockId) return;
+    state = state.copyWith(
+      activeClocks: {...state.activeClocks, sceneId: clockId},
+    );
+  }
+
+  /// Auto-key: writes to animatable properties without a track create one.
   void setAutoKey(bool on) => state = state.copyWith(autoKey: on);
 
   // ---- Resolution ---------------------------------------------------------
@@ -393,7 +420,8 @@ class EditorController extends Notifier<EditorState> {
   // ---- Inspector ----------------------------------------------------------
 
   /// How [path] of [nodeId] gets its value at [breakpointId] (default: the
-  /// edited breakpoint), for the inspector's value-source badge. Uses that
+  /// edited breakpoint), for the inspector's value-source badge, including
+  /// the `animated` layer at the playheads of the node's scene. Uses that
   /// breakpoint's long-lived resolver, so only the node's path is traced.
   ir.Provenance provenanceFor(
     String nodeId,
@@ -402,18 +430,19 @@ class EditorController extends Notifier<EditorState> {
   ]) {
     final bp = breakpointId ?? state.breakpointId;
     final ctx = ir.ResolveContext(breakpointId: bp);
-    if (bp == null) {
-      return ir.Resolver().explain(
-        state.document,
-        nodeId,
-        ir.PropertyPath(path),
-        ctx,
-      );
-    }
-    resolvedFor(bp); // brings the memo up to date
-    return resolverFor(
-      bp,
-    ).explain(state.document, nodeId, ir.PropertyPath(path), ctx);
+    final loc = ir.DocumentIndex.of(
+      state.document,
+    ).locate(nodeId.split('/').first);
+    final clocks = state.clockValuesOf(loc?.sceneId);
+    final resolver = bp == null ? ir.Resolver() : resolverFor(bp);
+    if (bp != null) resolvedFor(bp); // brings the memo up to date
+    return resolver.explainAt(
+      state.document,
+      nodeId,
+      ir.PropertyPath(path),
+      clocks,
+      ctx,
+    );
   }
 
   /// Resets [path] on [nodeIds] (default: the selection) to what it

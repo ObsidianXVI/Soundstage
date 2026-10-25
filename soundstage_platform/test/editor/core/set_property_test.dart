@@ -167,14 +167,6 @@ void main() {
       expect(bad.diagnostics.single.kind, IrDiagnosticKind.unknownPath);
       expect(c.st.history.undoLabel, 'Change properties');
     });
-
-    test('auto-key is reserved for M2: writes route as usual', () {
-      final c = editorContainer();
-      c.ctl.setAutoKey(true);
-      c.ctl.execute(SetProperty(['a1'], 'opacity', _half));
-      expect(c.node('a1').common.opacity, 0.5);
-      expect(c.doc.scenes.first.tracks, isEmpty);
-    });
   });
 
   group('ResetProperty via provenance', () {

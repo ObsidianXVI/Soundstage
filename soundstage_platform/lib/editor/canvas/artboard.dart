@@ -16,8 +16,17 @@ import 'canvas_controller.dart';
 /// - Height: a pinned scene shows at the viewport size (the design height);
 ///   a flow scene shows its full content height, so the artboard grows.
 /// - Clocks: a `StageAnimator` in edit mode holds every clock of the scene
-///   at the controller's playhead (0 in M1), so tracks show their values
-///   at that time; nothing ticks.
+///   at its playhead (`EditorState.playheads`; 0 without one), so every
+///   track of the scene shows its value at that time; nothing ticks and
+///   nothing is smoothed.
+/// - **Scrubbing** (m2.md "Playheads", §17.1): a playhead change is not
+///   watched by [build]. A listener hands the scene's playheads to the
+///   animator, which writes the changed tracks' values into the render
+///   objects directly: no widget rebuild and no document resolve per step.
+///   The overlay is told the geometry changed, so selection bounds and
+///   handles follow animated geometry.
+/// - Edits re-resolve and reload the animator, which recompiles only the
+///   tracks the edit touched (`StageAnimator.load`).
 /// - The artboard is a repaint boundary with its own node registry, which
 ///   the overlay reads ([ArtboardInfo]).
 class Artboard extends ConsumerStatefulWidget {
@@ -49,9 +58,7 @@ class _ArtboardState extends ConsumerState<Artboard>
   ir.ResolvedDocument? _loaded;
   StageEnvironment? _baseEnv;
   late StageEnvironment _env;
-  Map<String, double> _overrides = const {};
-  ir.ResolvedScene? _overridesScene;
-  double _overridesAt = 0;
+  String? _sceneId;
 
   @override
   void initState() {
@@ -63,6 +70,19 @@ class _ArtboardState extends ConsumerState<Artboard>
       mode: StageRenderMode.edit,
     );
     widget.controller.previewWidths.addListener(_widthsChanged);
+    ref.listenManual(
+      editorControllerProvider.select((s) => Identity(s.playheads)),
+      (_, _) => _pushPlayheads(),
+    );
+  }
+
+  /// Hands the shown scene's playheads to the animator (writes render
+  /// objects directly) and tells the overlay the geometry may have moved.
+  void _pushPlayheads() {
+    final values = ref.read(editorControllerProvider).clockValuesOf(_sceneId);
+    if (identical(values, _animator.clockOverrides)) return;
+    _animator.clockOverrides = values;
+    widget.controller.notifyGeometry();
   }
 
   /// Each artboard registers its own info (and node registry). When one
@@ -128,9 +148,6 @@ class _ArtboardState extends ConsumerState<Artboard>
     final sceneId = ref.watch(
       editorControllerProvider.select((s) => s.activeSceneId),
     );
-    final playhead = ref.watch(
-      editorControllerProvider.select((s) => s.playheads[sceneId] ?? 0.0),
-    );
     _width = widget.controller.previewWidthOf(bp.id);
     final width = _width ?? bp.designSize.width;
     final effective = _width == null
@@ -145,17 +162,14 @@ class _ArtboardState extends ConsumerState<Artboard>
       ..name = bp.name
       ..designSize = Size(bp.designSize.width, bp.designSize.height);
 
+    _sceneId = sceneId;
+    // Playheads first, so the reload evaluates new tracks at them.
+    _animator.clockOverrides = ref
+        .read(editorControllerProvider)
+        .clockValuesOf(sceneId);
     if (!identical(_loaded, art.resolved)) {
       _loaded = art.resolved;
       _animator.load(art.resolved);
-    }
-    if (!identical(_overridesScene, scene) || _overridesAt != playhead) {
-      _overridesScene = scene;
-      _overridesAt = playhead;
-      _overrides = {
-        for (final c in scene?.clocks ?? const <ir.Clock>[]) c.id: playhead,
-      };
-      _animator.clockOverrides = _overrides;
     }
 
     final viewport = Size(width, bp.designSize.height);

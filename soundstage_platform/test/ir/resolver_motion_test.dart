@@ -231,12 +231,9 @@ void main() {
           ],
         ),
       ).document;
-      final p = Resolver().explainAt(
-        doc,
-        'f1',
-        const PropertyPath('fills'),
-        {'scroll': 1},
-      );
+      final p = Resolver().explainAt(doc, 'f1', const PropertyPath('fills'), {
+        'scroll': 1,
+      });
       expect(p.entries.last.source, const ProvenanceSource.animated('c'));
       expect(
         p.finalValue,

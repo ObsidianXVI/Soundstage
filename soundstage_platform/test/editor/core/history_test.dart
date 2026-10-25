@@ -198,9 +198,9 @@ void main() {
       expect(c.st.selection, isEmpty);
       expect(c.st.hoverId, isNull);
       c.ctl
-        ..setPlayhead('s2', 0.25)
+        ..setPlayhead('s2', 'clk', 0.25)
         ..setTool(EditorTool.text);
-      expect(c.st.playhead, 0.25);
+      expect(c.st.playheadOf('s2', 'clk'), 0.25);
       expect(c.st.tool, EditorTool.text);
     });
 

@@ -102,6 +102,8 @@ class SelectedNodes {
     required this.document,
     required this.breakpointId,
     this.resolver,
+    this.animated = const [],
+    this.clockValues = const {},
   });
 
   /// Ids of the selected nodes that exist at [breakpointId], in selection
@@ -119,13 +121,58 @@ class SelectedNodes {
   final ir.Resolver? resolver;
   final String? breakpointId;
 
+  /// The animated values at the playheads, parallel to [ids] (empty when no
+  /// selected node is animated; null entries for nodes without tracks):
+  /// `property path → value` of every track that animates the node at
+  /// [breakpointId] (m2.md: the inspector shows the value at the playhead).
+  /// Compared by value, so scrubbing rebuilds only fields whose animated
+  /// value changed, and nothing when the selection is not animated.
+  final List<Map<String, ir.IrValue>?> animated;
+
+  /// The playheads the [animated] values were evaluated at (`clockId →
+  /// value`), for `explainAt`. Not compared.
+  final Map<String, double> clockValues;
+
+  /// Whether node [i] has a track on [path], a path under it or a path
+  /// containing it.
+  bool isAnimated(int i, String path) {
+    final a = i < animated.length ? animated[i] : null;
+    if (a == null) return false;
+    for (final k in a.keys) {
+      if (k == path || k.startsWith('$path.') || path.startsWith('$k.')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// [path] of selected node [i] as shown: the animated value at the
+  /// playhead when a track animates it, else the resolved (static) value.
+  ir.IrValue? valueAt(int i, String path) {
+    final n = resolved[i];
+    final a = i < animated.length ? animated[i] : null;
+    if (a == null || a.isEmpty) return ir.resolvedPropertyValue(n, path);
+    final exact = a[path];
+    if (exact != null) return exact;
+    var node = n.node;
+    var touched = false;
+    a.forEach((p, v) {
+      if (!(p.startsWith('$path.') || path.startsWith('$p.'))) return;
+      final next = ir.PropertyRegistry.standard.lookup(p)?.trySet(node, v);
+      if (next == null) return;
+      node = next;
+      touched = true;
+    });
+    return ir.resolvedPropertyValue(touched ? n.copyWith(node: node) : n, path);
+  }
+
   /// [path] across the selection.
   PropertyReading read(String path) {
     ir.IrValue? first;
     var mixed = false;
     var applicable = 0;
-    for (final n in resolved) {
-      final v = ir.resolvedPropertyValue(n, path);
+    for (var i = 0; i < resolved.length; i++) {
+      final v = valueAt(i, path);
       if (v == null) continue;
       applicable++;
       if (first == null) {
@@ -155,6 +202,10 @@ class SelectedNodes {
           !identical(other.authored[i], authored[i])) {
         return false;
       }
+    }
+    if (other.animated.length != animated.length) return false;
+    for (var i = 0; i < animated.length; i++) {
+      if (!mapEquals(other.animated[i], animated[i])) return false;
     }
     return true;
   }
@@ -191,7 +242,38 @@ final selectedNodesProvider = Provider.autoDispose<SelectedNodes>(
       resolved.add(n);
       authored.add(id.contains('/') ? null : index.node(id));
     }
+    // Animated values at the playheads. The playheads are watched only
+    // while a selected node is animated, so scrubbing never touches the
+    // inspector of a static selection.
+    final sceneId = ref.watch(
+      editorControllerProvider.select((s) => s.activeSceneId),
+    );
+    final tracks = art.scene(sceneId)?.tracks ?? const <ir.Track>[];
+    final selected = found.toSet();
+    final mine = [
+      for (final t in tracks)
+        if (selected.contains(t.target)) t,
+    ];
+    var animated = const <Map<String, ir.IrValue>?>[];
+    var clocks = const <String, double>{};
+    if (mine.isNotEmpty) {
+      clocks = ref
+          .watch(
+            editorControllerProvider.select(
+              (s) => Identity(s.clockValuesOf(sceneId)),
+            ),
+          )
+          .value;
+      final byNode = <String, Map<String, ir.IrValue>>{};
+      for (final t in mine) {
+        final v = ir.evaluateTrack(t, clocks[t.clockId] ?? 0);
+        if (v != null) (byNode[t.target] ??= {})[t.property] = v;
+      }
+      animated = [for (final id in found) byNode[id]];
+    }
     return SelectedNodes(
+      animated: animated,
+      clockValues: clocks,
       ids: found,
       resolved: resolved,
       authored: authored,
@@ -479,6 +561,9 @@ enum ValueSourceKind {
 
   /// Taken from a paint, effect or text style.
   style,
+
+  /// Animated by a track: the value shown is the value at the playhead.
+  animated,
 }
 
 /// How the value of one property was produced, summarised for the badge.
@@ -522,6 +607,7 @@ ValueSource summariseProvenance(ir.StageDocument doc, ir.Provenance p) {
     ValueSourceKind.token => 3,
     ValueSourceKind.breakpointOverride => 4,
     ValueSourceKind.instanceOverride => 5,
+    ValueSourceKind.animated => 6,
   };
   for (final e in p.entries) {
     final s = switch (e.source) {
@@ -562,6 +648,10 @@ ValueSource summariseProvenance(ir.StageDocument doc, ir.Provenance p) {
       ir.TextStyleSource(:final styleId) => ValueSource(
         ValueSourceKind.style,
         'Text style: $styleId',
+      ),
+      ir.AnimatedSource() => const ValueSource(
+        ValueSourceKind.animated,
+        'Animated',
       ),
       _ => null,
     };
@@ -625,10 +715,19 @@ ValueSource valueSourceOf(SelectedNodes nodes, String path) {
   ValueSource? best;
   for (var i = 0; i < nodes.ids.length; i++) {
     final id = nodes.ids[i];
-    if (!_mayHaveSource(id, nodes.authored[i], path)) continue;
+    final animated = nodes.isAnimated(i, path);
+    if (!animated && !_mayHaveSource(id, nodes.authored[i], path)) continue;
     final s = summariseProvenance(
       nodes.document,
-      resolver.explain(nodes.document, id, propertyPath, ctx),
+      animated
+          ? resolver.explainAt(
+              nodes.document,
+              id,
+              propertyPath,
+              nodes.clockValues,
+              ctx,
+            )
+          : resolver.explain(nodes.document, id, propertyPath, ctx),
     );
     if (s.kind == ValueSourceKind.own) continue;
     if (best == null || s.isOverride && !best.isOverride) best = s;

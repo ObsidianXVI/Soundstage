@@ -59,8 +59,15 @@ abstract class HistoryStatus with _$HistoryStatus {
 ///   at its design width (mirrored from the canvas), so edits know the
 ///   breakpoint in effect there ([breakpointId]).
 /// - `editScope` plus `scopeFlipped` (Alt held): see [effectiveScope].
-/// - `autoKey`: write keyframes at the playhead (M2; ignored in M1).
-/// - `playheads`: clock time per scene id (0 in M1).
+/// - `autoKey`: a write to an animatable property that has no track
+///   creates one, with a keyframe at the playhead (m2.md "Writing values
+///   while animated").
+/// - `playheads`: the playhead of each clock of each scene
+///   (`sceneId → clockId → value`, in the clock's units). A clock without
+///   one sits at 0 ([playheadOf]). Playheads are view state: changing one is
+///   not an undoable edit.
+/// - `activeClocks`: the clock the timeline shows per scene
+///   (`sceneId → clockId`); see [activeClockOf].
 /// - `revision`: a number identifying the document version (never reused,
 ///   restored by undo/redo); `savedRevision` is the last saved one.
 /// - `history`: what undo/redo would do.
@@ -79,7 +86,9 @@ abstract class EditorState with _$EditorState {
     @Default(false) bool scopeFlipped,
     @Default(EditorTool.move) EditorTool tool,
     @Default(false) bool autoKey,
-    @Default(<String, double>{}) Map<String, double> playheads,
+    @Default(<String, Map<String, double>>{})
+    Map<String, Map<String, double>> playheads,
+    @Default(<String, String>{}) Map<String, String> activeClocks,
     @Default(0) int revision,
     @Default(0) int savedRevision,
     @Default(HistoryStatus()) HistoryStatus history,
@@ -137,8 +146,43 @@ abstract class EditorState with _$EditorState {
     for (final b in document.primaryBreakpoints) b.id,
   };
 
-  /// The playhead of the active scene (0 when unset).
-  double get playhead => playheads[activeSceneId] ?? 0;
+  /// The playheads of scene [sceneId] (`clockId → value`; absent clocks
+  /// are at 0). This map is what the canvas freezes the scene's clocks at.
+  Map<String, double> clockValuesOf(String? sceneId) =>
+      playheads[sceneId] ?? const <String, double>{};
+
+  /// The playhead of clock [clockId] of scene [sceneId] (0 when unset).
+  double playheadOf(String? sceneId, String clockId) =>
+      playheads[sceneId]?[clockId] ?? 0;
+
+  /// The clock the timeline shows for scene [sceneId]: the one chosen in
+  /// [activeClocks] while the scene still has it, else the scene's own
+  /// scroll clock (m2.md "Playheads"), else its first clock. Null for a
+  /// scene without clocks.
+  String? activeClockOf(String? sceneId) {
+    ir.Scene? scene;
+    for (final s in document.scenes) {
+      if (s.id == sceneId) scene = s;
+    }
+    if (scene == null || scene.clocks.isEmpty) return null;
+    final chosen = activeClocks[sceneId];
+    if (chosen != null && scene.clocks.any((c) => c.id == chosen)) {
+      return chosen;
+    }
+    for (final c in scene.clocks) {
+      if (c is ir.SceneScrollClock && c.sceneId == scene.id) return c.id;
+    }
+    return scene.clocks.first.id;
+  }
+
+  /// The active scene's active clock (see [activeClockOf]).
+  String? get activeClockId => activeClockOf(activeSceneId);
+
+  /// The playhead of the active scene's active clock (0 when unset).
+  double get playhead {
+    final clock = activeClockId;
+    return clock == null ? 0 : playheadOf(activeSceneId, clock);
+  }
 }
 
 /// The first primary breakpoint of [doc], else its first breakpoint.
