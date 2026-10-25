@@ -27,53 +27,68 @@ class _ShapeBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = info.geometries;
-    return Grid(
+    // Word labels sit in labelled rows (the number fields' inline label is
+    // for single letters such as X and W).
+    Widget row(String label, NumberProp field) =>
+        LabelRow(label: label, child: field);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (g.contains('ellipse')) ...const [
-          NumberProp(
-            path: 'geometry.arcStart',
-            label: 'Start',
-            semanticLabel: 'Arc start',
-            unit: '°',
-            fractionDigits: 1,
+        if (g.contains('ellipse')) ...[
+          row(
+            'Start',
+            const NumberProp(
+              path: 'geometry.arcStart',
+              semanticLabel: 'Arc start',
+              unit: '°',
+              fractionDigits: 1,
+            ),
           ),
-          NumberProp(
-            path: 'geometry.arcEnd',
-            label: 'End',
-            semanticLabel: 'Arc end',
-            unit: '°',
-            fractionDigits: 1,
+          row(
+            'End',
+            const NumberProp(
+              path: 'geometry.arcEnd',
+              semanticLabel: 'Arc end',
+              unit: '°',
+              fractionDigits: 1,
+            ),
           ),
-          NumberProp(
-            path: 'geometry.innerRadius',
-            label: 'Ratio',
-            semanticLabel: 'Inner radius',
-            unit: '%',
-            scale: 100,
-            min: 0,
-            max: 100,
-            fractionDigits: 1,
+          row(
+            'Inner',
+            const NumberProp(
+              path: 'geometry.innerRadius',
+              semanticLabel: 'Inner radius',
+              unit: '%',
+              scale: 100,
+              min: 0,
+              max: 100,
+              fractionDigits: 1,
+            ),
           ),
         ],
         if (g.contains('polygon') || g.contains('star'))
-          const NumberProp(
-            path: 'geometry.pointCount',
-            label: 'Count',
-            semanticLabel: 'Point count',
-            min: 3,
-            max: 60,
-            fractionDigits: 0,
+          row(
+            'Count',
+            const NumberProp(
+              path: 'geometry.pointCount',
+              semanticLabel: 'Point count',
+              min: 3,
+              max: 60,
+              fractionDigits: 0,
+            ),
           ),
         if (g.contains('star'))
-          const NumberProp(
-            path: 'geometry.innerRatio',
-            label: 'Ratio',
-            semanticLabel: 'Star inner ratio',
-            unit: '%',
-            scale: 100,
-            min: 0,
-            max: 100,
-            fractionDigits: 1,
+          row(
+            'Ratio',
+            const NumberProp(
+              path: 'geometry.innerRatio',
+              semanticLabel: 'Star inner ratio',
+              unit: '%',
+              scale: 100,
+              min: 0,
+              max: 100,
+              fractionDigits: 1,
+            ),
           ),
       ],
     );

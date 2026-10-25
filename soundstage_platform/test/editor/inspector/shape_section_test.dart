@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,5 +75,22 @@ void main() {
     expect(nodeOf(c, 'pie').common.breakpointOverrides['mobile'], {
       'geometry.arcEnd': const ir.IrValue.number(180),
     });
+  });
+
+  testWidgets('word labels fit on one line at the narrowest inspector', (
+    tester,
+  ) async {
+    await pumpInspector(tester, _doc(), select: {'star'}, width: 240);
+    for (final l in ['Count', 'Ratio']) {
+      final t = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.byKey(const ValueKey('section:shape')),
+          matching: find.text(l),
+        ),
+      );
+      expect(t.size.height, lessThan(t.text.style!.fontSize! * 2), reason: l);
+      expect(t.didExceedMaxLines, isFalse, reason: l);
+    }
+    expect(tester.takeException(), isNull);
   });
 }
