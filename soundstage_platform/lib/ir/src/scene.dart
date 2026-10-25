@@ -2,10 +2,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'breakpoint.dart';
 import 'motion.dart';
+import 'nodes/appearance.dart';
 import 'nodes/node.dart';
 import 'nodes/node_common.dart';
 import 'nodes/paint.dart';
 import 'values/ids.dart';
+import 'values/stage_color.dart';
 
 part 'scene.freezed.dart';
 part 'scene.g.dart';
@@ -73,7 +75,10 @@ abstract class Scene with _$Scene {
   const Scene._();
 
   /// A blank pinned scene whose root frame is the size of [breakpoint]'s
-  /// design viewport, with a scroll clock for the scene.
+  /// design viewport, with a scroll clock for the scene. The root has a
+  /// white solid fill (Figma's default for a new frame), so the artboard is
+  /// not see-through onto the editor's dark canvas and new black text is
+  /// readable. Applies only at creation: existing documents are unchanged.
   factory Scene.blankPinned({
     required IdGenerator ids,
     required Breakpoint breakpoint,
@@ -94,6 +99,9 @@ abstract class Scene with _$Scene {
           height: breakpoint.designSize.height,
         ),
         clipContent: true,
+        appearance: const Appearance(
+          fills: [Paint.solid(id: 'fill', color: StageColor.white)],
+        ),
       ),
       clocks: [Clock.sceneScroll(id: ids.next(), sceneId: sceneId)],
     );

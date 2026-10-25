@@ -63,6 +63,12 @@ void main() {
     expect(scene.root.common.width, 390);
     expect(scene.root.common.height, 844);
     expect(scene.root.clipContent, isTrue);
+    // B7: a new scene root is white, not see-through onto the dark canvas.
+    expect(scene.root.appearance.fills, hasLength(1));
+    expect(
+      (scene.root.appearance.fills.single as SolidPaint).color,
+      StageColor.white,
+    );
     expect(scene.clocks.single, isA<SceneScrollClock>());
     expect((scene.clocks.single as SceneScrollClock).sceneId, scene.id);
     final withScene = doc.copyWith(scenes: [scene]);
