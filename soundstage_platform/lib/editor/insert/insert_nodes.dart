@@ -22,6 +22,8 @@ bool isInsertTool(EditorTool tool) => switch (tool) {
   EditorTool.text ||
   EditorTool.rectangle ||
   EditorTool.ellipse ||
+  EditorTool.polygon ||
+  EditorTool.star ||
   EditorTool.line => true,
   _ => false,
 };
@@ -37,7 +39,8 @@ const _lineStroke = ir.Stroke(
 
 /// The node [tool] creates, at [box] (parent space), named for its kind.
 ///
-/// - frame: white; rectangle and ellipse: light grey, no stroke; line: a
+/// - frame: white; rectangle, ellipse, polygon (a triangle) and star (five
+///   points): light grey, no stroke; line: a
 ///   1 px black stroke, the box's height is its slope.
 /// - text: an empty paragraph, role `paragraph`, hugging its text (a drawn
 ///   width ([drawn]) wraps it instead); the author types straight away
@@ -73,6 +76,18 @@ ir.Node? buildInsertNode(
       return ir.ShapeNode(
         common: common.copyWith(name: 'Ellipse'),
         geometry: const ir.ShapeGeometry.ellipse(),
+        appearance: const ir.Appearance(fills: [_shapeFill]),
+      );
+    case EditorTool.polygon:
+      return ir.ShapeNode(
+        common: common.copyWith(name: 'Polygon'),
+        geometry: const ir.ShapeGeometry.polygon(),
+        appearance: const ir.Appearance(fills: [_shapeFill]),
+      );
+    case EditorTool.star:
+      return ir.ShapeNode(
+        common: common.copyWith(name: 'Star'),
+        geometry: const ir.ShapeGeometry.star(),
         appearance: const ir.Appearance(fills: [_shapeFill]),
       );
     case EditorTool.line:

@@ -93,13 +93,21 @@ void main() {
             n is ir.ShapeNode && n.geometry is ir.EllipseGeometry,
         EditorTool.line: (n) =>
             n is ir.ShapeNode && n.geometry is ir.LineGeometry,
+        EditorTool.polygon: (n) =>
+            n is ir.ShapeNode &&
+            n.geometry == const ir.ShapeGeometry.polygon() &&
+            n.common.name == 'Polygon',
+        EditorTool.star: (n) =>
+            n is ir.ShapeNode &&
+            n.geometry == const ir.ShapeGeometry.star() &&
+            n.common.name == 'Star',
         EditorTool.text: (n) => n is ir.TextNode,
       };
-      var y = 150.0;
+      var y = 40.0;
       for (final e in kinds.entries) {
         await useTool(h, e.key);
         await h.click(h.desk(920, y)); // clear ground, clear of the last one
-        y += 120;
+        y += 110;
         expect(
           e.value(h.node(lastChildOf(h, 'root'))),
           isTrue,

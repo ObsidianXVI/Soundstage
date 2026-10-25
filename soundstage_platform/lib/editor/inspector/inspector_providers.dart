@@ -283,6 +283,7 @@ class SelectionInfo {
     this.inFreeParent = 0,
     this.roots = 0,
     this.innerNodes = 0,
+    this.geometries = const {},
   });
 
   final List<String> ids;
@@ -304,6 +305,9 @@ class SelectionInfo {
   /// Scene roots, and nodes inside instances (geometry is not editable).
   final int roots;
   final int innerNodes;
+
+  /// The geometry kinds of the selected shapes (`ellipse`, `star`, …).
+  final Set<String> geometries;
 
   int get count => ids.length;
   bool get isEmpty => ids.isEmpty;
@@ -335,7 +339,8 @@ class SelectionInfo {
       other.absoluteInAutoLayout == absoluteInAutoLayout &&
       other.inFreeParent == inFreeParent &&
       other.roots == roots &&
-      other.innerNodes == innerNodes;
+      other.innerNodes == innerNodes &&
+      setEquals(other.geometries, geometries);
 
   @override
   int get hashCode => Object.hash(
@@ -348,6 +353,7 @@ class SelectionInfo {
     inFreeParent,
     roots,
     innerNodes,
+    Object.hashAll(geometries),
   );
 }
 
@@ -362,6 +368,7 @@ SelectionInfo classifySelection(
   final kinds = <ir.NodeKind>{};
   var frames = 0, autoFrames = 0, inAuto = 0, absInAuto = 0, inFree = 0;
   var roots = 0, inner = 0;
+  final geometries = <String>{};
   for (final id in selection) {
     final rn = index[id];
     if (rn == null) continue;
@@ -373,6 +380,15 @@ SelectionInfo classifySelection(
     if (node is ir.FrameNode) {
       frames++;
       if (node.autoLayout != null) autoFrames++;
+    }
+    if (node is ir.ShapeNode) {
+      geometries.add(switch (node.geometry) {
+        ir.RectangleGeometry() => 'rectangle',
+        ir.EllipseGeometry() => 'ellipse',
+        ir.LineGeometry() => 'line',
+        ir.PolygonGeometry() => 'polygon',
+        ir.StarGeometry() => 'star',
+      });
     }
     if (id.contains('/')) {
       inner++;
@@ -404,6 +420,7 @@ SelectionInfo classifySelection(
     inFreeParent: inFree,
     roots: roots,
     innerNodes: inner,
+    geometries: geometries,
   );
 }
 
