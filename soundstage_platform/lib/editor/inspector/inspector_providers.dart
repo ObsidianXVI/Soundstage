@@ -599,8 +599,10 @@ bool _mayHaveSource(String id, ir.Node? node, String path) {
   if (id.contains('/')) return true;
   if (node == null) return false;
   final c = node.common;
-  for (final patch in c.breakpointOverrides.values) {
+  for (final MapEntry(key: bp, value: patch) in c.breakpointOverrides.entries) {
     for (final k in patch.keys) {
+      // Measured sizes of auto-sized text are not overrides.
+      if (!isShownOverrideKey(node, bp, k)) continue;
       if (_overlaps(k, path)) return true;
     }
   }

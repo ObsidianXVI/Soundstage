@@ -29,7 +29,8 @@ void main() {
     expect(list.every((s) => s.bundled), isTrue);
   });
 
-  test('creates a blank story, listed first, loadable', () async {
+  test('creates a story with one blank pinned scene, listed first, '
+      'loadable', () async {
     final s = await repo.create(title: 'My story');
     final list = await repo.list();
     expect(list.first.id, s.id);
@@ -37,7 +38,9 @@ void main() {
     expect(list.first.bundled, isFalse);
     final doc = await repo.load(s.id);
     expect(doc, isNotNull);
-    expect(doc!.scenes, isEmpty);
+    expect(doc!.scenes, hasLength(1));
+    expect(doc.scenes.single.kind, ir.SceneKind.pinned);
+    expect(list.first.sceneCount, 1);
     expect(doc.meta.title, 'My story');
   });
 

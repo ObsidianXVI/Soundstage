@@ -2,6 +2,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../command.dart';
 import '../editor_state.dart';
+import '../text_size_sync.dart';
 
 // Breakpoint editing (T1.10): reset a node's overrides on one breakpoint,
 // and the breakpoint manager's add / edit / remove. All undoable.
@@ -24,7 +25,7 @@ bool hasOverridesOn(
   final index = ir.DocumentIndex.of(doc);
   for (final id in nodeIds) {
     final n = index.node(id);
-    if (n != null && ir.hasBreakpointPatch(n, breakpointId)) return true;
+    if (n != null && hasShownOverride(n, breakpointId)) return true;
   }
   return false;
 }

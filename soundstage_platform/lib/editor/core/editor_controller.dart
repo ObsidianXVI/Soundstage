@@ -9,6 +9,7 @@ import 'editor_state.dart';
 import 'history.dart';
 import 'selection.dart';
 import 'shortcuts.dart';
+import 'text_size_sync.dart';
 
 /// The document the editor opens with. The shell overrides it per route
 /// (`/edit/:id`); the default is a blank story with one pinned scene.
@@ -116,6 +117,11 @@ class EditorController extends Notifier<EditorState> {
   /// Applies [command]. A failed or no-op command changes nothing and is
   /// not recorded; a successful one is recorded (coalesced within a
   /// gesture by its `coalesceKey`). Returns the command's result.
+  /// Measures auto-sized text for [syncTextSizes] after each edit. Set by
+  /// the surface that renders the document (the canvas, content mode) with
+  /// its font table; while unset, stored text sizes are left as they are.
+  TextMeasurer? textMeasurer;
+
   CommandResult execute(EditCommand command) {
     final s = state;
     final r = command.apply(s);
@@ -125,7 +131,17 @@ class EditorController extends Notifier<EditorState> {
       }
       return r;
     }
-    final doc = r.document;
+    // Auto-sized text keeps its stored size in line with its measured size
+    // (DECISIONS 25/10/26 T1.12-1), in the same undo step.
+    final measure = textMeasurer;
+    final doc = measure == null
+        ? r.document
+        : syncTextSizes(
+            s.document,
+            r.document,
+            measure: measure,
+            resolve: (d, bp) => _resolvedOf(bp, d).resolved.nodeIndex,
+          );
     final index = ir.DocumentIndex.of(doc);
     final selection =
         r.selectionAfter ??
@@ -352,8 +368,13 @@ class EditorController extends Notifier<EditorState> {
 
   /// The current document resolved for [breakpointId] (cached until the
   /// document changes; see [resolvedForProvider]).
-  ResolvedArtboard resolvedFor(String breakpointId) {
-    final doc = state.document;
+  ResolvedArtboard resolvedFor(String breakpointId) =>
+      _resolvedOf(breakpointId, state.document);
+
+  /// [doc] resolved for [breakpointId], through the same cache as
+  /// [resolvedFor] (a document resolved before it becomes the state, by
+  /// the text-size sync, is not resolved again for the frame).
+  ResolvedArtboard _resolvedOf(String breakpointId, ir.StageDocument doc) {
     final last = _resolved[breakpointId];
     if (last != null && identical(last.document, doc)) return last;
     return _resolved[breakpointId] = ResolvedArtboard(

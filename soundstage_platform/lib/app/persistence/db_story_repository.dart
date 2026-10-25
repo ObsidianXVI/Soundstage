@@ -203,13 +203,8 @@ class DbStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<StorySummary> create({String title = 'Untitled story'}) {
-    final doc = ir.StageDocument.empty(
-      ids: ir.IdGenerator(),
-      meta: ir.StageMeta(title: title),
-    );
-    return _insert(doc);
-  }
+  Future<StorySummary> create({String title = 'Untitled story'}) =>
+      _insert(newStoryDocument(title: title));
 
   @override
   Future<StorySummary> createFrom(ir.StageDocument document) {

@@ -19,3 +19,4 @@ export 'editor_state.dart';
 export 'history.dart';
 export 'selection.dart';
 export 'shortcuts.dart';
+export 'text_size_sync.dart';

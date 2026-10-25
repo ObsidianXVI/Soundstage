@@ -33,10 +33,6 @@
 //     browser's decoder.
 //
 // WORKAROUNDS (editor gaps found here; see CURRENT_TASK.md):
-//   - GAP-2: auto-height text keeps the stored height it was created with
-//     (0), so bottom/centre constraints anchor on a zero-height box. The
-//     test types H (which makes the text Fixed) and then picks Auto height
-//     again, matching the demo's stored heights.
 //   - FINDING-1: committing a colour in the picker while editing text
 //     ends the edit session in this test; Enter on the text resumes it.
 //
@@ -44,6 +40,11 @@
 //   - Font faces are dropped (`forComparison`): the test environment has
 //     no web fonts, so both render with the fallback and only layout is
 //     compared. Families are compared by name ("Fraunces", "Inter").
+//   - Auto-sized text has its stored size brought in line with its
+//     measured size (`syncTextSizes`, what the editor does on every edit;
+//     DECISIONS 25/10/26 T1.12-1). The hand-written demo predates that and
+//     stores arbitrary heights (20 for a 14 px line), which move bottom-
+//     and centre-pinned text.
 //   - Nodes are matched by layer name path; assets by file name.
 //   - Roles are checked against `_roles` (the demo predates roles).
 import 'dart:convert';
@@ -55,6 +56,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/app/persistence/story_package.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/canvas/editor_canvas.dart';
+import 'package:soundstage_platform/editor/core/core.dart'
+    show stageTextMeasurer, syncTextSizes;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
@@ -71,9 +74,7 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
   final desktop = r.bp('Desktop');
   final mobile = r.bp('Mobile');
   final tablet = r.bp('Tablet');
-  await r.tab('Scenes');
-  await r.tester.tap(find.text('Add a scene'));
-  await r.pump(4);
+  // A new story starts with one blank pinned scene.
   expect(r.doc.scenes, hasLength(1));
   await renameActiveScene(r, 'Hero');
   await r.zoomToFit();
@@ -114,8 +115,8 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
     'A Soundstage demo · Chapter one',
   );
   await r.rename(kicker, 'Kicker');
-  await geometry(r, x: 120, y: 560, w: 600, h: 20);
-  await textBox(r, autoHeight: true); // GAP-2: H typed first
+  await textBox(r, autoHeight: true);
+  await geometry(r, x: 120, y: 560, w: 600);
   await r.constraints(h: 'Left', v: 'Bottom');
   await textStyle(
     r,
@@ -135,8 +136,8 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
     'The light that stays after the sun',
   );
   await r.rename(title, 'Title');
-  await geometry(r, x: 120, y: 596, w: 1000, h: 200);
   await textBox(r, autoHeight: true);
+  await geometry(r, x: 120, y: 596, w: 1000);
   await r.constraints(h: 'Left', v: 'Bottom');
   await textStyle(
     r,
@@ -156,8 +157,8 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
     'Illustration: procedural, tool/gen_demo_images.dart',
   );
   await r.rename(credit, 'Credit');
-  await geometry(r, x: 920, y: 860, w: 480, h: 16);
   await textBox(r, autoHeight: true, align: 'Right');
+  await geometry(r, x: 920, y: 860, w: 480);
   await r.constraints(h: 'Right', v: 'Bottom');
   await textStyle(
     r,
@@ -181,8 +182,7 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
   await geometry(r, x: 24, y: 520, w: 342);
   await r.type('style.fontSize', '44');
   await r.selectLayer(credit);
-  await geometry(r, x: 24, y: 800, w: 342, h: 28);
-  await textBox(r, autoHeight: true);
+  await geometry(r, x: 24, y: 800, w: 342);
 
   await r.freeWidth(desktop, 834);
   await r.selectLayer(scrim);
@@ -1375,13 +1375,23 @@ Future<Fonts> uploadFonts(Rig r) async {
 }
 
 /// Both documents render with the runtime's fallback faces (the test
-/// environment has no web fonts), so only layout logic is compared.
-ir.StageDocument forComparison(ir.StageDocument d) => d.copyWith(
-  fonts: {
-    for (final MapEntry(:key, :value) in d.fonts.entries)
-      key: value.copyWith(faces: const []),
-  },
-);
+/// environment has no web fonts), so only layout logic is compared, and
+/// every auto-sized text stores its measured size (see the header).
+ir.StageDocument forComparison(ir.StageDocument d) {
+  final noFaces = d.copyWith(fonts: noFacesOf(d));
+  return syncTextSizes(
+    noFaces.copyWith(scenes: const [], overlay: null),
+    noFaces,
+    measure: stageTextMeasurer(() => StageFontTable.none),
+    resolve: (doc, bp) =>
+        ir.resolveDocument(doc, ir.ResolveContext(breakpointId: bp)).nodeIndex,
+  );
+}
+
+Map<String, ir.FontFamily> noFacesOf(ir.StageDocument d) => {
+  for (final MapEntry(:key, :value) in d.fonts.entries)
+    key: value.copyWith(faces: const []),
+};
 
 /// Roles the rebuilt story gives its text (the demo predates roles and has
 /// none). Every other text keeps the Text tool's default, Paragraph.

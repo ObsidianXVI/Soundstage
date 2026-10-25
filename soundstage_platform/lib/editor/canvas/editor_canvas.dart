@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/core/editor_controller.dart';
 import 'package:soundstage_platform/editor/core/editor_state.dart';
+import 'package:soundstage_platform/editor/core/text_size_sync.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
@@ -55,6 +56,8 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
   int? _panPointer;
   double _lastPinchScale = 1;
   StageEnvironment? _env;
+  late final TextMeasurer _sizer;
+  late final EditorController _editor;
   Object? _envKey;
 
   /// Decoded images and failed loads, kept across environment changes (an
@@ -67,10 +70,15 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
     super.initState();
     _c.attachTicker(this);
     HardwareKeyboard.instance.addHandler(_onKey);
+    // Auto-sized text is measured with this surface's fonts.
+    _sizer = stageTextMeasurer(() => _env?.fonts ?? StageFontTable.none);
+    _editor = ref.read(editorControllerProvider.notifier)
+      ..textMeasurer = _sizer;
   }
 
   @override
   void dispose() {
+    if (identical(_editor.textMeasurer, _sizer)) _editor.textMeasurer = null;
     HardwareKeyboard.instance.removeHandler(_onKey);
     _c.detachTicker();
     _images.clear();

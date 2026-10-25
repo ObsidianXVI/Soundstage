@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/core/editor_controller.dart';
 import 'package:soundstage_platform/editor/core/editor_state.dart';
+import 'package:soundstage_platform/editor/core/text_size_sync.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
@@ -327,7 +328,7 @@ class OverlayPainter extends CustomPainter {
       ..color = const Color(0xFFFFFFFF);
     for (final id in model.selection) {
       final n = index.node(id);
-      if (n == null || !ir.hasBreakpointPatch(n, bp)) continue;
+      if (n == null || !hasShownOverride(n, bp)) continue;
       final o = geometry.rectFor(id, a.breakpointId);
       if (o == null) continue;
       final b = o.bounds;

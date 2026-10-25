@@ -14,6 +14,26 @@ export '../persistence/records.dart'
         StoryNotFoundException;
 
 /// A story as listed on the home page.
+/// The document of a new story: the default breakpoints and one blank
+/// pinned scene (DECISIONS 25/10/26 T1.12-1: new stories do not start
+/// empty).
+ir.StageDocument newStoryDocument({String title = 'Untitled story'}) {
+  final ids = ir.IdGenerator();
+  final doc = ir.StageDocument.empty(
+    ids: ids,
+    meta: ir.StageMeta(title: title),
+  );
+  return doc.copyWith(
+    scenes: [
+      ir.Scene.blankPinned(
+        ids: ids,
+        breakpoint: doc.breakpoints.first,
+        name: 'Scene 1',
+      ),
+    ],
+  );
+}
+
 class StorySummary {
   const StorySummary({
     required this.id,
@@ -199,15 +219,12 @@ class InMemoryStoryRepository implements StoryRepository {
 
   @override
   Future<StorySummary> create({String title = 'Untitled story'}) async {
-    final doc = ir.StageDocument.empty(
-      ids: ir.IdGenerator(),
-      meta: ir.StageMeta(title: title),
-    );
+    final doc = newStoryDocument(title: title);
     final summary = StorySummary(
       id: doc.id,
       title: title,
       updatedAt: _now(),
-      sceneCount: 0,
+      sceneCount: doc.scenes.length,
     );
     _docs[doc.id] = doc;
     _own[doc.id] = summary;

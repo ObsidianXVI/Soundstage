@@ -83,6 +83,9 @@ void repositoryContract(
       expect(list.where((x) => x.bundled).length, kBundledStories.length);
       final open = await h.repo.open(s.id);
       expect(open!.document!.meta.title, 'Mine');
+      // A new story starts with one blank pinned scene.
+      expect(open.document!.scenes, hasLength(1));
+      expect(list.first.sceneCount, 1);
       expect(open.recovered, isFalse);
       expect(await h.repo.open('nope'), isNull);
     });

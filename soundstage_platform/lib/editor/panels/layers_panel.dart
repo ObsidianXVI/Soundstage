@@ -672,7 +672,7 @@ class _LayerTile extends ConsumerWidget {
         ref.watch(
           editorControllerProvider.select((s) {
             final n = ir.DocumentIndex.of(s.document).node(id);
-            return n != null && ir.hasAnyBreakpointPatch(n);
+            return n != null && hasAnyShownOverride(n);
           }),
         );
     final ctl = ref.read(editorControllerProvider.notifier);

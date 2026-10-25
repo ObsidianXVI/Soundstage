@@ -82,6 +82,8 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
   final StageImageCache _images = StageImageCache();
   final FocusNode _keys = FocusNode(debugLabel: 'Content mode');
   StageEnvironment? _env;
+  late final TextMeasurer _sizer;
+  late final EditorController _editor;
   Object? _envKey;
 
   _Panel _panel = _Panel.none;
@@ -96,10 +98,15 @@ class _ContentModeScreenState extends ConsumerState<ContentModeScreen> {
   void initState() {
     super.initState();
     _c = ref.read(canvasControllerProvider);
+    // Auto-sized text is measured with this surface's fonts.
+    _sizer = stageTextMeasurer(() => _env?.fonts ?? StageFontTable.none);
+    _editor = ref.read(editorControllerProvider.notifier)
+      ..textMeasurer = _sizer;
   }
 
   @override
   void dispose() {
+    if (identical(_editor.textMeasurer, _sizer)) _editor.textMeasurer = null;
     _images.clear();
     _keys.dispose();
     // The desktop editor frames its artboards once: let it do so again.
