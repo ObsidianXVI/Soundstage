@@ -6,6 +6,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import '../inspector_providers.dart';
 import '../property_writer.dart';
 import 'keyframe_controls.dart';
+import 'token_binding.dart';
 
 /// The override hint colour (Figma's purple), per theme. The chrome has a
 /// single accent hue; overrides get their own so they read at a glance.
@@ -69,9 +70,18 @@ class FieldFrame extends ConsumerWidget {
         ref.watch(selectedNodesProvider.select((s) => valueSourceOf(s, p))),
     ];
     final source = _strongest(sources);
-    final framed = source.kind == ValueSourceKind.own
+    final type = paths.length == 1 ? bindableType(paths.single) : null;
+    final inner = type == null
         ? child
-        : _framed(context, scope, source, sources);
+        : BindableField(
+            path: paths.single,
+            type: type,
+            source: source,
+            child: child,
+          );
+    final framed = source.kind == ValueSourceKind.own
+        ? inner
+        : _framed(context, scope, source, sources, inner);
     // Each animatable row gets its keyframe controls (m2.md "Inspector").
     if (!keyframes ||
         paths.length != 1 ||
@@ -99,6 +109,7 @@ class FieldFrame extends ConsumerWidget {
     InspectorScope scope,
     ValueSource source,
     List<ValueSource> sources,
+    Widget child,
   ) {
     final color = _sourceColor(context, source);
     void reset() => scope.writer.resetAll([

@@ -7,6 +7,7 @@ import '../property_writer.dart';
 import '../section_registry.dart';
 import 'appearance_style_banner.dart';
 import 'paint_stack.dart';
+import 'style_picker.dart';
 
 const String _fillsPath = 'fills';
 
@@ -17,7 +18,14 @@ final InspectorSectionSpec fillSection = InspectorSectionSpec(
   title: 'Fill',
   appliesTo: (info) => info.hasAppearance,
   builder: (context, info) => const _FillBody(),
-  actions: (context, info) => const [AddPaintButton(stackPath: _fillsPath)],
+  actions: (context, info) => const [
+    StylePickerButton(
+      kind: ir.StyleKind.paint,
+      stylePath: 'fillStyleId',
+      valuePath: _fillsPath,
+    ),
+    AddPaintButton(stackPath: _fillsPath),
+  ],
 );
 
 class _FillBody extends ConsumerWidget {

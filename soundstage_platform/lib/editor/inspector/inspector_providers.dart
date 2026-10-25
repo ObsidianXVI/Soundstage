@@ -367,6 +367,7 @@ class SelectionInfo {
     this.innerNodes = 0,
     this.geometries = const {},
     this.flowAutoLayoutRoots = 0,
+    this.hasModes = false,
   });
 
   final List<String> ids;
@@ -395,6 +396,10 @@ class SelectionInfo {
   /// Selected roots of flow scenes that have auto layout (their height can
   /// hug).
   final int flowAutoLayoutRoots;
+
+  /// Whether some token collection has more than one mode (the Modes
+  /// section has something to pick).
+  final bool hasModes;
 
   int get count => ids.length;
   bool get isEmpty => ids.isEmpty;
@@ -428,7 +433,8 @@ class SelectionInfo {
       other.roots == roots &&
       other.innerNodes == innerNodes &&
       setEquals(other.geometries, geometries) &&
-      other.flowAutoLayoutRoots == flowAutoLayoutRoots;
+      other.flowAutoLayoutRoots == flowAutoLayoutRoots &&
+      other.hasModes == hasModes;
 
   @override
   int get hashCode => Object.hash(
@@ -443,6 +449,7 @@ class SelectionInfo {
     innerNodes,
     Object.hashAll(geometries),
     flowAutoLayoutRoots,
+    hasModes,
   );
 }
 
@@ -519,6 +526,7 @@ SelectionInfo classifySelection(
     innerNodes: inner,
     geometries: geometries,
     flowAutoLayoutRoots: flowRoots,
+    hasModes: doc.tokens.collections.any((c) => c.modes.length > 1),
   );
 }
 
@@ -571,7 +579,13 @@ enum ValueSourceKind {
 /// `resettable` is true when [ResetProperty] has a layer to remove.
 @immutable
 class ValueSource {
-  const ValueSource(this.kind, this.description, {this.resettable = false});
+  const ValueSource(
+    this.kind,
+    this.description, {
+    this.resettable = false,
+    this.variableId,
+    this.value,
+  });
 
   static const ValueSource own = ValueSource(ValueSourceKind.own, '');
 
@@ -580,6 +594,12 @@ class ValueSource {
   /// "Mobile override", "Token: Brand/Primary", …; the tooltip text.
   final String description;
   final bool resettable;
+
+  /// The variable the value is bound to (m3.md "Binding"), when a token
+  /// produced it and no later layer replaced it; [value] is then the value
+  /// shown, which detaching writes back as a literal.
+  final String? variableId;
+  final ir.IrValue? value;
 
   bool get isOverride =>
       kind == ValueSourceKind.breakpointOverride ||
@@ -590,10 +610,13 @@ class ValueSource {
       other is ValueSource &&
       other.kind == kind &&
       other.description == description &&
-      other.resettable == resettable;
+      other.resettable == resettable &&
+      other.variableId == variableId &&
+      other.value == value;
 
   @override
-  int get hashCode => Object.hash(kind, description, resettable);
+  int get hashCode =>
+      Object.hash(kind, description, resettable, variableId, value);
 }
 
 /// Summarises [p] (an `explain` result) for [doc]: the topmost non-base layer
@@ -659,7 +682,22 @@ ValueSource summariseProvenance(ir.StageDocument doc, ir.Provenance p) {
       best = s;
     }
   }
-  return best ?? ValueSource.own;
+  // The binding shows while a token is the last layer (bar animation).
+  String? bound;
+  for (final e in p.entries.reversed) {
+    if (e.source is ir.AnimatedSource) continue;
+    if (e.source case ir.TokenSource(:final variableId)) bound = variableId;
+    break;
+  }
+  final b = best ?? ValueSource.own;
+  if (bound == null) return b;
+  return ValueSource(
+    b.kind,
+    b.description,
+    resettable: b.resettable,
+    variableId: bound,
+    value: p.finalValue,
+  );
 }
 
 String _bpName(ir.StageDocument doc, String id) {

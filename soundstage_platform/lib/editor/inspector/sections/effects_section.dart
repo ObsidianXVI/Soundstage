@@ -12,6 +12,7 @@ import '../property_writer.dart';
 import '../section_registry.dart';
 import 'appearance_blend.dart';
 import 'appearance_style_banner.dart';
+import 'style_picker.dart';
 
 const String _effectsPath = 'effects';
 
@@ -21,7 +22,14 @@ final InspectorSectionSpec effectsSection = InspectorSectionSpec(
   title: 'Effects',
   appliesTo: (info) => info.hasStroke,
   builder: (context, info) => const _EffectsBody(),
-  actions: (context, info) => const [_AddEffectButton()],
+  actions: (context, info) => const [
+    StylePickerButton(
+      kind: ir.StyleKind.effect,
+      stylePath: 'effectStyleId',
+      valuePath: 'effects',
+    ),
+    _AddEffectButton(),
+  ],
 );
 
 enum _Kind { dropShadow, innerShadow, layerBlur, backgroundBlur }

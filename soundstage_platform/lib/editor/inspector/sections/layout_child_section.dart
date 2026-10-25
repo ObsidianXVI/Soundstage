@@ -25,9 +25,8 @@ final InspectorSectionSpec layoutChildSection = InspectorSectionSpec(
   appliesTo: (info) =>
       (info.roots == 0 && (info.anyLayoutChild || info.anyAutoLayout)) ||
       (info.count > 0 && info.flowAutoLayoutRoots == info.count),
-  builder: (context, info) => _LayoutChildBody(
-    rootsOnly: info.count > 0 && info.roots == info.count,
-  ),
+  builder: (context, info) =>
+      _LayoutChildBody(rootsOnly: info.count > 0 && info.roots == info.count),
 );
 
 /// The sizings valid for one node on [axis] (Figma's rules):

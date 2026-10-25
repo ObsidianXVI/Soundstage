@@ -6,6 +6,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../../core/core.dart';
 import 'audio_section.dart';
 import 'clocks_section.dart';
+import 'modes_section.dart';
 
 // The active scene's settings, shown by the Inspector when nothing is
 // selected (DECISIONS: scene settings live in the Inspector only; the
@@ -176,6 +177,7 @@ class SceneSettings extends ConsumerWidget {
               ],
             ),
           ),
+          ModeOverrideRows(sceneId: scene.id),
           field(
             'Export as',
             SsSegmented<ir.SceneExportMode>(

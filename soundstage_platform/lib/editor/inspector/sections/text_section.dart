@@ -14,6 +14,7 @@ import '../property_writer.dart';
 import '../section_registry.dart';
 import 'appearance_style_banner.dart';
 import 'paint_stack.dart';
+import 'style_picker.dart';
 import 'text_target.dart';
 
 /// The text section (architecture §7, T1.8): every text field.
@@ -28,6 +29,9 @@ final InspectorSectionSpec textSection = InspectorSectionSpec(
   title: 'Text',
   appliesTo: (info) => info.kinds.contains(ir.NodeKind.text),
   builder: (context, info) => const TextSectionBody(),
+  actions: (context, info) => const [
+    StylePickerButton(kind: ir.StyleKind.text, stylePath: 'textStyleId'),
+  ],
 );
 
 /// The body of the text section: the text target scope around the controls.

@@ -12,6 +12,7 @@ import '../property_writer.dart';
 import '../section_registry.dart';
 import 'appearance_style_banner.dart';
 import 'paint_stack.dart';
+import 'style_picker.dart';
 
 const String _paintsPath = 'strokes.paints';
 const String _weightPath = 'strokes.weight';
@@ -23,7 +24,14 @@ final InspectorSectionSpec strokeSection = InspectorSectionSpec(
   title: 'Stroke',
   appliesTo: (info) => info.hasStroke,
   builder: (context, info) => const _StrokeBody(),
-  actions: (context, info) => const [AddPaintButton(stackPath: _paintsPath)],
+  actions: (context, info) => const [
+    StylePickerButton(
+      kind: ir.StyleKind.paint,
+      stylePath: 'strokeStyleId',
+      valuePath: _paintsPath,
+    ),
+    AddPaintButton(stackPath: _paintsPath),
+  ],
 );
 
 /// The name of the paint style the whole selection shares, or null.
