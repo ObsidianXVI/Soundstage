@@ -7,6 +7,7 @@ import 'dart:isolate' as iso;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soundstage_platform/runtime/runtime.dart' show StageRenderMode;
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -181,6 +182,38 @@ void main() {
     for (final b in boxes) {
       expect(identical(b.node, b.baseNode), isTrue);
     }
+    animator.dispose();
+  });
+
+  test('editor scrub of 200 mixed tracks (edit mode, playheads) allocates '
+      'within the animator budget', () async {
+    final s = service;
+    if (s == null) {
+      markTestSkipped('run with --enable-vmservice to measure allocations');
+      return;
+    }
+    final (:animator, boxes: _) = boundMixedAnimator(
+      mode: StageRenderMode.edit,
+    );
+    expect(animator.boundTrackCount, 200);
+    // The editor hands the animator one playhead map per scrub step; these
+    // are built ahead, as the editor state builds them outside the
+    // animator.
+    final steps = [
+      for (final v in _sweepValues()) <String, double>{'c': v},
+    ];
+    void run(int frames) {
+      for (var f = 0; f < frames; f++) {
+        animator.clockOverrides = steps[f % steps.length];
+      }
+    }
+
+    run(10 * _frames); // warm up: let the optimising JIT settle
+    final rates = await _perFrame(s, isolate, run);
+    final total = _report('editor scrub, 200 mixed tracks', rates);
+    // The mixed push budget (DECISIONS 23/10/26 T0.6b): up to 4 boxed
+    // doubles per frame on the VM JIT.
+    expect(total, lessThanOrEqualTo(4), reason: '$rates');
     animator.dispose();
   });
 }

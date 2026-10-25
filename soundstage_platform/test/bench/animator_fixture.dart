@@ -270,11 +270,20 @@ ir.ResolvedDocument mixedTrackDocument() {
 /// pipeline owner (repaint boundaries, as `StageSceneView` makes them), so
 /// slot tracks take the composited-update path and paint tracks write typed
 /// paint overrides.
-({StageAnimator animator, List<RenderStageBox> boxes}) boundMixedAnimator() {
+///
+/// [mode] `edit` freezes the clock at `clockOverrides` (the editor's
+/// playheads), as the canvas artboards do.
+({StageAnimator animator, List<RenderStageBox> boxes}) boundMixedAnimator({
+  StageRenderMode mode = StageRenderMode.play,
+}) {
   final resolved = mixedTrackDocument();
   final registry = StageNodeRegistry();
-  final animator = StageAnimator(registry: registry, vsync: _Vsync());
-  final env = StageEnvironment(nodes: registry);
+  final animator = StageAnimator(
+    registry: registry,
+    vsync: _Vsync(),
+    mode: mode,
+  );
+  final env = StageEnvironment(nodes: registry, mode: mode);
   final owner = PipelineOwner();
   final boxes = <RenderStageBox>[
     for (final child in resolved.scenes.single.root.children)
