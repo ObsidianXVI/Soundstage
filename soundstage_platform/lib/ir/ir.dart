@@ -27,6 +27,7 @@ export 'src/edit/breakpoint_edits.dart';
 export 'src/edit/constraint_math.dart';
 export 'src/edit/document_index.dart' hide carryRootIndex;
 export 'src/edit/edit_result.dart';
+export 'src/edit/motion_edits.dart';
 export 'src/edit/node_edits.dart';
 export 'src/edit/scene_edits.dart';
 export 'src/interactions.dart';

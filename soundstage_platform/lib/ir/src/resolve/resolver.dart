@@ -1,5 +1,6 @@
 import 'dart:collection';
 
+import '../animation/track_eval.dart';
 import '../breakpoint.dart';
 import '../components.dart';
 import '../diagnostics.dart';
@@ -53,8 +54,14 @@ ResolvedDocument resolveDocument(
 /// inputs are unchanged (the document's tokens, assets, components, variant
 /// sets, default text style, breakpoints, and the `ResolveContext`); when any
 /// of those changes the memo is dropped and the next pass is a full one.
-/// Only the previous pass is kept, so memory stays proportional to the
-/// document. Not thread-safe; use one `Resolver` per owner.
+/// Results are attached to the authored nodes (and tracks) themselves, by
+/// identity and weakly (an `Expando`): a subtree reused for many passes stays
+/// memoised even when a pass hit at an ancestor and never visited it (a
+/// motion-only edit keeps the scene root), and results go away with their
+/// nodes, so memory stays proportional to the documents still alive (the
+/// current one and the undo history's edited paths). At most
+/// [_Memo.maxModeEntries] mode variants are kept per node. Not thread-safe;
+/// use one `Resolver` per owner.
 class Resolver {
   Resolver({PropertyRegistry? registry})
     : registry = registry ?? PropertyRegistry.standard;
@@ -70,7 +77,6 @@ class Resolver {
     _memo.prepare(doc, context);
     final pass = _Pass(doc, context, registry, _memo);
     final out = pass.run();
-    _memo.commit(pass.memoNext);
     return out;
   }
 
@@ -81,18 +87,42 @@ class Resolver {
   /// → styles), each with the value it produced, and the final value. See
   /// [Provenance].
   ///
+  /// With [clockValues] (clock id → value; absent clocks at 0, the editor's
+  /// playheads), the tracks that animate the property at this breakpoint
+  /// add `animated` entries on top, valued at those clock values, and the
+  /// final value is the animated one (m2.md: the inspector shows the value
+  /// at the playhead). Without it, tracks are ignored, as in the resolved
+  /// document (animation is pipeline step 6, after resolution).
+  ///
   /// [nodeId] is a resolved id: a scene or overlay node, or
   /// `<instanceId>/<innerId>[/…]` inside instances. Only the path to the
   /// node is resolved afresh; when [doc] and [context] match this
-  /// resolver's last pass, everything else is reused from the memo. The
-  /// memo itself is not changed. Never throws: an unknown node gives no
+  /// resolver's last pass, everything else is reused from the memo (and
+  /// subtrees it had to resolve are added to it; the traced path is not). Never throws: an unknown node gives no
   /// entries, a null `finalValue` and a `missingNode` diagnostic.
   Provenance explain(
     StageDocument doc,
     String nodeId,
     PropertyPath path, [
     ResolveContext context = const ResolveContext(),
-  ]) {
+  ]) => _explain(doc, nodeId, path, context, null);
+
+  /// [explain] with the `animated` layer at [clockValues] (see [explain]).
+  Provenance explainAt(
+    StageDocument doc,
+    String nodeId,
+    PropertyPath path,
+    Map<String, double> clockValues, [
+    ResolveContext context = const ResolveContext(),
+  ]) => _explain(doc, nodeId, path, context, clockValues);
+
+  Provenance _explain(
+    StageDocument doc,
+    String nodeId,
+    PropertyPath path,
+    ResolveContext context,
+    Map<String, double>? clockValues,
+  ) {
     final p = path.value;
     Provenance missing() => Provenance(
       nodeId: nodeId,
@@ -127,11 +157,11 @@ class Resolver {
       _memo.isValidFor(doc, context) ? _memo : _Memo(),
       tracer,
     );
-    pass.explainRun(loc.sceneIndex);
+    final scene = pass.explainRun(loc.sceneIndex);
     final resolved = tracer.resolved;
     if (resolved == null) return missing();
-    final IrValue? finalValue;
-    final List<ProvenanceEntry> entries;
+    IrValue? finalValue;
+    List<ProvenanceEntry> entries;
     if (tracer.textEntries case final te?) {
       entries = te;
       finalValue = tracer.textFinal;
@@ -140,6 +170,13 @@ class Resolver {
       finalValue = _styleRefPaths.contains(p)
           ? (entries.isEmpty ? null : entries.last.value)
           : resolvedPropertyValue(resolved, p, registry: registry);
+    }
+    if (clockValues != null && scene != null && finalValue != null) {
+      final animated = _animatedEntries(scene, resolved, p, clockValues);
+      if (animated.isNotEmpty) {
+        entries = [...entries, ...animated];
+        finalValue = animated.last.value;
+      }
     }
     return Provenance(
       nodeId: nodeId,
@@ -150,6 +187,54 @@ class Resolver {
         pass.diagnostics.where((d) => d.nodeId == nodeId),
       ),
     );
+  }
+}
+
+extension on Resolver {
+  /// The `animated` layer of [path] on [node] in [scene] at [clocks]: one
+  /// entry per track of the scene (already filtered for the breakpoint, with
+  /// breakpoint-specific tracks winning) that animates [path], a path under
+  /// it, or a path containing it. Text style paths are only matched
+  /// exactly (their value is the merged cascade).
+  List<ProvenanceEntry> _animatedEntries(
+    ResolvedScene scene,
+    ResolvedNode node,
+    String path,
+    Map<String, double> clocks,
+  ) {
+    final out = <ProvenanceEntry>[];
+    var animated = node.node;
+    final textPath = path.startsWith('style.') || path.startsWith('content.');
+    for (final t in scene.tracks) {
+      if (t.target != node.id) continue;
+      final prop = t.property;
+      final exact = prop == path;
+      if (!exact &&
+          (textPath ||
+              !(prop.startsWith('$path.') || path.startsWith('$prop.')))) {
+        continue;
+      }
+      final v = evaluateTrack(t, clocks[t.clockId] ?? 0, registry: registry);
+      if (v == null) continue;
+      IrValue? value = v;
+      if (!exact) {
+        final match = registry.lookup(prop);
+        final next = match?.trySet(animated, v);
+        if (next == null) continue;
+        animated = next;
+        value = registry.get(animated, path);
+        if (value == null) continue;
+      }
+      out.add(
+        ProvenanceEntry(
+          source: ProvenanceSource.animated(t.id),
+          value: value,
+          nodeId: t.target.split('/').last,
+          keys: [prop],
+        ),
+      );
+    }
+    return out;
   }
 }
 
@@ -523,13 +608,29 @@ class _MemoEntry {
   final List<IrDiagnostic> diagnostics;
 }
 
-typedef _MemoMap = Map<Node, List<_MemoEntry>>;
+/// A resolved track and the resolved target it was checked against. The
+/// resolved track keeps its identity across passes while the source track
+/// and its target do, so the runtime recompiles only edited tracks.
+class _TrackMemo {
+  const _TrackMemo(this.target, this.result);
 
-/// The previous pass of a [Resolver] and the inputs it is valid for.
+  final ResolvedNode target;
+  final Track result;
+}
+
+/// The memoised results of a [Resolver] and the inputs they are valid for.
 class _Memo {
   StageDocument? _doc;
   ResolveContext? _ctx;
-  _MemoMap previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+
+  /// Memoised subtrees by authored node (identity, weak).
+  Expando<List<_MemoEntry>> nodes = Expando<List<_MemoEntry>>('resolved');
+
+  /// Resolved tracks by source track (identity, weak).
+  Expando<_TrackMemo> tracks = Expando<_TrackMemo>('resolvedTrack');
+
+  /// Mode variants kept per node (oldest dropped first).
+  static const int maxModeEntries = 4;
 
   /// Whether the memo is valid for [doc] and [ctx] (see [prepare]).
   bool isValidFor(StageDocument doc, ResolveContext ctx) {
@@ -550,13 +651,12 @@ class _Memo {
     // never holds for them; `==` is cheap here because freezed values
     // short-circuit on identity and these inputs are small or unchanged.
     if (!isValidFor(doc, ctx)) {
-      previous = LinkedHashMap<Node, List<_MemoEntry>>.identity();
+      nodes = Expando<List<_MemoEntry>>('resolved');
+      tracks = Expando<_TrackMemo>('resolvedTrack');
     }
     _doc = doc;
     _ctx = ctx;
   }
-
-  void commit(_MemoMap next) => previous = next;
 
   static bool sameModes(Map<String, String> a, Map<String, String> b) {
     if (identical(a, b)) return true;
@@ -646,9 +746,6 @@ class _Pass {
 
   final _Memo memo;
 
-  /// The memo this pass is building (becomes the next pass's `previous`).
-  final _MemoMap memoNext = LinkedHashMap<Node, List<_MemoEntry>>.identity();
-
   late final Breakpoint? breakpoint = _pickBreakpoint();
 
   /// The breakpoints whose patches apply, root first (§3.1).
@@ -723,13 +820,14 @@ class _Pass {
 
   /// Resolves only the tree holding the traced node: scene [sceneIndex], or
   /// the overlay when null.
-  void explainRun(int? sceneIndex) {
+  /// Returns the resolved scene (null for the overlay).
+  ResolvedScene? explainRun(int? sceneIndex) {
     final baseModes = _baseModes();
     if (sceneIndex == null) {
       _resolveNode(doc.overlay!, _Scope(prefix: '', modes: baseModes));
-    } else {
-      _resolveScene(doc.scenes[sceneIndex], baseModes);
+      return null;
     }
+    return _resolveScene(doc.scenes[sceneIndex], baseModes);
   }
 
   /// The active mode of [variableId]'s collection under [modes].
@@ -942,11 +1040,28 @@ class _Pass {
     final root = _resolveNode(scene.root, _Scope(prefix: '', modes: modes));
     final index = <String, ResolvedNode>{};
     _index(root, index);
-    final tracks = <Track>[];
+    // Tracks that apply at the active breakpoint. A breakpoint-specific
+    // track wins over an all-breakpoints track on the same target and
+    // property (m2.md "Tracks and breakpoints"); the runtime evaluates
+    // exactly these.
+    final applied = <Track>[];
+    Set<String>? specific;
     for (final t in scene.tracks) {
-      final r = _resolveTrack(t, index);
-      if (r != null) tracks.add(r);
+      final r = _resolveTrackMemo(t, index);
+      if (r == null) continue;
+      applied.add(r);
+      if (r.breakpoints != null) {
+        (specific ??= {}).add('${r.target}\u0000${r.property}');
+      }
     }
+    final tracks = specific == null
+        ? applied
+        : [
+            for (final r in applied)
+              if (r.breakpoints != null ||
+                  !specific.contains('${r.target}\u0000${r.property}'))
+                r,
+          ];
     return ResolvedScene(
       id: scene.id,
       name: scene.name,
@@ -961,6 +1076,28 @@ class _Pass {
       exportAs: scene.exportAs,
       posterClock: scene.posterClock,
     );
+  }
+
+  /// [_resolveTrack], reusing the previous pass's result while the source
+  /// track and its resolved target keep their identity. Only results that
+  /// produced no diagnostics are memoised (diagnostics must be replayed).
+  Track? _resolveTrackMemo(Track t, Map<String, ResolvedNode> index) {
+    final only = t.breakpoints;
+    if (only != null &&
+        (breakpoint == null || !only.contains(breakpoint!.id))) {
+      return null;
+    }
+    final target = index[t.target];
+    final prev = memo.tracks[t];
+    if (prev != null && target != null && identical(prev.target, target)) {
+      return prev.result;
+    }
+    final before = diagnostics.length;
+    final r = _resolveTrack(t, index);
+    if (r != null && target != null && diagnostics.length == before) {
+      memo.tracks[t] = _TrackMemo(target, r);
+    }
+    return r;
   }
 
   Track? _resolveTrack(Track t, Map<String, ResolvedNode> index) {
@@ -1090,19 +1227,20 @@ class _Pass {
     if (t != null && t.bypass.contains(node)) {
       return _resolveNodeUncached(node, scope);
     }
-    final hits = memo.previous[node];
+    final hits = memo.nodes[node];
     if (hits != null) {
       for (final e in hits) {
         if (_Memo.sameModes(e.modes, scope.modes)) {
           diagnostics.addAll(e.diagnostics);
-          (memoNext[node] ??= []).add(e);
           return e.result;
         }
       }
     }
     final start = diagnostics.length;
     final result = _resolveNodeUncached(node, scope);
-    (memoNext[node] ??= []).add(
+    final entries = memo.nodes[node] ??= [];
+    if (entries.length >= _Memo.maxModeEntries) entries.removeAt(0);
+    entries.add(
       _MemoEntry(
         scope.modes,
         result,

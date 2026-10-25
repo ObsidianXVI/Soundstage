@@ -65,6 +65,12 @@ enum IrDiagnosticKind {
   /// edited through instance overrides, never in place.
   editInsideInstance,
 
+  /// A motion edit names a track that is not in its scene.
+  missingTrack,
+
+  /// A motion edit names a keyframe that is not in its track.
+  missingKeyframe,
+
   /// The document could not be parsed at all (`loadDocument`).
   invalidDocument,
 
