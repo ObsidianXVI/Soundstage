@@ -37,7 +37,11 @@ class InsertActions {
   /// Stores [files] and adds the assets to the document (one undo step).
   /// Returns the stored assets; failures are reported.
   Future<List<ir.Asset>> addToLibrary(Iterable<EditorFile> files) async {
-    final report = await ingestMedia(_assets, files);
+    final report = await ingestMedia(
+      _assets,
+      files,
+      existing: _state.document.assets.values,
+    );
     if (report.assets.isNotEmpty) {
       _ctl.execute(AddAssets(report.assets));
     }

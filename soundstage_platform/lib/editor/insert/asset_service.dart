@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../clipboard/content_hash.dart';
+
 /// A file the author gave the editor: from the picker, a drop or the
 /// clipboard.
 typedef EditorFile = ({String name, Uint8List bytes, String mime});
@@ -89,8 +91,29 @@ Future<IngestReport> ingestMedia(
     ir.AssetKind.audio,
     ir.AssetKind.video,
   },
+  Iterable<ir.Asset> existing = const [],
 }) async {
   final report = IngestReport();
+  // Same bytes, same asset (as an import does): a file already in the
+  // document, or given twice, reuses that asset instead of a second copy.
+  // Candidates are matched on byte size first, so only same-size stored
+  // files are read and hashed.
+  final known = [...existing];
+  final hashes = <String, String>{};
+  Future<ir.Asset?> sameAs(EditorFile f, ir.AssetKind kind) async {
+    final h = contentHash(f.bytes);
+    for (final a in known) {
+      if (a.kind != kind) continue;
+      if (a.byteSize > 0 && a.byteSize != f.bytes.length) continue;
+      final ah = hashes[a.id] ??= await () async {
+        final b = await service.bytes(a.id);
+        return b == null ? '' : contentHash(b);
+      }();
+      if (ah == h) return a;
+    }
+    return null;
+  }
+
   for (final f in files) {
     final mime = mimeOfFile(f);
     final kind = mime == null ? null : mediaKindForMime(mime);
@@ -105,7 +128,15 @@ Future<IngestReport> ingestMedia(
       continue;
     }
     try {
-      report.assets.add(await service.add(f.bytes, mime, name: f.name));
+      final same = await sameAs(f, kind);
+      if (same != null) {
+        if (!report.assets.contains(same)) report.assets.add(same);
+        continue;
+      }
+      final added = await service.add(f.bytes, mime, name: f.name);
+      hashes[added.id] = contentHash(f.bytes);
+      known.add(added);
+      report.assets.add(added);
     } on AssetServiceException catch (e) {
       report.problems.add('${f.name}: ${e.message}');
     }

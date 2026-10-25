@@ -49,6 +49,21 @@ void main() {
       expect(s.c.doc.assets, isEmpty);
     });
 
+    test('the same file twice is stored once (R3): again later, or twice '
+        'in one drop', () async {
+      final s = _setup();
+      await _actions(s.c).addFiles([_img('sea.png', 10, 10, 1)]);
+      final first = s.c.doc.assets.keys.single;
+      await _actions(s.c).addFiles([
+        _img('sea copy.png', 10, 10, 1),
+        _img('other.png', 10, 10, 2),
+        _img('other again.png', 10, 10, 2),
+      ]);
+      expect(s.c.doc.assets, hasLength(2));
+      expect(s.c.doc.assets.containsKey(first), isTrue);
+      expect(s.service.addCount, 2);
+    });
+
     test('a failing file is reported and the others still land', () async {
       final s = _setup();
       await _actions(s.c).addFiles([
