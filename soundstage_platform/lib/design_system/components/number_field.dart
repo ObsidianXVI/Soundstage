@@ -87,7 +87,6 @@ class _SsNumberFieldState extends State<SsNumberField> {
 
   /// The text last committed, so the blur that follows an Enter does not
   /// emit the same value twice. Cleared when the field gains focus.
-  String? _committedText;
   double _scrubStart = 0;
   double _scrubAccum = 0;
 
@@ -130,7 +129,6 @@ class _SsNumberFieldState extends State<SsNumberField> {
   void _onFocusChange() {
     final has = _focus.hasFocus;
     if (has) {
-      _committedText = null;
       _selectAll();
     } else {
       _commit();
@@ -157,14 +155,14 @@ class _SsNumberFieldState extends State<SsNumberField> {
   }
 
   /// Parses the text and applies it; invalid input reverts.
+  ///
+  /// Only typed text commits (Enter or blur alike): after a commit the field
+  /// is clean, so the blur that follows Enter (focus goes back to the
+  /// editor) or a target change while focused writes nothing.
   void _commit() {
-    if (!_dirty) {
-      _controller.text = _format();
-      return;
-    }
+    if (!_dirty) return;
     _dirty = false;
     final text = _controller.text.trim();
-    if (text == _committedText) return;
     if (text.isEmpty) {
       _controller.text = _format();
       return;
@@ -176,7 +174,6 @@ class _SsNumberFieldState extends State<SsNumberField> {
     }
     final v = _clamp(parsed);
     _controller.text = _format(v);
-    _committedText = _controller.text;
     if (widget.mixed || v != _current) _emit(v);
   }
 

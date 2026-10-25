@@ -81,6 +81,7 @@ Future<void> buildHero(Rig r, Map<String, String> assets, Fonts fonts) async {
   // The root: image fill (the asset tile applies to the selection), focal
   // point typed in %.
   await r.selectRoot();
+  await noFill(r, r.rootId); // a new scene's root is white
   await r.tab('Assets');
   await r.tester.tap(
     find.byKey(ValueKey<String>('asset-tile:${assets['hero']}')),
@@ -307,7 +308,12 @@ Future<void> buildEssay(Rig r, Map<String, String> assets, Fonts fonts) async {
   }
   await r.selectRoot();
   final root = r.rootId;
-  await r.tapKey('add-paint:fills');
+  if ((ir.PropertyRegistry.standard.get(r.node(root), 'fills')!
+          as ir.PaintsValue)
+      .value
+      .isEmpty) {
+    await r.tapKey('add-paint:fills');
+  }
   await solidFill(r, root, 'f4efe6', '100');
   await r.tapKey('field:clipContent'); // a blank root clips; this one not
   await r.tapKey('auto-layout:add');
@@ -978,6 +984,7 @@ Future<void> buildQuote(Rig r, Map<String, String> assets, Fonts fonts) async {
   await r.zoomToFit();
 
   await r.selectRoot();
+  await noFill(r, r.rootId); // a new scene's root is white
   await r.tab('Assets');
   await r.tester.tap(
     find.byKey(ValueKey<String>('asset-tile:${assets['sea']}')),
