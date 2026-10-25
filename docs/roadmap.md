@@ -79,3 +79,13 @@ Goal: build a static, responsive multi-scene story entirely in the editor and sa
 - Letterpress embedding (`StagePlayer` inside an `LPModule`).
 - **Export to Flutter:** a one-way generator from a story to a standalone Dart widget tree, for
   ownership and no lock-in. The IR stays the source of truth.
+
+## Unscheduled — from the product spec (`product_spec.md`)
+Placement waits on `DECISIONS_NEEDED.md` #5–#7.
+- Editor modes: Writing, Design, Animation, Publish.
+- Writing mode: Markdown/prose editing, meta-notes, drafts, version history, inspiration boards.
+- Agent panel, Annotate mode, Proactive toggle with an agent policy; operation preconditions and
+  staged transactions underneath.
+- Static publishing as a release target; per-feature static fallbacks; performance budgets.
+- Publish mode: releases and rollback, links, audiences, analytics, publications, custom domains,
+  Mailchimp.
