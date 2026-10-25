@@ -12,6 +12,8 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
 
 import 'not_found_page.dart';
+import 'open_in_new_tab_stub.dart'
+    if (dart.library.js_interop) 'open_in_new_tab_web.dart';
 
 /// `/edit/:id`: the editor for one story.
 ///
@@ -85,6 +87,7 @@ class _EditPageState extends ConsumerState<EditPage> {
           filePicker: pickEditorFiles,
           onBack: () => context.go('/'),
           onPreview: () => context.go('/play/$_id'),
+          onOpenPreviewInNewTab: () => openInNewTab('/play/$_id'),
           onDocumentChanged: (doc) {
             _edited = true;
             autosave.notifyChanged(doc);
