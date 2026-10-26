@@ -15,6 +15,7 @@ export 'src/animator/text_style_tracks.dart';
 export 'src/clocks/clock_source.dart';
 export 'src/clocks/smoothing.dart';
 export 'src/clocks/timeline_clock.dart';
+export 'src/export/stage_poster.dart';
 export 'src/media/asset_resolver.dart';
 export 'src/media/audio.dart';
 export 'src/media/font_metrics.dart';

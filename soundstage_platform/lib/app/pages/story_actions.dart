@@ -2,14 +2,20 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
+import 'package:soundstage_platform/app/export/pdf_export.dart';
+import 'package:soundstage_platform/app/export/static_export.dart';
 import 'package:soundstage_platform/app/persistence/db_story_repository.dart';
 import 'package:soundstage_platform/app/persistence/platform.dart' as platform;
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/app/persistence/story_package.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/ir/ir.dart' as ir;
+import 'package:soundstage_platform/runtime/runtime.dart'
+    show StageEnvironment, StageRenderMode, renderStagePoster;
 
 /// Story-level actions of the story list: import, export, duplicate,
 /// revisions. Each reports failures as a toast and never throws.
@@ -100,6 +106,78 @@ class StoryActions {
         bytes,
         'application/zip',
       );
+    } on Object catch (e) {
+      _toast('Export failed: ${_describe(e)}', SsToastKind.danger);
+    }
+  }
+
+  /// Static exports (architecture §16.1): Markdown or HTML in a zip with
+  /// their images and poster frames, or a PDF. Local exports carry no
+  /// backlink until the story is published (M4 hosting).
+  Future<void> exportStatic(StorySummary s, StaticExportFormat format) =>
+      _exportWith(s, (doc, bytesOf, poster) async {
+        final zip = await exportStaticZip(
+          doc,
+          format,
+          bytesOf: bytesOf,
+          poster: poster,
+        );
+        final suffix = format == StaticExportFormat.markdown ? 'md' : 'html';
+        return (
+          '${exportFileBase(s.title)}.$suffix.zip',
+          zip,
+          'application/zip',
+        );
+      });
+
+  Future<void> exportPdf(StorySummary s) =>
+      _exportWith(s, (doc, bytesOf, poster) async {
+        Uint8List? font;
+        try {
+          final data = await rootBundle.load(
+            'assets/fonts/inter/Inter-Variable.ttf',
+          );
+          font = data.buffer.asUint8List();
+        } on Object {
+          font = null; // Times alone still covers Latin text
+        }
+        final pdf = await exportStoryPdf(
+          doc,
+          bytesOf: bytesOf,
+          poster: poster,
+          fallbackFont: font,
+        );
+        return ('${exportFileBase(s.title)}.pdf', pdf, 'application/pdf');
+      });
+
+  Future<void> _exportWith(
+    StorySummary s,
+    Future<(String, Uint8List, String)> Function(
+      ir.StageDocument doc,
+      AssetBytesSource bytesOf,
+      PosterSource poster,
+    )
+    build,
+  ) async {
+    final db = _db;
+    try {
+      final doc = await _repo.load(s.id);
+      if (doc == null) return;
+      _toast('Exporting "${s.title}"…');
+      final env = StageEnvironment.forDocument(doc, mode: StageRenderMode.edit);
+      final (name, bytes, mime) = await build(
+        doc,
+        (a) => db?.assetBytes(a) ?? Future.value(null),
+        ({required sceneId, clock, nodeId}) => renderStagePoster(
+          doc,
+          env,
+          sceneId: sceneId,
+          clock: clock,
+          nodeId: nodeId,
+          pixelRatio: 2,
+        ),
+      );
+      platform.downloadFile(name, bytes, mime);
     } on Object catch (e) {
       _toast('Export failed: ${_describe(e)}', SsToastKind.danger);
     }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
+import 'package:soundstage_platform/app/export/static_export.dart'
+    show StaticExportFormat;
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
@@ -144,6 +146,22 @@ class _StoryRow extends ConsumerWidget {
         label: 'Export .stage.zip',
         icon: SsIcons.file,
         onSelected: () => actions.exportZip(story),
+      ),
+      SsMenuItem(
+        label: 'Export Markdown (.zip)',
+        icon: SsIcons.file,
+        onSelected: () =>
+            actions.exportStatic(story, StaticExportFormat.markdown),
+      ),
+      SsMenuItem(
+        label: 'Export HTML (.zip)',
+        icon: SsIcons.file,
+        onSelected: () => actions.exportStatic(story, StaticExportFormat.html),
+      ),
+      SsMenuItem(
+        label: 'Export PDF',
+        icon: SsIcons.file,
+        onSelected: () => actions.exportPdf(story),
       ),
       if (!story.bundled)
         SsMenuItem(
