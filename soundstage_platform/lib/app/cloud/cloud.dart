@@ -148,6 +148,30 @@ class FirebaseCloudBackend implements CloudBackend {
   }
 
   @override
+  Future<SeriesRecord?> series(String slug) async {
+    final data = (await _cloud.firestore.doc('series/$slug').get()).data();
+    return data == null ? null : SeriesRecord.fromMap(data);
+  }
+
+  @override
+  Future<void> setSeries(String slug, SeriesRecord record) => _cloud.firestore
+      .doc('series/$slug')
+      .set({...record.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
+
+  @override
+  Future<String?> seriesSlugOf(String projectId) async {
+    final uid = this.uid;
+    if (uid == null) return null;
+    final q = await _cloud.firestore
+        .collection('series')
+        .where('ownerId', isEqualTo: uid)
+        .where('projectId', isEqualTo: projectId)
+        .limit(1)
+        .get();
+    return q.docs.isEmpty ? null : q.docs.first.id;
+  }
+
+  @override
   Future<void> setStoryMeta(String storyId, Map<String, Object?> data) =>
       _cloud.firestore.doc('stories/$storyId').set({
         ...data,

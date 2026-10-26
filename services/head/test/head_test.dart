@@ -97,4 +97,39 @@ void main() {
     expect(xml, contains('<url><loc>https://site/s/x2</loc></url>'));
     expect(sitemapEntries({}), isEmpty);
   });
+
+  test('series previews and sitemap entries', () {
+    expect(seriesSlugFromPath('/series/weekly'), 'weekly');
+    expect(seriesSlugFromPath('/s/weekly'), isNull);
+    final h = seriesHead({
+      'fields': {
+        'title': {'stringValue': 'Weekly'},
+        'issues': {
+          'arrayValue': {
+            'values': [
+              {
+                'mapValue': {
+                  'fields': {
+                    'image': {'stringValue': 'https://cdn/c.png'},
+                  },
+                },
+              },
+              {
+                'mapValue': {'fields': <String, Object?>{}},
+              },
+            ],
+          },
+        },
+      },
+    }, 'https://site/series/weekly');
+    expect(h.title, 'Weekly');
+    expect(h.description, contains('2 issues'));
+    expect(h.image, 'https://cdn/c.png');
+    final xml = sitemapXml(
+      'https://site',
+      const [],
+      series: const [(slug: 'weekly', lastModified: null)],
+    );
+    expect(xml, contains('<loc>https://site/series/weekly</loc>'));
+  });
 }

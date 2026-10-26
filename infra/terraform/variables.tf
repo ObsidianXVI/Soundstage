@@ -19,7 +19,7 @@ variable "auth_domains" {
 variable "head_image_tag" {
   description = "Tag of the soundstage-head image in Artifact Registry (built with services/head/cloudbuild.yaml)."
   type        = string
-  default     = "v2"
+  default     = "v3"
 }
 
 variable "agent_image_tag" {

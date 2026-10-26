@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/publish.dart' as pub;
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
+import 'cloud_ui.dart'
+    show showPublishDialog, showPublishedDialog, showSignInDialog;
 import 'not_found_page.dart';
 import 'story_list_page.dart' show StoryRow;
 
@@ -133,6 +137,56 @@ class ProjectActions {
     return true;
   }
 
+  /// Publishes the project's series page (`/series/<slug>`): its
+  /// published issues, newest first. Publishing an issue later refreshes it.
+  Future<void> publishSeries(ProjectSummary p) async {
+    final cloud = ref.read(cloudProvider);
+    if (cloud == null) return;
+    if (cloud.auth.currentUser == null) {
+      await showSignInDialog(context, cloud.auth);
+      if (cloud.auth.currentUser == null || !context.mounted) return;
+    }
+    final existing = await cloud.backend.seriesSlugOf(p.id);
+    if (!context.mounted) return;
+    final origin = Uri.base.origin;
+    final slug = await showPublishDialog(
+      context,
+      title: p.title,
+      suggested: existing ?? pub.slugFor(p.title),
+      origin: origin,
+      path: 'series',
+    );
+    if (slug == null || !context.mounted) return;
+    try {
+      final stories = await _repo.list();
+      final record = await pub.publishSeries(
+        projectId: p.id,
+        title: p.title,
+        slug: slug,
+        issueIds: [
+          for (final s in stories)
+            if (s.projectId == p.id) s.id,
+        ],
+        backend: cloud.backend,
+      );
+      if (!context.mounted) return;
+      await showPublishedDialog(
+        context,
+        url: '$origin/series/$slug',
+        version: 1,
+        warnings: [
+          if (record.issues.isEmpty)
+            'No issue is published yet: publish issues and they appear here.',
+        ],
+        onOpen: () => context.go('/series/$slug'),
+      );
+    } on pub.PublishException catch (e) {
+      if (context.mounted) {
+        SsToast.show(context, e.message, kind: SsToastKind.danger);
+      }
+    }
+  }
+
   /// A new issue: blank with the project's library, or a copy of
   /// [template].
   Future<void> newIssue(ProjectSummary p, {StorySummary? template}) async {
@@ -209,6 +263,13 @@ class ProjectPage extends ConsumerWidget {
                               icon: SsIcons.pencil,
                               onSelected: () => actions.rename(project),
                             ),
+                            if (ref.read(cloudProvider) != null)
+                              SsMenuItem(
+                                label: 'Publish series…',
+                                icon: SsIcons.globe,
+                                onSelected: () =>
+                                    actions.publishSeries(project),
+                              ),
                             const SsMenuDivider(),
                             SsMenuItem(
                               label: 'Delete project',

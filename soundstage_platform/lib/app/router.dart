@@ -8,6 +8,7 @@ import 'pages/not_found_page.dart';
 import 'pages/play_page.dart';
 import 'pages/project_page.dart';
 import 'pages/published_page.dart';
+import 'pages/series_page.dart';
 import 'pages/story_list_page.dart';
 
 bool? _flag(Uri uri, String key, String value) =>
@@ -35,6 +36,7 @@ String? redirectLegacyDemo(Uri uri) {
 /// - `/edit/:id` editor (content mode below 1024 px)
 /// - `/play/:id` the player behind the enter gate
 /// - `/s/:slug` a published story (M4)
+/// - `/series/:slug` a project's published issues
 ///   (both take `?tier=lite|static`, m4.md T4.6)
 /// - `/demo/:name` the M0 demos; `/demo/design-system` the component gallery
 GoRouter buildRouter({String initialLocation = '/'}) {
@@ -69,6 +71,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           slug: state.pathParameters['slug']!,
           tier: StageTier.parse(state.uri.queryParameters['tier']),
         ),
+      ),
+      GoRoute(
+        path: '/series/:slug',
+        builder: (context, state) =>
+            SeriesPage(slug: state.pathParameters['slug']!),
       ),
       GoRoute(
         path: '/demo/design-system',

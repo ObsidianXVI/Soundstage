@@ -87,6 +87,126 @@ abstract interface class CloudBackend {
 
   /// The slug story [storyId] was last published at, or null.
   Future<String?> publishedSlugOf(String storyId);
+
+  /// The series at [slug], or null.
+  Future<SeriesRecord?> series(String slug);
+
+  Future<void> setSeries(String slug, SeriesRecord record);
+
+  /// The signed-in author's series of project [projectId]: its slug, or
+  /// null.
+  Future<String?> seriesSlugOf(String projectId);
+}
+
+/// One published issue in a series.
+class SeriesIssue {
+  const SeriesIssue({
+    required this.slug,
+    required this.title,
+    this.description = '',
+    this.image = '',
+  });
+
+  factory SeriesIssue.fromMap(Map<String, Object?> m) => SeriesIssue(
+    slug: m['slug']! as String,
+    title: (m['title'] as String?) ?? '',
+    description: (m['description'] as String?) ?? '',
+    image: (m['image'] as String?) ?? '',
+  );
+
+  final String slug;
+  final String title;
+  final String description;
+  final String image;
+
+  Map<String, Object?> toMap() => {
+    'slug': slug,
+    'title': title,
+    'description': description,
+    'image': image,
+  };
+}
+
+/// A project's public index (Firestore `series/{slug}`, `/series/<slug>`):
+/// its published issues, newest first (DECISIONS 26/10/26 #11: a series or
+/// newsletter routine).
+class SeriesRecord {
+  const SeriesRecord({
+    required this.ownerId,
+    required this.projectId,
+    required this.title,
+    this.issues = const [],
+  });
+
+  factory SeriesRecord.fromMap(Map<String, Object?> m) => SeriesRecord(
+    ownerId: m['ownerId']! as String,
+    projectId: m['projectId']! as String,
+    title: (m['title'] as String?) ?? '',
+    issues: [
+      for (final i in (m['issues'] as List?) ?? const [])
+        if (i is Map) SeriesIssue.fromMap(i.cast<String, Object?>()),
+    ],
+  );
+
+  final String ownerId;
+  final String projectId;
+  final String title;
+  final List<SeriesIssue> issues;
+
+  Map<String, Object?> toMap() => {
+    'ownerId': ownerId,
+    'projectId': projectId,
+    'title': title,
+    'issues': [for (final i in issues) i.toMap()],
+  };
+}
+
+/// Publishes (or refreshes) the series of project [projectId] at [slug]:
+/// the issues among [issueIds] that are published, in the given order
+/// (newest first). Throws [PublishException] when signed out, the slug is
+/// invalid or someone else's.
+Future<SeriesRecord> publishSeries({
+  required String projectId,
+  required String title,
+  required String slug,
+  required List<String> issueIds,
+  required CloudBackend backend,
+}) async {
+  final uid = backend.uid;
+  if (uid == null) throw const PublishException('Sign in to publish.');
+  if (!isValidSlug(slug)) {
+    throw const PublishException(
+      'Use lowercase letters, digits and dashes for the link.',
+    );
+  }
+  final existing = await backend.series(slug);
+  if (existing != null &&
+      (existing.ownerId != uid || existing.projectId != projectId)) {
+    throw PublishException('The link "$slug" is taken. Choose another.');
+  }
+  final issues = <SeriesIssue>[];
+  for (final id in issueIds) {
+    final s = await backend.publishedSlugOf(id);
+    if (s == null) continue;
+    final r = await backend.published(s);
+    if (r == null || r.ownerId != uid) continue;
+    issues.add(
+      SeriesIssue(
+        slug: s,
+        title: r.title,
+        description: r.description,
+        image: r.image,
+      ),
+    );
+  }
+  final record = SeriesRecord(
+    ownerId: uid,
+    projectId: projectId,
+    title: title,
+    issues: issues,
+  );
+  await backend.setSeries(slug, record);
+  return record;
 }
 
 class PublishException implements Exception {

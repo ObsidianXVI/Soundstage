@@ -35,7 +35,11 @@ Future<void> _handle(HttpRequest request) async {
       return;
     }
     if (request.uri.path == '/sitemap.xml') {
-      final body = sitemapXml(_site, await _publishedEntries());
+      final body = sitemapXml(
+        _site,
+        await _publishedEntries('published'),
+        series: await _publishedEntries('series'),
+      );
       res
         ..headers.contentType = ContentType(
           'application',
@@ -47,6 +51,27 @@ Future<void> _handle(HttpRequest request) async {
       return;
     }
     final shell = await _shell();
+    final seriesSlug = seriesSlugFromPath(request.uri.path);
+    if (seriesSlug != null) {
+      final doc = await _document('series', seriesSlug);
+      res
+        ..statusCode = doc == null ? HttpStatus.notFound : HttpStatus.ok
+        ..headers.contentType = ContentType.html
+        ..headers.set(
+          'cache-control',
+          'public, max-age=60, s-maxage=${doc == null ? 60 : 600}',
+        )
+        ..headers.set('cross-origin-opener-policy', 'same-origin')
+        ..headers.set('cross-origin-embedder-policy', 'credentialless');
+      if (request.method == 'GET') {
+        res.write(
+          doc == null
+              ? shell
+              : injectHead(shell, seriesHead(doc, '$_site/series/$seriesSlug')),
+        );
+      }
+      return;
+    }
     final slug = slugFromPath(request.uri.path);
     var status = HttpStatus.ok;
     var body = shell;
@@ -108,11 +133,15 @@ Future<String> _shell() async {
 }
 
 /// The Firestore document `published/{slug}` (REST), or null.
-Future<Map<String, Object?>?> _published(String slug) async {
+Future<Map<String, Object?>?> _published(String slug) =>
+    _document('published', slug);
+
+/// The Firestore document `[collection]/[id]` (REST), or null.
+Future<Map<String, Object?>?> _document(String collection, String id) async {
   final (status, body) = await _get(
     Uri.parse(
       'https://firestore.googleapis.com/v1/projects/$_project/databases/'
-      '(default)/documents/published/$slug',
+      '(default)/documents/$collection/$id',
     ),
     bearer: await _token(),
   );
@@ -121,15 +150,15 @@ Future<Map<String, Object?>?> _published(String slug) async {
   return jsonDecode(body) as Map<String, Object?>;
 }
 
-/// Every published slug (at most 5,000; a sitemap holds 50,000).
-Future<List<SitemapEntry>> _publishedEntries() async {
+/// Every slug of [collection] (`published` or `series`; at most 5,000).
+Future<List<SitemapEntry>> _publishedEntries(String collection) async {
   final out = <SitemapEntry>[];
   String? pageToken;
   for (var page = 0; page < 20; page++) {
     final uri =
         Uri.parse(
           'https://firestore.googleapis.com/v1/projects/$_project/databases/'
-          '(default)/documents/published',
+          '(default)/documents/$collection',
         ).replace(
           queryParameters: {
             'pageSize': '250',

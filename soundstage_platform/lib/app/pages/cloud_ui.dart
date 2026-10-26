@@ -205,10 +205,15 @@ Future<String?> showPublishDialog(
   required String title,
   required String suggested,
   required String origin,
+  String path = 's',
 }) => showSsDialog<String>(
   context,
-  builder: (ctx) =>
-      _PublishDialog(title: title, suggested: suggested, origin: origin),
+  builder: (ctx) => _PublishDialog(
+    title: title,
+    suggested: suggested,
+    origin: origin,
+    path: path,
+  ),
 );
 
 class _PublishDialog extends StatefulWidget {
@@ -216,11 +221,15 @@ class _PublishDialog extends StatefulWidget {
     required this.title,
     required this.suggested,
     required this.origin,
+    this.path = 's',
   });
 
   final String title;
   final String suggested;
   final String origin;
+
+  /// The route the link lives under (`s` for stories, `series`).
+  final String path;
 
   @override
   State<_PublishDialog> createState() => _PublishDialogState();
@@ -267,7 +276,10 @@ class _PublishDialogState extends State<_PublishDialog> {
             autofocus: true,
             selectAllOnFocus: true,
             semanticLabel: 'Link',
-            prefix: Text('${widget.origin}/s/', style: t.text.small),
+            prefix: Text(
+              '${widget.origin}/${widget.path}/',
+              style: t.text.small,
+            ),
             errorText: valid || slug.isEmpty
                 ? null
                 : 'Lowercase letters, digits and dashes',

@@ -12,6 +12,46 @@ String? slugFromPath(String path) {
   return slug != null && _slugPattern.hasMatch(slug) ? slug : null;
 }
 
+/// The slug of a `/series/<slug>` path, or null.
+String? seriesSlugFromPath(String path) {
+  final m = RegExp(r'^/series/([^/]+)/?$').firstMatch(path);
+  final slug = m?.group(1);
+  return slug != null && _slugPattern.hasMatch(slug) ? slug : null;
+}
+
+/// A series' preview from its Firestore REST document: its title, how
+/// many issues, and the newest issue's cover.
+StoryHead seriesHead(Map<String, Object?> doc, String url) {
+  final fields = (doc['fields'] as Map<String, Object?>?) ?? const {};
+  final title = switch (fields['title']) {
+    {'stringValue': final String t} => t.trim(),
+    _ => '',
+  };
+  final issues = switch (fields['issues']) {
+    {'arrayValue': {'values': final List<Object?> v}} => v,
+    _ => const <Object?>[],
+  };
+  final first = issues.isEmpty
+      ? null
+      : switch (issues.first) {
+          {'mapValue': {'fields': final Map<String, Object?> f}} => f,
+          _ => null,
+        };
+  final image = switch (first?['image']) {
+    {'stringValue': final String s} => s,
+    _ => '',
+  };
+  final n = issues.length;
+  return StoryHead(
+    title: title,
+    description: n == 0
+        ? 'A series on Soundstage.'
+        : 'A series on Soundstage: $n ${n == 1 ? 'issue' : 'issues'}.',
+    image: image,
+    url: url,
+  );
+}
+
 /// What a link preview shows.
 class StoryHead {
   const StoryHead({
@@ -120,13 +160,24 @@ List<SitemapEntry> sitemapEntries(Map<String, Object?> page) {
 
 /// `sitemap.xml` for [site] (no trailing slash): the home page and every
 /// published story.
-String sitemapXml(String site, Iterable<SitemapEntry> entries) {
+String sitemapXml(
+  String site,
+  Iterable<SitemapEntry> entries, {
+  Iterable<SitemapEntry> series = const [],
+}) {
   final out = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     ..writeln('  <url><loc>${escapeHtml('$site/')}</loc></url>');
   for (final e in entries) {
     out.write('  <url><loc>${escapeHtml('$site/s/${e.slug}')}</loc>');
+    if (e.lastModified case final t?) {
+      out.write('<lastmod>${escapeHtml(t)}</lastmod>');
+    }
+    out.writeln('</url>');
+  }
+  for (final e in series) {
+    out.write('  <url><loc>${escapeHtml('$site/series/${e.slug}')}</loc>');
     if (e.lastModified case final t?) {
       out.write('<lastmod>${escapeHtml(t)}</lastmod>');
     }

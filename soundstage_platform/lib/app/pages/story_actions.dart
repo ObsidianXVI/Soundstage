@@ -282,6 +282,36 @@ class StoryActions {
         );
   }
 
+  /// Republishes the series of [storyId]'s project, if it has one, so a
+  /// newly published issue is listed. Failures are quiet: the issue itself
+  /// is published.
+  Future<void> refreshSeriesOf(String storyId) async {
+    final cloud = ref.read(cloudProvider);
+    if (cloud == null) return;
+    try {
+      final stories = await _repo.list();
+      final pid = stories.where((x) => x.id == storyId).firstOrNull?.projectId;
+      if (pid == null) return;
+      final slug = await cloud.backend.seriesSlugOf(pid);
+      if (slug == null) return;
+      final project = (await _repo.projects())
+          .where((p) => p.id == pid)
+          .firstOrNull;
+      await publishSeries(
+        projectId: pid,
+        title: project?.title ?? '',
+        slug: slug,
+        issueIds: [
+          for (final x in stories)
+            if (x.projectId == pid) x.id,
+        ],
+        backend: cloud.backend,
+      );
+    } on Object {
+      // The series catches up when it is next published.
+    }
+  }
+
   /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,
   /// upload, then show the link. [current] is the editor's document (the
   /// editor's Publish button): it is published as is, and the story is not
@@ -334,6 +364,8 @@ class StoryActions {
                 sceneId: doc.scenes.first.id,
               ),
       );
+      // An issue's series lists it.
+      await refreshSeriesOf(s.id);
       // Remember the link in the story (the next publish suggests it).
       if (current == null && !s.bundled && doc.meta.slug != slug) {
         await _repo.save(

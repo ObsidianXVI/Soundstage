@@ -14,6 +14,13 @@
         }
       },
       {
+        "source": "/series/**",
+        "run": {
+          "serviceId": "soundstage-head",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "/sitemap.xml",
         "run": {
           "serviceId": "soundstage-head",

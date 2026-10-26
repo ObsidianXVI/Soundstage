@@ -44,6 +44,21 @@ class FakeBackend implements CloudBackend {
   Future<String?> publishedSlugOf(String id) async =>
       meta[id]?['publishedSlug'] as String?;
 
+  final seriesRecords = <String, SeriesRecord>{};
+
+  @override
+  Future<SeriesRecord?> series(String slug) async => seriesRecords[slug];
+
+  @override
+  Future<void> setSeries(String slug, SeriesRecord r) async =>
+      seriesRecords[slug] = r;
+
+  @override
+  Future<String?> seriesSlugOf(String projectId) async => seriesRecords.entries
+      .where((e) => e.value.ownerId == uid && e.value.projectId == projectId)
+      .map((e) => e.key)
+      .firstOrNull;
+
   Uint8List fetch(String url) {
     final path = Uri.decodeComponent(
       url.substring('https://cdn.test/o/'.length, url.indexOf('?')),
@@ -334,6 +349,57 @@ void main() {
     expect(manifest, isNot(contains('private')));
     expect(manifest, isNot(contains('secret idea')));
   });
+
+  test(
+    'a series lists the published issues, in order, and is its own',
+    () async {
+      final b = FakeBackend('u1');
+      for (final (id, slug) in [('i2', 'issue-two'), ('i1', 'issue-one')]) {
+        await publishStory(
+          _doc(),
+          storyId: id,
+          slug: slug,
+          backend: b,
+          bytesOf: _bytes,
+        );
+      }
+      final r = await publishSeries(
+        projectId: 'p',
+        title: 'Weekly',
+        slug: 'weekly',
+        issueIds: ['i3', 'i2', 'i1'], // i3 is not published
+        backend: b,
+      );
+      expect(r.issues.map((i) => i.slug), ['issue-two', 'issue-one']);
+      expect(b.seriesRecords['weekly']!.title, 'Weekly');
+      expect(await b.seriesSlugOf('p'), 'weekly');
+      final back = SeriesRecord.fromMap(r.toMap());
+      expect(back.issues.first.title, r.issues.first.title);
+
+      // Another project, or another author, cannot take the link.
+      await expectLater(
+        publishSeries(
+          projectId: 'other',
+          title: 'X',
+          slug: 'weekly',
+          issueIds: const [],
+          backend: b,
+        ),
+        throwsA(isA<PublishException>()),
+      );
+      b.uid = 'u2';
+      await expectLater(
+        publishSeries(
+          projectId: 'p',
+          title: 'X',
+          slug: 'weekly',
+          issueIds: const [],
+          backend: b,
+        ),
+        throwsA(isA<PublishException>()),
+      );
+    },
+  );
 
   test('missing files are reported, not fatal', () async {
     final b = FakeBackend('u1');
