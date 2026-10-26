@@ -1,0 +1,10 @@
+name: soundstage_agent
+description: Holds authors' model API keys (Secret Manager) and forwards their agent requests.
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

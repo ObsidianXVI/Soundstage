@@ -16,7 +16,9 @@
 #   terraform apply -var head_image_tag=<tag>   (then update the default)
 
 locals {
-  head_image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.soundstage.repository_id}/head"
+  registry    = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.soundstage.repository_id}"
+  head_image  = "${local.registry}/head"
+  agent_image = "${local.registry}/agent"
 }
 
 resource "google_artifact_registry_repository" "soundstage" {

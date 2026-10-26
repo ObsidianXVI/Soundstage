@@ -21,3 +21,9 @@ variable "head_image_tag" {
   type        = string
   default     = "v2"
 }
+
+variable "agent_image_tag" {
+  description = "Tag of the soundstage-agent image in Artifact Registry (built with services/agent/cloudbuild.yaml)."
+  type        = string
+  default     = "v1"
+}

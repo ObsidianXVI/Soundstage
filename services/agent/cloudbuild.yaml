@@ -1,0 +1,11 @@
+# Built with (see infra/terraform/head.tf):
+#   gcloud builds submit services/agent --config services/agent/cloudbuild.yaml \
+#     --substitutions _IMAGE=<registry>/agent:<tag> --service-account <builder> \
+#     --gcs-source-staging-dir gs://project-soundstage-builds/source \
+#     --project project-soundstage
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "$_IMAGE", "."]
+images: ["$_IMAGE"]
+options:
+  logging: CLOUD_LOGGING_ONLY

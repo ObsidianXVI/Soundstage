@@ -38,3 +38,7 @@ output "builder_service_account" {
 output "head_service_url" {
   value = google_cloud_run_v2_service.head.uri
 }
+
+output "agent_service_url" {
+  value = google_cloud_run_v2_service.agent.uri
+}
