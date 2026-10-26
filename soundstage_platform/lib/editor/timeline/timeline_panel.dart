@@ -567,7 +567,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   final ScrollController _rows = ScrollController();
   final FocusNode _focus = FocusNode(debugLabel: 'timeline');
   final ValueNotifier<Rect?> _marquee = ValueNotifier(null);
-  late final _PlayheadSource _playhead = _PlayheadSource(ref);
+  // Created on first use: a body that never shows lanes (no clocks) must not
+  // create it in dispose, when ref is no longer usable.
+  _PlayheadSource? _playheadSource;
+  _PlayheadSource get _playhead => _playheadSource ??= _PlayheadSource(ref);
   _LanePress? _press;
   _BodyModel? _model;
   double _laneWidth = 1;
@@ -619,7 +622,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     _rows.dispose();
     _focus.dispose();
     _marquee.dispose();
-    _playhead.dispose();
+    _playheadSource?.dispose();
     super.dispose();
   }
 

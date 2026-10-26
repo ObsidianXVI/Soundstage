@@ -80,7 +80,13 @@ class EditorToolbar extends ConsumerWidget {
     );
     final canvas = ref.watch(canvasControllerProvider);
     // Below this window width the scope label shortens ("Only Tablet").
-    final compact = MediaQuery.sizeOf(context).width < 1280;
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final compact = windowWidth < 1280;
+    // The mode picker is a dropdown until there is room for four segments.
+    final narrow = windowWidth < 1800;
+    // The canvas tools belong to Design and Animation (m5.md T5.1).
+    final mode = layout.mode;
+    final onCanvas = mode == EditorMode.design || mode == EditorMode.animation;
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: SsSpace.s2),
@@ -110,50 +116,80 @@ class EditorToolbar extends ConsumerWidget {
             ),
           ),
           const _Divider(),
-          for (final (t, icon, label, id) in _tools)
-            SsIconButton(
-              icon: icon,
-              semanticLabel: label,
-              shortcut: shortcutLabel(id),
-              selected: tool == t,
-              onPressed: () => editor.setTool(t),
-            ),
-          ShapeToolButton(tool: tool, onSelect: editor.setTool),
-          for (final (t, icon, label, id) in _after)
-            SsIconButton(
-              icon: icon,
-              semanticLabel: label,
-              shortcut: shortcutLabel(id),
-              selected: tool == t,
-              onPressed: () => editor.setTool(t),
-            ),
-          const Spacer(),
-          SsTooltip(
-            message:
-                'Edit scope: Both changes the shared design (every '
-                'breakpoint); This breakpoint changes $bpName only, the '
-                'breakpoint in effect on the edited artboard. Alt flips scope',
-            placement: SsPlacement.belowCenter,
-            child: SsSegmented<EditScope>(
-              key: ValueKey<String>('edit-scope${flipped ? '-flipped' : ''}'),
-              semanticLabel: flipped
-                  ? 'Edit scope (flipped by Alt)'
-                  : 'Edit scope',
-              selected: scope,
-              onChanged: (v) => editor.setEditScope(flipped ? v.flipped : v),
+          if (narrow)
+            SsDropdown<EditorMode>(
+              key: const ValueKey<String>('editor-mode'),
+              semanticLabel: 'Editor mode',
+              width: 100,
+              value: mode,
+              items: [
+                for (final m in EditorMode.values)
+                  SsDropdownItem(value: m, label: m.label),
+              ],
+              onChanged: notifier.setMode,
+            )
+          else
+            SsSegmented<EditorMode>(
+              key: const ValueKey<String>('editor-mode'),
+              semanticLabel: 'Editor mode',
+              selected: mode,
+              onChanged: notifier.setMode,
               segments: [
-                const SsSegment(value: EditScope.both, label: 'Both'),
-                SsSegment(
-                  value: EditScope.thisBreakpoint,
-                  label: bpName.isEmpty
-                      ? 'This breakpoint'
-                      : (compact ? 'Only $bpName' : 'This breakpoint: $bpName'),
-                ),
+                for (final m in EditorMode.values)
+                  SsSegment(value: m, label: m.label),
               ],
             ),
-          ),
-          const SizedBox(width: SsSpace.s1),
-          const BreakpointManagerButton(),
+          if (onCanvas) ...[
+            const _Divider(),
+            for (final (t, icon, label, id) in _tools)
+              SsIconButton(
+                icon: icon,
+                semanticLabel: label,
+                shortcut: shortcutLabel(id),
+                selected: tool == t,
+                onPressed: () => editor.setTool(t),
+              ),
+            ShapeToolButton(tool: tool, onSelect: editor.setTool),
+            for (final (t, icon, label, id) in _after)
+              SsIconButton(
+                icon: icon,
+                semanticLabel: label,
+                shortcut: shortcutLabel(id),
+                selected: tool == t,
+                onPressed: () => editor.setTool(t),
+              ),
+          ],
+          const Spacer(),
+          if (onCanvas) ...[
+            SsTooltip(
+              message:
+                  'Edit scope: Both changes the shared design (every '
+                  'breakpoint); This breakpoint changes $bpName only, the '
+                  'breakpoint in effect on the edited artboard. Alt flips scope',
+              placement: SsPlacement.belowCenter,
+              child: SsSegmented<EditScope>(
+                key: ValueKey<String>('edit-scope${flipped ? '-flipped' : ''}'),
+                semanticLabel: flipped
+                    ? 'Edit scope (flipped by Alt)'
+                    : 'Edit scope',
+                selected: scope,
+                onChanged: (v) => editor.setEditScope(flipped ? v.flipped : v),
+                segments: [
+                  const SsSegment(value: EditScope.both, label: 'Both'),
+                  SsSegment(
+                    value: EditScope.thisBreakpoint,
+                    label: bpName.isEmpty
+                        ? 'This breakpoint'
+                        : (compact
+                              ? 'Only $bpName'
+                              : 'This breakpoint: $bpName'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: SsSpace.s1),
+            const BreakpointManagerButton(),
+          ],
           const Spacer(),
           if (saveStatus != null) ...[saveStatus!, const _Divider()],
           SsIconButton(
@@ -172,58 +208,74 @@ class EditorToolbar extends ConsumerWidget {
             shortcut: shortcutLabel('redo'),
             onPressed: history.canRedo ? editor.redo : null,
           ),
+          if (onCanvas) ...[const _Divider(), _ZoomReadout(controller: canvas)],
           const _Divider(),
-          _ZoomReadout(controller: canvas),
-          const _Divider(),
-          SsIconButton(
-            icon: SsIcons.panelLeft,
-            semanticLabel: 'Toggle left panel',
-            shortcut: shortcutLabel('toggleLeft'),
-            selected: layout.leftOpen,
-            onPressed: notifier.toggleLeft,
-          ),
-          SsIconButton(
-            icon: SsIcons.panelBottom,
-            semanticLabel: 'Toggle timeline',
-            shortcut: shortcutLabel('toggleTimeline'),
-            selected: layout.timelineOpen,
-            onPressed: notifier.toggleTimeline,
-          ),
-          SsIconButton(
-            icon: SsIcons.panelRight,
-            semanticLabel: 'Toggle inspector',
-            shortcut: shortcutLabel('toggleRight'),
-            selected: layout.rightOpen,
-            onPressed: notifier.toggleRight,
-          ),
-          const _Divider(),
-          SsIconButton(
-            icon: SsIcons.keyboard,
-            semanticLabel: 'Keyboard shortcuts',
-            shortcut: shortcutLabel('help'),
-            onPressed: onHelp,
-          ),
-          const SizedBox(width: SsSpace.s1),
-          SsIconButton(
-            key: const ValueKey<String>('toolbar-autokey'),
-            icon: SsIcons.timer,
-            semanticLabel: autoKey ? 'Auto-key on' : 'Auto-key',
-            tooltip: autoKey
-                ? 'Auto-key is on: changes to properties write keyframes'
-                : 'Auto-key: changes to properties write keyframes',
-            selected: autoKey,
-            selectedColor: c.danger,
-            onPressed: () => editor.setAutoKey(!autoKey),
-          ),
-          const SizedBox(width: SsSpace.s1),
-          SsButton(
-            label: 'Preview',
-            icon: SsIcons.play,
-            variant: ref.watch(previewProvider.select((s) => s.open))
-                ? SsButtonVariant.secondary
-                : SsButtonVariant.primary,
-            onPressed: onPreview,
-          ),
+          if (onCanvas) ...[
+            SsIconButton(
+              icon: SsIcons.panelLeft,
+              semanticLabel: 'Toggle left panel',
+              shortcut: shortcutLabel('toggleLeft'),
+              selected: layout.leftOpen,
+              onPressed: notifier.toggleLeft,
+            ),
+            SsIconButton(
+              icon: SsIcons.panelBottom,
+              semanticLabel: 'Toggle timeline',
+              shortcut: shortcutLabel('toggleTimeline'),
+              selected: layout.timelineOpen,
+              onPressed: notifier.toggleTimeline,
+            ),
+            SsIconButton(
+              icon: SsIcons.panelRight,
+              semanticLabel: 'Toggle inspector',
+              shortcut: shortcutLabel('toggleRight'),
+              selected: layout.rightOpen,
+              onPressed: notifier.toggleRight,
+            ),
+            const _Divider(),
+          ],
+          // Narrow windows: ? still opens the shortcut list.
+          if (!compact)
+            SsIconButton(
+              icon: SsIcons.keyboard,
+              semanticLabel: 'Keyboard shortcuts',
+              shortcut: shortcutLabel('help'),
+              onPressed: onHelp,
+            ),
+          if (onCanvas) ...[
+            const SizedBox(width: SsSpace.s1),
+            SsIconButton(
+              key: const ValueKey<String>('toolbar-autokey'),
+              icon: SsIcons.timer,
+              semanticLabel: autoKey ? 'Auto-key on' : 'Auto-key',
+              tooltip: autoKey
+                  ? 'Auto-key is on: changes to properties write keyframes'
+                  : 'Auto-key: changes to properties write keyframes',
+              selected: autoKey,
+              selectedColor: c.danger,
+              onPressed: () => editor.setAutoKey(!autoKey),
+            ),
+          ],
+          // Publish mode shows the player itself.
+          if (mode != EditorMode.publish) ...[
+            const SizedBox(width: SsSpace.s1),
+            if (compact)
+              SsIconButton(
+                icon: SsIcons.play,
+                semanticLabel: 'Preview',
+                selected: ref.watch(previewProvider.select((s) => s.open)),
+                onPressed: onPreview,
+              )
+            else
+              SsButton(
+                label: 'Preview',
+                icon: SsIcons.play,
+                variant: ref.watch(previewProvider.select((s) => s.open))
+                    ? SsButtonVariant.secondary
+                    : SsButtonVariant.primary,
+                onPressed: onPreview,
+              ),
+          ],
           if (onPublish != null) ...[
             const SizedBox(width: SsSpace.s1),
             if (compact)

@@ -9,6 +9,20 @@ const double kEditorMinWidth = 1024;
 
 enum LeftPanelTab { scenes, layers, assets, tokens }
 
+/// The editor's modes over one story (m5.md T5.1, product spec "Modes"):
+/// Writing (the words), Design (layout and style), Animation (motion, with
+/// the timeline open) and Publish (preview by tier, publish, export).
+enum EditorMode {
+  writing('Write'),
+  design('Design'),
+  animation('Animate'),
+  publish('Publish');
+
+  const EditorMode(this.label);
+
+  final String label;
+}
+
 const double kLeftPanelMin = 200;
 const double kLeftPanelMax = 420;
 const double kRightPanelMin = 240;
@@ -46,6 +60,7 @@ class EditorLayoutState {
     this.timelineOpen = false,
     this.timelineHeight = kTimelineDefaultHeight,
     this.leftTab = LeftPanelTab.scenes,
+    this.mode = EditorMode.design,
   });
 
   final double leftWidth;
@@ -57,6 +72,10 @@ class EditorLayoutState {
   /// The expanded timeline's height (its top edge drags).
   final double timelineHeight;
   final LeftPanelTab leftTab;
+  final EditorMode mode;
+
+  /// Whether the timeline shows (always in Animation mode).
+  bool get showsTimeline => mode == EditorMode.animation || timelineOpen;
 
   EditorLayoutState copyWith({
     double? leftWidth,
@@ -66,6 +85,7 @@ class EditorLayoutState {
     bool? timelineOpen,
     double? timelineHeight,
     LeftPanelTab? leftTab,
+    EditorMode? mode,
   }) => EditorLayoutState(
     leftWidth: leftWidth ?? this.leftWidth,
     rightWidth: rightWidth ?? this.rightWidth,
@@ -74,6 +94,7 @@ class EditorLayoutState {
     timelineOpen: timelineOpen ?? this.timelineOpen,
     timelineHeight: timelineHeight ?? this.timelineHeight,
     leftTab: leftTab ?? this.leftTab,
+    mode: mode ?? this.mode,
   );
 }
 
@@ -111,8 +132,13 @@ class EditorLayoutNotifier extends Notifier<EditorLayoutState> {
 
   void toggleLeft() => state = state.copyWith(leftOpen: !state.leftOpen);
   void toggleRight() => state = state.copyWith(rightOpen: !state.rightOpen);
-  void toggleTimeline() =>
-      state = state.copyWith(timelineOpen: !state.timelineOpen);
+
+  /// In Animation mode the timeline is always open: collapsing it goes back
+  /// to Design.
+  void toggleTimeline() => state = state.mode == EditorMode.animation
+      ? state.copyWith(mode: EditorMode.design, timelineOpen: false)
+      : state.copyWith(timelineOpen: !state.timelineOpen);
+  void setMode(EditorMode mode) => state = state.copyWith(mode: mode);
   void setLeftTab(LeftPanelTab t) => state = state.copyWith(leftTab: t);
 
   /// The expanded timeline's height, clamped (see [clampTimelineHeight]

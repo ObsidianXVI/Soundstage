@@ -6,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
+import 'package:soundstage_platform/app/export/static_export.dart'
+    show StaticExportFormat;
 import 'package:soundstage_platform/app/persistence/autosave.dart';
 import 'package:soundstage_platform/app/persistence/editor_asset_service.dart';
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
+import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import 'not_found_page.dart';
 import 'open_in_new_tab_stub.dart'
@@ -95,6 +98,7 @@ class _EditPageState extends ConsumerState<EditPage> {
             autosave.notifyChanged(doc);
           },
           onSave: () => unawaited(autosave.flush()),
+          publishActions: _exportActions(autosave),
           onPublish: ref.watch(cloudProvider) == null
               ? null
               : (doc) async {
@@ -121,6 +125,56 @@ class _EditPageState extends ConsumerState<EditPage> {
       ),
       _ => Scaffold(backgroundColor: context.ss.colors.surface0),
     };
+  }
+}
+
+extension on _EditPageState {
+  /// Publish mode's exports: the story is saved first, then exported like
+  /// from the story list.
+  List<EditorPublishAction> _exportActions(AutosaveController autosave) {
+    StorySummary summary(ir.StageDocument doc) => StorySummary(
+      id: _id,
+      title: doc.meta.title.isEmpty ? 'Untitled story' : doc.meta.title,
+      updatedAt: DateTime.now(),
+    );
+    EditorPublishAction action(
+      String label,
+      IconData icon,
+      Future<void> Function(StoryActions a, StorySummary s) run,
+    ) => EditorPublishAction(
+      label: label,
+      icon: icon,
+      onSelected: (doc) async {
+        await autosave.flush();
+        if (!mounted) return;
+        await run(StoryActions(context, ref), summary(doc));
+      },
+    );
+    return [
+      action(
+        'Markdown (.zip)',
+        SsIcons.file,
+        (a, s) => a.exportStatic(s, StaticExportFormat.markdown),
+      ),
+      action(
+        'HTML (.zip)',
+        SsIcons.file,
+        (a, s) => a.exportStatic(s, StaticExportFormat.html),
+      ),
+      action('PDF', SsIcons.file, (a, s) => a.exportPdf(s)),
+      action(
+        'Letterpress (.zip)',
+        SsIcons.file,
+        (a, s) => a.exportLetterpress(s),
+      ),
+      // Straight from the click: the clipboard needs the user's gesture.
+      EditorPublishAction(
+        label: 'Copy as rich text',
+        icon: SsIcons.copy,
+        onSelected: (doc) =>
+            StoryActions(context, ref).copyRichText(summary(doc)),
+      ),
+    ];
   }
 }
 

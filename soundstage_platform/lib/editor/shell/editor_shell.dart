@@ -20,15 +20,19 @@ import '../panels/scenes_panel.dart';
 import '../panels/tokens_panel.dart';
 import '../preview/preview_split.dart';
 import '../preview/preview_state.dart';
+import '../publish/publish_view.dart';
 import '../shortcuts/editor_shortcuts.dart';
 import '../shortcuts/intents.dart';
 import '../shortcuts/shortcut_help.dart';
 import '../timeline/timeline_panel.dart';
+import '../writing/writing_view.dart';
 import 'content_mode_screen.dart';
 import 'editor_layout.dart';
 import 'isolation_bar.dart';
 import 'resize_handle.dart';
 import 'toolbar.dart';
+
+export '../publish/publish_view.dart' show EditorPublishAction;
 
 /// The editor frame for one story: toolbar, resizable left panel, canvas,
 /// inspector and the timeline strip.
@@ -50,6 +54,7 @@ class EditorShell extends StatelessWidget {
     this.filePicker,
     this.onOpenPreviewInNewTab,
     this.onPublish,
+    this.publishActions = const [],
     super.key,
   });
 
@@ -87,6 +92,9 @@ class EditorShell extends StatelessWidget {
   /// (hidden when null). The app supplies it when the cloud is configured.
   final ValueChanged<ir.StageDocument>? onPublish;
 
+  /// The Publish mode's export actions, supplied by the app.
+  final List<EditorPublishAction> publishActions;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -105,6 +113,7 @@ class EditorShell extends StatelessWidget {
         onSave: onSave,
         saveStatus: saveStatus,
         onPublish: onPublish,
+        publishActions: publishActions,
       ),
     );
   }
@@ -120,6 +129,7 @@ class _EditorScope extends ConsumerWidget {
     required this.onSave,
     required this.saveStatus,
     required this.onPublish,
+    required this.publishActions,
   });
 
   final VoidCallback onBack;
@@ -129,6 +139,7 @@ class _EditorScope extends ConsumerWidget {
   final VoidCallback? onSave;
   final Widget? saveStatus;
   final ValueChanged<ir.StageDocument>? onPublish;
+  final List<EditorPublishAction> publishActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -165,6 +176,8 @@ class _EditorScope extends ConsumerWidget {
                 : () => onPublish!(
                     ref.read(editorControllerProvider).storyDocument,
                   ),
+            onPublishDocument: onPublish,
+            publishActions: publishActions,
           ),
         );
       },
@@ -219,6 +232,8 @@ class _DockedEditor extends ConsumerWidget {
     required this.onSave,
     required this.saveStatus,
     required this.onPublish,
+    required this.onPublishDocument,
+    required this.publishActions,
   });
 
   final String title;
@@ -229,6 +244,8 @@ class _DockedEditor extends ConsumerWidget {
   final VoidCallback? onSave;
   final Widget? saveStatus;
   final VoidCallback? onPublish;
+  final ValueChanged<ir.StageDocument>? onPublishDocument;
+  final List<EditorPublishAction> publishActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -344,54 +361,35 @@ class _DockedEditor extends ConsumerWidget {
                   onPublish: onPublish,
                 ),
                 Expanded(
-                  child: Row(
-                    children: [
-                      if (layout.leftOpen) ...[
-                        SizedBox(
-                          width: leftW.toDouble(),
-                          child: const _LeftPanel(),
-                        ),
-                        ResizeHandle(
-                          semanticLabel: 'Resize left panel',
-                          onDelta: (d) => notifier.setLeftWidth(
-                            leftW + d,
-                            available: width,
-                          ),
-                          onReset: () => notifier.setLeftWidth(264),
-                        ),
-                      ],
-                      Expanded(
-                        child: PreviewSplit(
-                          canvas: const IsolationFrame(child: EditorCanvas()),
-                          onOpenInNewTab: onOpenPreviewInNewTab,
-                        ),
-                      ),
-                      if (layout.rightOpen) ...[
-                        ResizeHandle(
-                          semanticLabel: 'Resize inspector',
-                          onDelta: (d) => notifier.setRightWidth(
-                            rightW - d,
-                            available: width,
-                          ),
-                          onReset: () => notifier.setRightWidth(288),
-                        ),
-                        SizedBox(
-                          width: rightW.toDouble(),
-                          child: const Inspector(),
-                        ),
-                      ],
-                    ],
-                  ),
+                  child: switch (layout.mode) {
+                    EditorMode.writing => PreviewSplit(
+                      canvas: const WritingView(),
+                      onOpenInNewTab: onOpenPreviewInNewTab,
+                    ),
+                    EditorMode.publish => PublishView(
+                      onPublish: onPublishDocument,
+                      actions: publishActions,
+                      onOpenInNewTab: onOpenPreviewInNewTab,
+                    ),
+                    EditorMode.design || EditorMode.animation => _canvasArea(
+                      layout: layout,
+                      notifier: notifier,
+                      leftW: leftW.toDouble(),
+                      rightW: rightW.toDouble(),
+                    ),
+                  },
                 ),
-                TimelinePanel(
-                  open: layout.timelineOpen,
-                  height: timelineH,
-                  onToggle: notifier.toggleTimeline,
-                  onResize: (d) => notifier.setTimelineHeight(
-                    timelineH - d,
-                    available: MediaQuery.sizeOf(context).height,
+                if (layout.mode == EditorMode.design ||
+                    layout.mode == EditorMode.animation)
+                  TimelinePanel(
+                    open: layout.showsTimeline,
+                    height: timelineH,
+                    onToggle: notifier.toggleTimeline,
+                    onResize: (d) => notifier.setTimelineHeight(
+                      timelineH - d,
+                      available: MediaQuery.sizeOf(context).height,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -399,6 +397,38 @@ class _DockedEditor extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _canvasArea({
+    required EditorLayoutState layout,
+    required EditorLayoutNotifier notifier,
+    required double leftW,
+    required double rightW,
+  }) => Row(
+    children: [
+      if (layout.leftOpen) ...[
+        SizedBox(width: leftW, child: const _LeftPanel()),
+        ResizeHandle(
+          semanticLabel: 'Resize left panel',
+          onDelta: (d) => notifier.setLeftWidth(leftW + d, available: width),
+          onReset: () => notifier.setLeftWidth(264),
+        ),
+      ],
+      Expanded(
+        child: PreviewSplit(
+          canvas: const IsolationFrame(child: EditorCanvas()),
+          onOpenInNewTab: onOpenPreviewInNewTab,
+        ),
+      ),
+      if (layout.rightOpen) ...[
+        ResizeHandle(
+          semanticLabel: 'Resize inspector',
+          onDelta: (d) => notifier.setRightWidth(rightW - d, available: width),
+          onReset: () => notifier.setRightWidth(288),
+        ),
+        SizedBox(width: rightW, child: const Inspector()),
+      ],
+    ],
+  );
 }
 
 class _LeftPanel extends ConsumerWidget {
