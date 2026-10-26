@@ -129,6 +129,19 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('new items never land on top of each other', (tester) async {
+    await _pump(tester);
+    await tester.tap(find.text('Board'));
+    await tester.pump();
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byKey(const ValueKey('board-add-note')));
+      await tester.pump();
+    }
+    final items = _items(tester);
+    expect({for (final i in items) (i.x, i.y)}, hasLength(3));
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('the board fits at 1024 px', (tester) async {
     final root = await _pump(tester, size: const Size(1024, 768));
     root.read(editorLayoutProvider.notifier).showBoard(true);

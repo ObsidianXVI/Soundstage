@@ -58,20 +58,36 @@ class _BoardViewState extends ConsumerState<BoardView> {
     return _view.toScene(size.center(Offset.zero));
   }
 
+  /// [topLeft], stepped down and right past items already there, so new
+  /// items never hide each other.
+  Offset _free(Offset topLeft) {
+    final items = ref.read(editorControllerProvider).document.board.items;
+    var p = topLeft;
+    for (var guard = 0; guard < 50; guard++) {
+      final taken = items.any(
+        (i) => (i.x - p.dx).abs() < 16 && (i.y - p.dy).abs() < 16,
+      );
+      if (!taken) break;
+      p += const Offset(28, 28);
+    }
+    return p;
+  }
+
   Offset? _boardPoint(Offset global) {
     final box = _paper.currentContext?.findRenderObject() as RenderBox?;
     return box?.globalToLocal(global);
   }
 
   void _addNote([Offset? at]) {
-    final p = at ?? _centre();
+    final c = at ?? _centre();
+    final p = _free(Offset(c.dx - 110, c.dy - 80));
     _editor.execute(
       AddBoardItem(
         ir.BoardItem(
           id: _newId(),
           kind: ir.BoardItemKind.note,
-          x: p.dx - 110,
-          y: p.dy - 80,
+          x: p.dx,
+          y: p.dy,
           color: _color,
         ),
       ),
@@ -79,14 +95,15 @@ class _BoardViewState extends ConsumerState<BoardView> {
   }
 
   void _addLink() {
-    final p = _centre();
+    final c = _centre();
+    final p = _free(Offset(c.dx - 140, c.dy - 40));
     _editor.execute(
       AddBoardItem(
         ir.BoardItem(
           id: _newId(),
           kind: ir.BoardItemKind.link,
-          x: p.dx - 140,
-          y: p.dy - 40,
+          x: p.dx,
+          y: p.dy,
           width: 280,
           height: 88,
         ),
@@ -112,13 +129,14 @@ class _BoardViewState extends ConsumerState<BoardView> {
       final h = asset.width != null && asset.height != null
           ? w * asset.height! / asset.width!
           : 220.0;
+      final at = _free(Offset(p.dx - w / 2, p.dy - h / 2));
       _editor.execute(
         AddBoardItem(
           ir.BoardItem(
             id: _newId(),
             kind: ir.BoardItemKind.image,
-            x: p.dx - w / 2,
-            y: p.dy - h / 2,
+            x: at.dx,
+            y: at.dy,
             width: w,
             height: h,
             uri: asset.uri,
