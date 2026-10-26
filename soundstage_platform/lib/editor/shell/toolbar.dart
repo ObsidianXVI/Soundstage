@@ -120,7 +120,7 @@ class EditorToolbar extends ConsumerWidget {
             SsDropdown<EditorMode>(
               key: const ValueKey<String>('editor-mode'),
               semanticLabel: 'Editor mode',
-              width: 100,
+              width: compact ? 86 : 100,
               value: mode,
               items: [
                 for (final m in EditorMode.values)
@@ -286,7 +286,7 @@ class EditorToolbar extends ConsumerWidget {
           ),
           if (onPublish != null) ...[
             const SizedBox(width: SsSpace.s1),
-            if (compact)
+            if (windowWidth < 1600)
               SsIconButton(
                 key: const ValueKey<String>('toolbar-publish'),
                 icon: SsIcons.globe,

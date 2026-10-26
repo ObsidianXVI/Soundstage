@@ -63,6 +63,54 @@ const List<Map<String, Object?>> kAgentTools = [
     },
   },
   {
+    'name': 'get_annotations',
+    'description':
+        'The author\'s annotations: rough marks drawn on artboards to show '
+        'you what they want (frame, text area, arrow, path, comment), each '
+        'with its scene, artboard (breakpoint and size), points in that '
+        'artboard\'s pixels, the layer it is over, a note, and a status. '
+        'Build the real design from open ones; their boxes are where things '
+        'go. Mark them resolved when done.',
+    'input_schema': {
+      'type': 'object',
+      'properties': {
+        'include_resolved': {'type': 'boolean'},
+      },
+      'additionalProperties': false,
+    },
+  },
+  {
+    'name': 'set_annotation_status',
+    'description': 'Sets an annotation to open, in_progress or resolved.',
+    'input_schema': {
+      'type': 'object',
+      'properties': {
+        'id': {'type': 'string'},
+        'status': {
+          'type': 'string',
+          'enum': ['open', 'in_progress', 'resolved'],
+        },
+      },
+      'required': ['id', 'status'],
+      'additionalProperties': false,
+    },
+  },
+  {
+    'name': 'ask_point',
+    'description':
+        'Asks the author to click a place on the canvas (e.g. "Where should '
+        'the icon go?") and waits. Returns the scene, the artboard '
+        '(breakpoint) and the point in its pixels, or that they cancelled.',
+    'input_schema': {
+      'type': 'object',
+      'properties': {
+        'question': {'type': 'string'},
+      },
+      'required': ['question'],
+      'additionalProperties': false,
+    },
+  },
+  {
     'name': 'set_text',
     'description':
         'Replaces the words of a text layer (paragraphs separated by \\n). '
@@ -222,7 +270,12 @@ const List<Map<String, Object?>> kAgentTools = [
 ];
 
 /// The tools a review may use: reads only, and `suggest`.
-const Set<String> kReviewReadTools = {'get_outline', 'get_node', 'get_board'};
+const Set<String> kReviewReadTools = {
+  'get_outline',
+  'get_node',
+  'get_board',
+  'get_annotations',
+};
 
 /// The review's way to propose a change (DECISIONS 26/10/26 #12: unasked,
 /// the agent only suggests).
@@ -264,7 +317,13 @@ class AgentToolbox {
     required this.readState,
     this.assets,
     this.transport,
+    this.askPoint,
   });
+
+  /// Asks the author to point at the canvas (the session's), or null.
+  final Future<({String sceneId, String breakpointId, double x, double y})?>
+  Function(String question)?
+  askPoint;
 
   final EditorController editor;
 
@@ -280,8 +339,14 @@ class AgentToolbox {
   int writes = 0;
 
   /// Whether [name] changes the document.
-  static bool isWrite(String name) =>
-      !const {'get_outline', 'get_node', 'get_board', 'select'}.contains(name);
+  static bool isWrite(String name) => !const {
+    'get_outline',
+    'get_node',
+    'get_board',
+    'get_annotations',
+    'ask_point',
+    'select',
+  }.contains(name);
 
   Future<ToolResult> run(String name, Map<String, Object?> input) async {
     try {
@@ -289,6 +354,14 @@ class AgentToolbox {
         'get_outline' => _ok(outline(input['scene_id'] as String?)),
         'get_node' => _node(_str(input, 'node_id')),
         'get_board' => _ok(board()),
+        'get_annotations' => _ok(
+          annotations(includeResolved: input['include_resolved'] == true),
+        ),
+        'set_annotation_status' => _setAnnotationStatus(
+          _str(input, 'id'),
+          _str(input, 'status'),
+        ),
+        'ask_point' => await _askPoint(_str(input, 'question')),
         'set_text' => _setText(_str(input, 'node_id'), _str(input, 'text')),
         'set_properties' => _setProperties(input),
         'add_layer' => _addLayer(input),
@@ -367,6 +440,67 @@ class AgentToolbox {
           ir.BoardItemKind.image => '- image: ${i.text}',
         },
     ].join('\n');
+  }
+
+  /// The annotations as JSON lines (see the get_annotations tool).
+  String annotations({bool includeResolved = false}) {
+    final doc = _doc;
+    final list = [
+      for (final (i, a) in doc.annotations.indexed)
+        if (includeResolved || a.status != ir.AnnotationStatus.resolved)
+          (i + 1, a),
+    ];
+    if (list.isEmpty) return 'There are no open annotations.';
+    final bps = {for (final b in doc.breakpoints) b.id: b};
+    return [
+      for (final (n, a) in list)
+        jsonEncode({
+          'number': n,
+          'id': a.id,
+          'kind': a.kind.name,
+          'scene_id': a.sceneId,
+          'artboard': switch (bps[a.breakpointId]) {
+            final b? =>
+              '${b.name} ${b.designSize.width.round()}×${b.designSize.height.round()}',
+            null => a.breakpointId,
+          },
+          'points': [
+            for (final p in a.points) [p.x.round(), p.y.round()],
+          ],
+          if (a.targetIds.isNotEmpty) 'over': a.targetIds,
+          'note': a.note,
+          'status': a.status == ir.AnnotationStatus.inProgress
+              ? 'in_progress'
+              : a.status.name,
+        }),
+    ].join('\n');
+  }
+
+  ToolResult _setAnnotationStatus(String id, String status) {
+    final a = _doc.annotations.where((x) => x.id == id).firstOrNull;
+    if (a == null) return _error('There is no annotation "$id".');
+    final s = switch (status) {
+      'open' => ir.AnnotationStatus.open,
+      'in_progress' => ir.AnnotationStatus.inProgress,
+      'resolved' => ir.AnnotationStatus.resolved,
+      _ => throw FormatException('Unknown status "$status".'),
+    };
+    return _exec(UpdateAnnotation(a.copyWith(status: s)));
+  }
+
+  Future<ToolResult> _askPoint(String question) async {
+    final ask = askPoint;
+    if (ask == null) return _error('The author cannot be asked here.');
+    final p = await ask(question);
+    if (p == null) return _ok('The author cancelled.');
+    return _ok(
+      jsonEncode({
+        'scene_id': p.sceneId,
+        'breakpoint': p.breakpointId,
+        'x': p.x,
+        'y': p.y,
+      }),
+    );
   }
 
   ToolResult _node(String id) {

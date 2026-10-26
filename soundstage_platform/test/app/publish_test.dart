@@ -311,6 +311,15 @@ void main() {
             BoardItem(id: 'b', kind: BoardItemKind.note, text: 'secret idea'),
           ],
         ),
+        annotations: const [
+          Annotation(
+            id: 'an',
+            kind: AnnotationKind.comment,
+            sceneId: 's',
+            breakpointId: 'b',
+            note: 'draft mark',
+          ),
+        ],
       ),
       storyId: 'st',
       slug: 'quiet',
@@ -320,6 +329,7 @@ void main() {
     final whole = utf8.decode(b.files[b.records['quiet']!.path]!);
     expect(whole, isNot(contains('private')));
     expect(whole, isNot(contains('secret idea')));
+    expect(whole, isNot(contains('draft mark')));
     final manifest = utf8.decode(b.files[b.records['quiet']!.manifest]!);
     expect(manifest, isNot(contains('private')));
     expect(manifest, isNot(contains('secret idea')));

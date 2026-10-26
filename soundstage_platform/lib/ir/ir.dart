@@ -16,6 +16,7 @@ export 'package:json_annotation/json_annotation.dart'
 export 'src/animation/easing.dart';
 export 'src/animation/interpolate.dart';
 export 'src/animation/track_eval.dart';
+export 'src/annotation.dart';
 export 'src/assets.dart';
 export 'src/audio.dart';
 export 'src/behaviors.dart';

@@ -11,6 +11,7 @@ import 'package:soundstage_platform/editor/core/text_size_sync.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
 
+import '../annotate/annotation_layer.dart';
 import '../insert/canvas_drop.dart';
 import '../insert/insert_tool_layer.dart';
 import '../interaction/canvas_interaction.dart';
@@ -272,6 +273,7 @@ class _EditorCanvasState extends ConsumerState<EditorCanvas>
                     InsertToolLayer(controller: _c, pansWith: _pansWith),
                     TextEditLayer(controller: _c),
                     ArtboardChrome(controller: _c, breakpoints: boards),
+                    AnnotationLayer(controller: _c),
                   ],
                 ),
               ),

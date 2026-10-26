@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../core/core.dart';
 import '../insert/asset_service.dart';
@@ -53,7 +54,8 @@ final agentSessionProvider = Provider<AgentSession?>(
         ..events.dispose()
         ..running.dispose()
         ..suggestions.dispose()
-        ..reviewing.dispose();
+        ..reviewing.dispose()
+        ..pointRequest.dispose();
     });
     return session;
   },
@@ -223,6 +225,14 @@ class _AgentPanelState extends ConsumerState<AgentPanel> {
                     },
                   ),
           ),
+          if (session != null)
+            _AskAndBuild(
+              session: session,
+              onSend: (text) {
+                _input.text = text;
+                _send(session);
+              },
+            ),
           if (session != null)
             ValueListenableBuilder<bool>(
               valueListenable: session.running,
@@ -591,6 +601,85 @@ class _PolicyDialogState extends State<_PolicyDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ],
+    );
+  }
+}
+
+/// The agent's open question to point at the canvas, and the quick action
+/// to build from the author's open annotations.
+class _AskAndBuild extends ConsumerWidget {
+  const _AskAndBuild({required this.session, required this.onSend});
+
+  final AgentSession session;
+  final ValueChanged<String> onSend;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.ss;
+    final open = ref.watch(
+      editorControllerProvider.select(
+        (s) => s.document.annotations
+            .where((a) => a.status != ir.AnnotationStatus.resolved)
+            .length,
+      ),
+    );
+    return ValueListenableBuilder<PointRequest?>(
+      valueListenable: session.pointRequest,
+      builder: (context, request, _) {
+        if (request != null) {
+          return Container(
+            key: const ValueKey<String>('agent-point-request'),
+            padding: const EdgeInsets.all(SsSpace.s2),
+            color: t.colors.accent.withValues(alpha: 0.12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${request.question}\nClick the place on the canvas '
+                    '(in Design or Animate).',
+                    style: t.text.small,
+                  ),
+                ),
+                SsButton(
+                  label: 'Cancel',
+                  variant: SsButtonVariant.ghost,
+                  onPressed: () => session.answerPoint(null),
+                ),
+              ],
+            ),
+          );
+        }
+        if (open == 0) return const SizedBox.shrink();
+        return ValueListenableBuilder<bool>(
+          valueListenable: session.running,
+          builder: (context, running, _) => Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SsSpace.s2,
+              SsSpace.s1,
+              SsSpace.s2,
+              0,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SsButton(
+                key: const ValueKey<String>('agent-build-annotations'),
+                label:
+                    'Build from $open '
+                    '${open == 1 ? 'annotation' : 'annotations'}',
+                icon: SsIcons.penTool,
+                variant: SsButtonVariant.ghost,
+                onPressed: running
+                    ? null
+                    : () => onSend(
+                        'Build the real design from my open annotations '
+                        '(read them with get_annotations), then mark each '
+                        'one resolved.',
+                      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -94,7 +94,7 @@ void main() {
       expect(published.single.scenes, hasLength(2));
     });
 
-    testWidgets('Publish is an icon button below 1280 px', (tester) async {
+    testWidgets('Publish is an icon button below 1600 px', (tester) async {
       await _pump(tester, const Size(1100, 800), onPublish: (_) {});
       final publish = find.byKey(const ValueKey<String>('toolbar-publish'));
       expect(tester.widget(publish), isA<SsIconButton>());

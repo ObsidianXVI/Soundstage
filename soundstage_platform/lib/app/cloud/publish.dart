@@ -242,6 +242,7 @@ Future<PublishResult> publishStory(
     meta: doc.meta.copyWith(slug: slug),
     notes: const {},
     board: const ir.InspirationBoard(),
+    annotations: const [],
   );
   var image = '';
   try {

@@ -167,6 +167,7 @@ abstract final class SsIcons {
   static const IconData panelLeft = IconData(0xe12a, fontFamily: fontFamily);
   static const IconData panelRight = IconData(0xe431, fontFamily: fontFamily);
   static const IconData pause = IconData(0xe12e, fontFamily: fontFamily);
+  static const IconData penTool = IconData(0xe131, fontFamily: fontFamily);
   static const IconData pencil = IconData(0xe1f9, fontFamily: fontFamily);
   static const IconData pilcrow = IconData(0xe3a3, fontFamily: fontFamily);
   static const IconData pipette = IconData(0xe13b, fontFamily: fontFamily);

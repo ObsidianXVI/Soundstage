@@ -189,6 +189,7 @@ ir.StageDocument issueCopy(ir.StageDocument doc, {required String title}) {
     meta: doc.meta.copyWith(title: title, slug: ''),
     notes: const {},
     board: const ir.InspirationBoard(),
+    annotations: const [],
   );
 }
 

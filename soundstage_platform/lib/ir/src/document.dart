@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'annotation.dart';
 import 'assets.dart';
 import 'audio.dart';
 import 'board.dart';
@@ -40,7 +41,8 @@ abstract class StageMeta with _$StageMeta {
 /// `scenes` are in reading order. `overlay` is persistent chrome drawn over
 /// every scene. `notes` are the author's private meta-notes (m5.md
 /// T5.3), keyed by scene or node id; `board` is the draft's inspiration
-/// board (DECISIONS 26/10/26 #11). Publishing drops both.
+/// board (DECISIONS 26/10/26 #11); `annotations` are Annotate mode's marks
+/// for the agent. Publishing drops all three.
 @freezed
 abstract class StageDocument with _$StageDocument {
   const factory StageDocument({
@@ -59,6 +61,7 @@ abstract class StageDocument with _$StageDocument {
     FrameNode? overlay,
     @Default(<String, String>{}) Map<String, String> notes,
     @Default(InspirationBoard()) InspirationBoard board,
+    @Default(<Annotation>[]) List<Annotation> annotations,
   }) = _StageDocument;
 
   const StageDocument._();

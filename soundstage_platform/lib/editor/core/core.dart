@@ -5,6 +5,7 @@ library;
 
 export 'command.dart';
 export 'commands/align_commands.dart';
+export 'commands/annotation_commands.dart';
 export 'commands/asset_commands.dart';
 export 'commands/audio_commands.dart';
 export 'commands/board_commands.dart';

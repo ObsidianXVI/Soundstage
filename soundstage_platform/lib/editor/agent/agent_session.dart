@@ -24,7 +24,10 @@ exist per breakpoint (desktop, mobile…) over a shared base; text is shared.
 Work only through the tools. Read before you write: call get_outline (and
 get_node for details) to learn ids and boxes, then make focused edits. Keep
 the author's words unless asked to change them. Prefer small, reversible
-steps; your whole run is undone with one undo. If a write is refused because
+steps; your whole run is undone with one undo. The author may draw
+annotations (get_annotations) to show you what they want: build from them
+and resolve them. When you need a place on the canvas, ask_point. If a
+write is refused because
 the document changed, read again. When you are unsure what the author wants,
 ask one short question instead of guessing. Finish with one or two sentences
 saying what you changed.''';
@@ -93,6 +96,25 @@ class AgentSuggestion {
 
 enum SuggestionStatus { open, applied, autoApplied, dismissed, failed }
 
+/// A place on an artboard the author pointed at.
+typedef CanvasPoint = ({
+  String sceneId,
+  String breakpointId,
+  double x,
+  double y,
+});
+
+/// The agent asking the author to point at the canvas (product spec
+/// "Annotate mode": "the agent can ask the author to point at the canvas").
+class PointRequest {
+  PointRequest(this.question);
+
+  final String question;
+  final Completer<CanvasPoint?> _done = Completer();
+
+  Future<CanvasPoint?> get answer => _done.future;
+}
+
 class AgentProblem extends AgentEvent {
   const AgentProblem(this.message, {this.needsKey = false});
   final String message;
@@ -106,17 +128,20 @@ class AgentSession {
     required this.readState,
     required this.transport,
     EditorAssetService? assets,
-  }) : toolbox = AgentToolbox(
-         editor: editor,
-         readState: readState,
-         assets: assets,
-         transport: transport,
-       );
+  }) {
+    toolbox = AgentToolbox(
+      editor: editor,
+      readState: readState,
+      assets: assets,
+      transport: transport,
+      askPoint: askPoint,
+    );
+  }
 
   final EditorController editor;
   final EditorState Function() readState;
   final AgentTransport transport;
-  final AgentToolbox toolbox;
+  late final AgentToolbox toolbox;
 
   /// The conversation in Messages API form (assistant turns kept whole,
   /// thinking blocks included, as the API requires).
@@ -131,6 +156,26 @@ class AgentSession {
     const [],
   );
   final ValueNotifier<bool> reviewing = ValueNotifier(false);
+
+  /// The agent's open question to point at the canvas, if any.
+  final ValueNotifier<PointRequest?> pointRequest = ValueNotifier(null);
+
+  /// Asks the author to click a place on the canvas; null if they cancel.
+  Future<CanvasPoint?> askPoint(String question) {
+    pointRequest.value?._done.complete(null);
+    final r = PointRequest(question);
+    pointRequest.value = r;
+    return r.answer;
+  }
+
+  /// The author's answer to [pointRequest] (null: cancelled).
+  void answerPoint(CanvasPoint? point) {
+    final r = pointRequest.value;
+    if (r == null) return;
+    pointRequest.value = null;
+    if (!r._done.isCompleted) r._done.complete(point);
+  }
+
   int _suggestionSerial = 0;
   bool _stop = false;
 
@@ -140,7 +185,10 @@ class AgentSession {
   void _emit(AgentEvent e) => events.value = [...events.value, e];
 
   /// Asks the agent to stop after the current step.
-  void stop() => _stop = true;
+  void stop() {
+    _stop = true;
+    answerPoint(null);
+  }
 
   /// Runs one request from the author to the end of the agent's turn.
   Future<void> send(String prompt) async {
