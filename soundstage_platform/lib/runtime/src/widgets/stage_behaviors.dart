@@ -122,9 +122,9 @@ class StageCarousel extends StatefulWidget {
 @visibleForTesting
 class StageCarouselState extends State<StageCarousel>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _anim = AnimationController.unbounded(
-    vsync: this,
-  )..addListener(_apply);
+  // Created in initState: a lazy controller first touched in dispose would
+  // make its ticker on a deactivated element.
+  late final AnimationController _anim;
   late final DragGestureRecognizer _drag =
       (_horizontal
             ? HorizontalDragGestureRecognizer(debugOwner: this)
@@ -148,6 +148,7 @@ class StageCarouselState extends State<StageCarousel>
   @override
   void initState() {
     super.initState();
+    _anim = AnimationController.unbounded(vsync: this)..addListener(_apply);
     _restartAutoplay();
   }
 
