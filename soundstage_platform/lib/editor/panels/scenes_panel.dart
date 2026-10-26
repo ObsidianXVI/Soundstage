@@ -342,7 +342,8 @@ class _ScenesPanelState extends ConsumerState<ScenesPanel> {
                   alignment: Alignment.centerLeft,
                   child: SsButton(
                     key: const ValueKey<String>('edit-overlay'),
-                    label: 'Edit overlay',
+                    // Short: the panel can be 200 px wide.
+                    label: 'Overlay',
                     icon: SsIcons.layers,
                     variant: SsButtonVariant.ghost,
                     onPressed: _ctl.enterOverlay,
