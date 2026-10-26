@@ -34,6 +34,20 @@ void main() {
         const Rect.fromLTWH(0, -100, 200, 200),
       );
     });
+    test(
+      'a scaled length a rounding error short of the box does not throw',
+      () {
+        // 121 × (1000 / 121) is 1.1e-13 short of 1000 in doubles: clamp's
+        // bounds used to cross (seen in Chrome on the spike demo).
+        final r = imageFillRect(
+          const Size(1000, 100),
+          const Size(121, 1000),
+          const ir.StagePoint(x: 0.5, y: 0.5),
+        );
+        expect(r.left, 0);
+        expect(r.width, closeTo(1000, 1e-9));
+      },
+    );
   });
 
   group('media', () {

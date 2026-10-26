@@ -19,7 +19,9 @@ Rect imageFillRect(Size box, Size image, ir.StagePoint focalPoint) {
   final h = image.height * scale;
   double place(double boxLen, double len, double focal) {
     final ideal = boxLen / 2 - focal.clamp(0.0, 1.0) * len;
-    return ideal.clamp(boxLen - len, 0.0);
+    // `len` can come out a rounding error short of `boxLen` (scale ×
+    // image length); clamp would throw on a lower bound above 0.
+    return ideal.clamp(math.min(boxLen - len, 0.0), 0.0);
   }
 
   return Rect.fromLTWH(
