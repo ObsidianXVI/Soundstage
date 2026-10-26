@@ -124,6 +124,53 @@ void main() {
     expect(posters, ['chart', 'scene:s2@0.5']);
   });
 
+  test('Letterpress zip mirrors the repo layout', () async {
+    final zip = await exportLetterpressZip(
+      _doc(),
+      bytesOf: bytesOf,
+      poster: poster,
+      name: 'zipped_story',
+      date: DateTime(2026, 10, 26),
+      backlink: const Backlink('https://soundstage.app/s/z'),
+    );
+    final archive = ZipDecoder().decodeBytes(zip);
+    final names = [for (final f in archive) f.name]..sort();
+    expect(names, [
+      'LETTERPRESS_IMPORT.md',
+      'assets/images/soundstage/zipped_story/Harbour-at-dusk.png',
+      'assets/images/soundstage/zipped_story/figure-chart.png',
+      'assets/images/soundstage/zipped_story/scene-s2.png',
+      'lib/letterpress-engine/store/md_sources/zipped_story.md',
+      'lib/letterpress-engine/store/modules/soundstage/zipped_story.dart',
+    ]);
+    String text(String name) =>
+        utf8.decode(archive.findFile(name)!.readBytes()!);
+    final module = text(
+      'lib/letterpress-engine/store/modules/soundstage/zipped_story.dart',
+    );
+    expect(module, startsWith('part of letterpress.store;'));
+    expect(module, contains('class ZippedStory extends LPModule'));
+    expect(module, contains("LPText.header1(content: 'Arrival')"));
+    expect(
+      module,
+      contains(
+        "LPImage.asset(assetPath: 'assets/images/soundstage/zipped_story/"
+        "Harbour-at-dusk.png', width: 300, height: 200)",
+      ),
+    );
+    // A poster's size comes from the PNG (1×1).
+    expect(module, contains('scene-s2.png\', width: 1, height: 1)'));
+    expect(module, contains('https://soundstage.app/s/z#scene-s2'));
+    final readme = text('LETTERPRESS_IMPORT.md');
+    expect(readme, contains("part './modules/soundstage/zipped_story.dart';"));
+    expect(
+      readme,
+      contains('static final LPModule zippedStory = ZippedStory('),
+    );
+    expect(readme, contains('- assets/images/soundstage/zipped_story/'));
+    expect(letterpressFileName('My Story: Part 2!'), 'my_story_part_2');
+  });
+
   test('HTML zip has index.html', () async {
     final zip = await exportStaticZip(
       _doc(),

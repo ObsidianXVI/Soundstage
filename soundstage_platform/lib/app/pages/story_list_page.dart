@@ -174,6 +174,16 @@ class _StoryRow extends ConsumerWidget {
         icon: SsIcons.file,
         onSelected: () => actions.exportPdf(story),
       ),
+      SsMenuItem(
+        label: 'Export for Letterpress (.zip)',
+        icon: SsIcons.file,
+        onSelected: () => actions.exportLetterpress(story),
+      ),
+      SsMenuItem(
+        label: 'Copy as rich text',
+        icon: SsIcons.copy,
+        onSelected: () => actions.copyRichText(story),
+      ),
       if (!story.bundled)
         SsMenuItem(
           label: 'Revisions',

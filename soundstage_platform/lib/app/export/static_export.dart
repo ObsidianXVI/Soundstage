@@ -126,3 +126,97 @@ Future<Uint8List> exportStaticZip(
   }
   return Uint8List.fromList(ZipEncoder().encode(archive));
 }
+
+/// A `.zip` laid out like the Letterpress repository (m4.md T4.5d): unzip
+/// it at the repo root. It holds the Markdown source
+/// (`lib/letterpress-engine/store/md_sources/<name>.md`), the generated
+/// module (`lib/letterpress-engine/store/modules/soundstage/<name>.dart`),
+/// the images (`assets/images/soundstage/<name>/`) and
+/// `LETTERPRESS_IMPORT.md` with the lines to add to `lp_store.dart` and
+/// `pubspec.yaml`.
+Future<Uint8List> exportLetterpressZip(
+  ir.StageDocument doc, {
+  required AssetBytesSource bytesOf,
+  required PosterSource poster,
+  required String name,
+  required DateTime date,
+  Backlink? backlink,
+}) async {
+  final story = linearize(doc);
+  final files = await collectExportFiles(
+    story,
+    doc,
+    bytesOf: bytesOf,
+    poster: poster,
+  );
+  final assetDir = 'assets/images/soundstage/$name';
+  String? assetPathOf(String key) {
+    final f = files[key];
+    return f == null ? null : '$assetDir/${f.path.split('/').last}';
+  }
+
+  final className = letterpressClassName(story.title);
+  final module = toLetterpressModule(
+    story,
+    className: className,
+    projectName: 'soundstage',
+    date: date,
+    assetPathOf: assetPathOf,
+    sizeOf: (key) {
+      final f = files[key];
+      return f == null ? null : imageSizeOf(f.bytes);
+    },
+    backlink: backlink,
+  );
+  final field = '${className[0].toLowerCase()}${className.substring(1)}';
+  final readme =
+      '''
+# Importing "${story.title}" into Letterpress
+
+Unzip this archive at the root of the Letterpress repository, then:
+
+1. In `lib/letterpress-engine/store/lp_store.dart`, add the part:
+
+       part './modules/soundstage/$name.dart';
+
+   and the registry entry inside `LPStore`:
+
+       static final LPModule $field = $className(renderWithPost: false);
+
+2. In `pubspec.yaml`, under `flutter: assets:`, add:
+
+       - $assetDir/
+
+3. To publish it, list `LPStore.$field` in `ContentConfig`.
+''';
+  const store = 'lib/letterpress-engine/store';
+  final archive = Archive()
+    ..addFile(
+      ArchiveFile.bytes(
+        '$store/md_sources/$name.md',
+        utf8.encode(toMarkdown(story, pathOf: assetPathOf, backlink: backlink)),
+      ),
+    )
+    ..addFile(
+      ArchiveFile.bytes(
+        '$store/modules/soundstage/$name.dart',
+        utf8.encode(module),
+      ),
+    )
+    ..addFile(ArchiveFile.bytes('LETTERPRESS_IMPORT.md', utf8.encode(readme)));
+  for (final f in files.values) {
+    if (!f.mime.startsWith('image/')) continue; // Letterpress has no audio
+    final path = '$assetDir/${f.path.split('/').last}';
+    archive.add(ArchiveFile.noCompress(path, f.bytes.length, f.bytes));
+  }
+  return Uint8List.fromList(ZipEncoder().encode(archive));
+}
+
+/// A Letterpress file name for [title] (`My story` → `my_story`).
+String letterpressFileName(String title) {
+  final s = title
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  return s.isEmpty ? 'soundstage_story' : s;
+}

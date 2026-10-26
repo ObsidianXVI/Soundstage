@@ -3,6 +3,48 @@ import 'linear_story.dart';
 /// [story] as one standalone, semantic HTML file with light inline CSS
 /// (architecture §16.1). [pathOf] and [backlink] as in `toMarkdown`.
 String toHtml(LinearStory story, {ExportPathOf? pathOf, Backlink? backlink}) {
+  final body = _bodyHtml(story, pathOf, backlink, paste: false);
+  final title = escapeHtml(story.title);
+  final description = story.description.trim().isEmpty
+      ? ''
+      : '\n<meta name="description" content="${escapeHtml(story.description.trim())}">';
+  return '''
+<!doctype html>
+<html lang="${escapeHtml(story.lang)}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title</title>$description
+<style>$kExportCss</style>
+</head>
+<body>
+<article>
+<h1>$title</h1>
+$body</article>
+</body>
+</html>
+''';
+}
+
+/// [story] as an HTML fragment for pasting into Medium or Substack (m4.md
+/// T4.5d, "Copy as rich text"): the title and the body, with no
+/// stylesheet, sections or media players (an audio track is a line of
+/// text). [pathOf] should give absolute URLs; files without one are left
+/// out.
+String toPasteHtml(
+  LinearStory story, {
+  ExportPathOf? pathOf,
+  Backlink? backlink,
+}) =>
+    '<h1>${escapeHtml(story.title)}</h1>\n'
+    '${_bodyHtml(story, pathOf, backlink, paste: true)}';
+
+String _bodyHtml(
+  LinearStory story,
+  ExportPathOf? pathOf,
+  Backlink? backlink, {
+  required bool paste,
+}) {
   final body = StringBuffer();
   if (story.description.trim().isNotEmpty) {
     body.writeln('<p class="lede">${escapeHtml(story.description.trim())}</p>');
@@ -16,7 +58,7 @@ String toHtml(LinearStory story, {ExportPathOf? pathOf, Backlink? backlink}) {
 
   for (final scene in story.scenes) {
     closeList();
-    body.writeln('<section id="scene-${escapeHtml(scene.id)}">');
+    if (!paste) body.writeln('<section id="scene-${escapeHtml(scene.id)}">');
     for (final b in scene.blocks) {
       if (b is! ParagraphBlock || b.list == ListKind.none) closeList();
       switch (b) {
@@ -89,6 +131,10 @@ String toHtml(LinearStory story, {ExportPathOf? pathOf, Backlink? backlink}) {
             ..writeln('</blockquote>');
         case AudioBlock(:final name):
           final path = pathOf?.call(fileKeyOf(b)!);
+          if (paste) {
+            body.writeln('<p><em>Audio: ${escapeHtml(name)}</em></p>');
+            break;
+          }
           body.writeln(
             path == null
                 ? '<p class="audio">${escapeHtml(name)}</p>'
@@ -99,7 +145,7 @@ String toHtml(LinearStory story, {ExportPathOf? pathOf, Backlink? backlink}) {
       }
     }
     closeList();
-    body.writeln('</section>');
+    if (!paste) body.writeln('</section>');
   }
   if (backlink != null) {
     body.writeln(
@@ -107,26 +153,7 @@ String toHtml(LinearStory story, {ExportPathOf? pathOf, Backlink? backlink}) {
       '${Backlink.label}</a></footer>',
     );
   }
-  final title = escapeHtml(story.title);
-  final description = story.description.trim().isEmpty
-      ? ''
-      : '\n<meta name="description" content="${escapeHtml(story.description.trim())}">';
-  return '''
-<!doctype html>
-<html lang="${escapeHtml(story.lang)}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>$title</title>$description
-<style>$kExportCss</style>
-</head>
-<body>
-<article>
-<h1>$title</h1>
-$body</article>
-</body>
-</html>
-''';
+  return body.toString();
 }
 
 /// The export's light stylesheet: readable measure, responsive media.

@@ -9,15 +9,21 @@ import 'package:soundstage_platform/app/cloud/cloud.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/export/pdf_export.dart';
+import 'package:soundstage_platform/app/export/rich_copy.dart' as clip;
 import 'package:soundstage_platform/app/export/static_export.dart';
 import 'package:soundstage_platform/app/persistence/db_story_repository.dart';
 import 'package:soundstage_platform/app/persistence/platform.dart' as platform;
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/app/persistence/story_package.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/export/export.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart'
-    show StageEnvironment, StageRenderMode, renderStagePoster;
+    show
+        StageAssetResolver,
+        StageEnvironment,
+        StageRenderMode,
+        renderStagePoster;
 
 import 'cloud_ui.dart';
 
@@ -116,15 +122,16 @@ class StoryActions {
   }
 
   /// Static exports (architecture §16.1): Markdown or HTML in a zip with
-  /// their images and poster frames, or a PDF. Local exports carry no
-  /// backlink until the story is published (M4 hosting).
+  /// their images and poster frames, or a PDF. A published story's exports
+  /// link back to it ("View interactive article on Soundstage").
   Future<void> exportStatic(StorySummary s, StaticExportFormat format) =>
-      _exportWith(s, (doc, bytesOf, poster) async {
+      _exportWith(s, (doc, bytesOf, poster, backlink) async {
         final zip = await exportStaticZip(
           doc,
           format,
           bytesOf: bytesOf,
           poster: poster,
+          backlink: backlink,
         );
         final suffix = format == StaticExportFormat.markdown ? 'md' : 'html';
         return (
@@ -134,8 +141,25 @@ class StoryActions {
         );
       });
 
+  /// The story for the Letterpress blog (m4.md T4.5d): a zip to unzip at
+  /// the Letterpress repo root (Markdown source, generated `LPModule`,
+  /// images, and the lines to add).
+  Future<void> exportLetterpress(StorySummary s) =>
+      _exportWith(s, (doc, bytesOf, poster, backlink) async {
+        final name = letterpressFileName(s.title);
+        final zip = await exportLetterpressZip(
+          doc,
+          bytesOf: bytesOf,
+          poster: poster,
+          name: name,
+          date: DateTime.now(),
+          backlink: backlink,
+        );
+        return ('$name.letterpress.zip', zip, 'application/zip');
+      });
+
   Future<void> exportPdf(StorySummary s) =>
-      _exportWith(s, (doc, bytesOf, poster) async {
+      _exportWith(s, (doc, bytesOf, poster, backlink) async {
         Uint8List? font;
         try {
           final data = await rootBundle.load(
@@ -150,6 +174,7 @@ class StoryActions {
           bytesOf: bytesOf,
           poster: poster,
           fallbackFont: font,
+          backlink: backlink,
         );
         return ('${exportFileBase(s.title)}.pdf', pdf, 'application/pdf');
       });
@@ -160,6 +185,7 @@ class StoryActions {
       ir.StageDocument doc,
       AssetBytesSource bytesOf,
       PosterSource poster,
+      Backlink? backlink,
     )
     build,
   ) async {
@@ -180,11 +206,78 @@ class StoryActions {
           nodeId: nodeId,
           pixelRatio: 2,
         ),
+        await _backlinkFor(s.id, doc),
       );
       platform.downloadFile(name, bytes, mime);
     } on Object catch (e) {
       _toast('Export failed: ${_describe(e)}', SsToastKind.danger);
     }
+  }
+
+  /// The slug story [storyId] is published at (the document's, else the
+  /// cloud's record), or null when it is not published or the cloud is
+  /// unavailable.
+  Future<String?> _publishedSlug(String storyId, ir.StageDocument doc) async {
+    final cloud = ref.read(cloudProvider);
+    if (cloud == null || cloud.auth.currentUser == null) return null;
+    try {
+      final slug = await cloud.backend.publishedSlugOf(storyId);
+      return slug ?? (doc.meta.slug.isEmpty ? null : doc.meta.slug);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<Backlink?> _backlinkFor(String storyId, ir.StageDocument doc) async {
+    final slug = await _publishedSlug(storyId, doc);
+    return slug == null ? null : Backlink('${Uri.base.origin}/s/$slug');
+  }
+
+  /// Puts the story on the clipboard as rich text for Medium or Substack
+  /// (m4.md T4.5d). Called straight from the menu, so the browser still
+  /// sees the click. Images go along by their public URLs, so only a
+  /// published story's images are included; posters become links.
+  void copyRichText(StorySummary s) {
+    final content = () async {
+      final doc = await _repo.load(s.id);
+      if (doc == null) throw StateError('the story is gone');
+      final story = linearize(doc);
+      final slug = await _publishedSlug(s.id, doc);
+      final backlink = slug == null
+          ? null
+          : Backlink('${Uri.base.origin}/s/$slug');
+      Map<String, ir.Asset> published = const {};
+      final cloud = ref.read(cloudProvider);
+      if (slug != null && cloud != null) {
+        try {
+          final loaded = await loadPublished(
+            slug,
+            backend: cloud.backend,
+            fetch: StageAssetResolver().load,
+          );
+          published = loaded?.document?.assets ?? const {};
+        } on Object {
+          published = const {}; // text only
+        }
+      }
+      String? urlOf(String key) {
+        final uri = published[key]?.uri;
+        return uri != null && uri.startsWith('https://') ? uri : null;
+      }
+
+      return (
+        html: toPasteHtml(story, pathOf: urlOf, backlink: backlink),
+        plain: toMarkdown(story, pathOf: urlOf, backlink: backlink),
+      );
+    }();
+    clip.copyRichText(content).then(
+      (_) => _toast(
+        'Copied "${s.title}". Paste it into Medium or Substack.',
+        SsToastKind.success,
+      ),
+      onError: (Object e) =>
+          _toast('Could not copy: ${_describe(e)}', SsToastKind.danger),
+    );
   }
 
   /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,
