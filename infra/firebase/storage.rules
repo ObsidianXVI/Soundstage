@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Soundstage Storage (m4.md T4.1), bucket <project>-media.
+//   users/{uid}/...                 an author's documents and media (private)
+//   published/{uid}/{slug}/...      frozen published versions (public read)
+// Everything else is closed.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owns(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Deletes have no request.resource; uploads stay under 500 MB.
+    function sizeOk() {
+      return request.resource == null || request.resource.size < 500 * 1024 * 1024;
+    }
+
+    match /users/{uid}/{allPaths=**} {
+      allow read: if owns(uid);
+      allow write: if owns(uid) && sizeOk();
+    }
+
+    match /published/{uid}/{slug}/{allPaths=**} {
+      allow read: if true;
+      allow write: if owns(uid) && sizeOk();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

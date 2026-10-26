@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// Soundstage Firestore (m4.md T4.1).
+//   stories/{storyId}   an author's story metadata; the document JSON and
+//                       assets live in Storage under users/{uid}/stories/.
+//   published/{slug}    the public pointer for /s/<slug>: owner, story,
+//                       version, title, description, poster path.
+// Everything else is closed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return signedIn() && data.ownerId == request.auth.uid;
+    }
+
+    // ownerId never changes after creation.
+    function keepsOwner() {
+      return request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    match /stories/{storyId} {
+      allow read, delete: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data)
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200;
+      allow update: if isOwner(resource.data) && keepsOwner()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200;
+    }
+
+    match /published/{slug} {
+      allow read: if true;
+      allow create: if isOwner(request.resource.data)
+        && slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$')
+        && request.resource.data.storyId is string
+        && request.resource.data.version is int;
+      allow update: if isOwner(resource.data) && keepsOwner()
+        && request.resource.data.version is int
+        && request.resource.data.version >= resource.data.version;
+      allow delete: if isOwner(resource.data);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -24,3 +24,10 @@ DECISIONS_NEEDED.md
 
 # Firebase
 .firebase/
+
+# Terraform (state lives in gs://project-soundstage-tfstate)
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+crash.log
