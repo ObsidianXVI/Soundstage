@@ -27,7 +27,8 @@ move-horizontal move-vertical circle-dashed
 align-left align-center align-right align-justify align-vertical-justify-start
 align-vertical-justify-center align-vertical-justify-end bold italic underline
 strikethrough list list-ordered case-sensitive baseline superscript subscript
-pilcrow indent image-up replace volume-2 star hexagon timer repeat diamond''';
+pilcrow indent image-up replace volume-2 star hexagon timer repeat diamond
+user log-out globe''';
 
 String _camel(String kebab) {
   final parts = kebab.split('-');

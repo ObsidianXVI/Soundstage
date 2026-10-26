@@ -33,6 +33,8 @@ class SsTextField extends StatefulWidget {
     this.textAlign = TextAlign.start,
     this.dense = false,
     this.bare = false,
+    this.obscureText = false,
+    this.autofillHints,
     super.key,
   });
 
@@ -64,6 +66,13 @@ class SsTextField extends StatefulWidget {
 
   /// No border or fill (the host draws the container).
   final bool bare;
+
+  /// Hides the text (passwords). Single line only.
+  final bool obscureText;
+
+  /// Lets the browser's password manager fill the field (e.g.
+  /// [AutofillHints.email], [AutofillHints.password]).
+  final Iterable<String>? autofillHints;
 
   @override
   State<SsTextField> createState() => _SsTextFieldState();
@@ -117,8 +126,10 @@ class _SsTextFieldState extends State<SsTextField> {
       focusNode: _focus,
       enabled: widget.enabled,
       autofocus: widget.autofocus,
-      maxLines: widget.maxLines,
+      maxLines: widget.obscureText ? 1 : widget.maxLines,
       minLines: 1,
+      obscureText: widget.obscureText,
+      autofillHints: widget.autofillHints,
       style: style,
       textAlign: widget.textAlign,
       cursorColor: c.accentText,

@@ -68,6 +68,10 @@ class JustAudioBackend implements StageAudioBackend {
       _heldFrom = loader;
       await _player.setUrl(url);
     } else {
+      // Published audio is cross-origin and the page is cross-origin
+      // isolated (COEP): the element must fetch it in CORS mode (the
+      // bucket allows it), or the browser blocks the response.
+      await _player.setWebCrossOrigin(ja.WebCrossOrigin.anonymous);
       await _player.setUrl(uri);
     }
   }

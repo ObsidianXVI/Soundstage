@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:soundstage_platform/app/cloud/cloud.dart' show cloudProvider;
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/export/static_export.dart'
     show StaticExportFormat;
 import 'package:soundstage_platform/app/persistence/providers.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
+import 'cloud_ui.dart' show AccountButton;
 import 'demo_page.dart';
 import 'story_actions.dart';
 
@@ -48,6 +50,7 @@ class StoryListPage extends ConsumerWidget {
                     Wrap(
                       spacing: SsSpace.s2,
                       children: [
+                        const AccountButton(),
                         SsButton(
                           label: 'Import',
                           icon: SsIcons.file,
@@ -136,6 +139,14 @@ class _StoryRow extends ConsumerWidget {
           icon: SsIcons.pencil,
           onSelected: () => _rename(context, ref),
         ),
+      if (ref.read(cloudProvider) != null) ...[
+        const SsMenuDivider(),
+        SsMenuItem(
+          label: 'Publish…',
+          icon: SsIcons.globe,
+          onSelected: () => actions.publish(story),
+        ),
+      ],
       const SsMenuDivider(),
       SsMenuItem(
         label: 'Export .stage.json',

@@ -120,6 +120,7 @@ abstract final class SsIcons {
   );
   static const IconData folder = IconData(0xe0d7, fontFamily: fontFamily);
   static const IconData frame = IconData(0xe291, fontFamily: fontFamily);
+  static const IconData globe = IconData(0xe0e8, fontFamily: fontFamily);
   static const IconData gripHorizontal = IconData(
     0xe0ea,
     fontFamily: fontFamily,
@@ -144,6 +145,7 @@ abstract final class SsIcons {
   static const IconData listOrdered = IconData(0xe1d1, fontFamily: fontFamily);
   static const IconData lock = IconData(0xe10b, fontFamily: fontFamily);
   static const IconData lockOpen = IconData(0xe10c, fontFamily: fontFamily);
+  static const IconData logOut = IconData(0xe10e, fontFamily: fontFamily);
   static const IconData maximize = IconData(0xe112, fontFamily: fontFamily);
   static const IconData minimize = IconData(0xe11a, fontFamily: fontFamily);
   static const IconData minus = IconData(0xe11c, fontFamily: fontFamily);
@@ -214,6 +216,7 @@ abstract final class SsIcons {
     fontFamily: fontFamily,
   );
   static const IconData unlink = IconData(0xe19c, fontFamily: fontFamily);
+  static const IconData user = IconData(0xe19f, fontFamily: fontFamily);
   static const IconData volume2 = IconData(0xe1ab, fontFamily: fontFamily);
   static const IconData wrapText = IconData(0xe248, fontFamily: fontFamily);
   static const IconData x = IconData(0xe1b2, fontFamily: fontFamily);

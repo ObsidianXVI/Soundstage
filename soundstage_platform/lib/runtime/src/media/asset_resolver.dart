@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/services.dart' show AssetBundle, rootBundle;
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import 'fetch_bytes.dart';
+
 /// Resolves document assets to bytes (architecture §12).
 ///
 /// Supported URI schemes:
@@ -11,9 +13,9 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 ///   loaded through [local]. The app installs the loader once at start-up
 ///   ([defaultLocal]); a missing file throws [StateError].
 ///
-/// `https://` (published stories, M4) is not wired yet; loading it throws
-/// [UnsupportedError], which the image cache reports once and then paints
-/// the asset's placeholder.
+/// - `https://…` — a published file (M4), fetched over the network (the
+///   bucket allows cross-origin GETs). A failed fetch throws, which the
+///   image cache reports once and then paints the asset's placeholder.
 class StageAssetResolver {
   StageAssetResolver({this.assets = const {}, this.customBundle, this._local});
 
@@ -54,7 +56,8 @@ class StageAssetResolver {
     return best.uri;
   }
 
-  /// Loads the bytes at [uri].
+  /// Loads the bytes at [uri]: `asset://` from the bundle, `local://` from
+  /// browser storage, `https://` over the network (published stories).
   Future<Uint8List> load(String uri) async {
     final path = bundledAssetPath(uri);
     if (path != null) {
@@ -71,9 +74,10 @@ class StageAssetResolver {
       if (bytes == null) throw StateError('Local asset "$localId" is missing.');
       return bytes;
     }
-    throw UnsupportedError(
-      'Cannot load "$uri" yet: only asset:// and local:// are wired.',
-    );
+    if (uri.startsWith('https://') || uri.startsWith('http://')) {
+      return fetchBytes(uri);
+    }
+    throw UnsupportedError('Cannot load "$uri": unknown scheme.');
   }
 }
 

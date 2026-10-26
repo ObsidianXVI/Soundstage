@@ -5,6 +5,7 @@ import 'pages/demo_page.dart';
 import 'pages/edit_page.dart';
 import 'pages/not_found_page.dart';
 import 'pages/play_page.dart';
+import 'pages/published_page.dart';
 import 'pages/story_list_page.dart';
 
 bool? _flag(Uri uri, String key, String value) =>
@@ -30,6 +31,7 @@ String? redirectLegacyDemo(Uri uri) {
 /// - `/` story list
 /// - `/edit/:id` editor (content mode below 1024 px)
 /// - `/play/:id` the player behind the enter gate
+/// - `/s/:slug` a published story (M4)
 /// - `/demo/:name` the M0 demos; `/demo/design-system` the component gallery
 GoRouter buildRouter({String initialLocation = '/'}) {
   return GoRouter(
@@ -50,6 +52,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           wheelNative: _flag(state.uri, 'wheel', 'native'),
           statsOn: _flag(state.uri, 'stats', '1'),
         ),
+      ),
+      GoRoute(
+        path: '/s/:slug',
+        builder: (context, state) =>
+            PublishedPage(slug: state.pathParameters['slug']!),
       ),
       GoRoute(
         path: '/demo/design-system',

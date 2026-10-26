@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/export/pdf_export.dart';
 import 'package:soundstage_platform/app/export/static_export.dart';
@@ -16,6 +18,8 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart'
     show StageEnvironment, StageRenderMode, renderStagePoster;
+
+import 'cloud_ui.dart';
 
 /// Story-level actions of the story list: import, export, duplicate,
 /// revisions. Each reports failures as a toast and never throws.
@@ -180,6 +184,57 @@ class StoryActions {
       platform.downloadFile(name, bytes, mime);
     } on Object catch (e) {
       _toast('Export failed: ${_describe(e)}', SsToastKind.danger);
+    }
+  }
+
+  /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,
+  /// upload, then show the link.
+  Future<void> publish(StorySummary s) async {
+    final cloud = ref.read(cloudProvider);
+    final db = _db;
+    if (cloud == null) return;
+    if (cloud.auth.currentUser == null) {
+      await showSignInDialog(context, cloud.auth);
+      if (cloud.auth.currentUser == null || !context.mounted) return;
+    }
+    try {
+      final doc = await _repo.load(s.id);
+      if (doc == null || !context.mounted) return;
+      final origin = Uri.base.origin;
+      final slug = await showPublishDialog(
+        context,
+        title: s.title,
+        suggested: doc.meta.slug.isNotEmpty ? doc.meta.slug : slugFor(s.title),
+        origin: origin,
+      );
+      if (slug == null) return;
+      _toast('Publishing "${s.title}"…');
+      final result = await publishStory(
+        doc,
+        storyId: s.id,
+        slug: slug,
+        backend: cloud.backend,
+        bytesOf: (a) => db?.assetBytes(a) ?? Future.value(null),
+      );
+      // Remember the link in the story (the next publish suggests it).
+      if (!s.bundled && doc.meta.slug != slug) {
+        await _repo.save(
+          s.id,
+          doc.copyWith(meta: doc.meta.copyWith(slug: slug)),
+        );
+      }
+      if (!context.mounted) return;
+      await showPublishedDialog(
+        context,
+        url: '$origin${result.path}',
+        version: result.version,
+        warnings: result.warnings,
+        onOpen: () => context.go(result.path),
+      );
+    } on PublishException catch (e) {
+      _toast(e.message, SsToastKind.danger);
+    } on Object catch (e) {
+      _toast('Publishing failed: ${_describe(e)}', SsToastKind.danger);
     }
   }
 

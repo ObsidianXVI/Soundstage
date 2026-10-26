@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'app/app.dart';
+import 'app/cloud/cloud.dart';
 import 'app/data/story_repository.dart';
 import 'app/persistence/providers.dart';
 
@@ -15,11 +16,12 @@ Future<void> main() async {
   usePathUrlStrategy();
   // The editor has its own context menus.
   if (kIsWeb) BrowserContextMenu.disableContextMenu().ignore();
-  final storage = await openAppStorage();
+  final (storage, cloud) = (await openAppStorage(), await openCloud());
   runApp(
     ProviderScope(
       overrides: [
         appStorageProvider.overrideWithValue(storage),
+        cloudProvider.overrideWithValue(cloud),
         if (storage.repository case final repo?)
           storyRepositoryProvider.overrideWithValue(repo),
       ],
