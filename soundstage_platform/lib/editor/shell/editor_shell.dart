@@ -49,6 +49,7 @@ class EditorShell extends StatelessWidget {
     this.assetService,
     this.filePicker,
     this.onOpenPreviewInNewTab,
+    this.onPublish,
     super.key,
   });
 
@@ -82,6 +83,10 @@ class EditorShell extends StatelessWidget {
   /// The browser file picker, supplied by the app.
   final EditorFilePicker? filePicker;
 
+  /// The toolbar's Publish button, called with the current story document
+  /// (hidden when null). The app supplies it when the cloud is configured.
+  final ValueChanged<ir.StageDocument>? onPublish;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -99,6 +104,7 @@ class EditorShell extends StatelessWidget {
         onDocumentChanged: onDocumentChanged,
         onSave: onSave,
         saveStatus: saveStatus,
+        onPublish: onPublish,
       ),
     );
   }
@@ -113,6 +119,7 @@ class _EditorScope extends ConsumerWidget {
     required this.onDocumentChanged,
     required this.onSave,
     required this.saveStatus,
+    required this.onPublish,
   });
 
   final VoidCallback onBack;
@@ -121,6 +128,7 @@ class _EditorScope extends ConsumerWidget {
   final ValueChanged<ir.StageDocument>? onDocumentChanged;
   final VoidCallback? onSave;
   final Widget? saveStatus;
+  final ValueChanged<ir.StageDocument>? onPublish;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -152,6 +160,11 @@ class _EditorScope extends ConsumerWidget {
             onOpenPreviewInNewTab: onOpenPreviewInNewTab,
             onSave: onSave,
             saveStatus: saveStatus,
+            onPublish: onPublish == null
+                ? null
+                : () => onPublish!(
+                    ref.read(editorControllerProvider).storyDocument,
+                  ),
           ),
         );
       },
@@ -205,6 +218,7 @@ class _DockedEditor extends ConsumerWidget {
     required this.onOpenPreviewInNewTab,
     required this.onSave,
     required this.saveStatus,
+    required this.onPublish,
   });
 
   final String title;
@@ -214,6 +228,7 @@ class _DockedEditor extends ConsumerWidget {
   final VoidCallback? onOpenPreviewInNewTab;
   final VoidCallback? onSave;
   final Widget? saveStatus;
+  final VoidCallback? onPublish;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -326,6 +341,7 @@ class _DockedEditor extends ConsumerWidget {
                   onPreview: preview,
                   onHelp: help,
                   saveStatus: saveStatus,
+                  onPublish: onPublish,
                 ),
                 Expanded(
                   child: Row(

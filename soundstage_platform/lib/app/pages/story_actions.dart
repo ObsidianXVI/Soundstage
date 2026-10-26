@@ -188,8 +188,15 @@ class StoryActions {
   }
 
   /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,
-  /// upload, then show the link.
-  Future<void> publish(StorySummary s) async {
+  /// upload, then show the link. [current] is the editor's document (the
+  /// editor's Publish button): it is published as is, and the story is not
+  /// written to (the editor's autosave owns it). [open] opens the
+  /// published link (default: navigate to it).
+  Future<void> publish(
+    StorySummary s, {
+    ir.StageDocument? current,
+    ValueChanged<String>? open,
+  }) async {
     final cloud = ref.read(cloudProvider);
     final db = _db;
     if (cloud == null) return;
@@ -198,13 +205,22 @@ class StoryActions {
       if (cloud.auth.currentUser == null || !context.mounted) return;
     }
     try {
-      final doc = await _repo.load(s.id);
+      final doc = current ?? await _repo.load(s.id);
       if (doc == null || !context.mounted) return;
       final origin = Uri.base.origin;
+      var suggested = doc.meta.slug;
+      if (suggested.isEmpty) {
+        try {
+          suggested = await cloud.backend.publishedSlugOf(s.id) ?? '';
+        } on Object {
+          suggested = ''; // not published yet, or offline
+        }
+      }
+      if (!context.mounted) return;
       final slug = await showPublishDialog(
         context,
         title: s.title,
-        suggested: doc.meta.slug.isNotEmpty ? doc.meta.slug : slugFor(s.title),
+        suggested: suggested.isNotEmpty ? suggested : slugFor(s.title),
         origin: origin,
       );
       if (slug == null) return;
@@ -224,7 +240,7 @@ class StoryActions {
               ),
       );
       // Remember the link in the story (the next publish suggests it).
-      if (!s.bundled && doc.meta.slug != slug) {
+      if (current == null && !s.bundled && doc.meta.slug != slug) {
         await _repo.save(
           s.id,
           doc.copyWith(meta: doc.meta.copyWith(slug: slug)),
@@ -236,7 +252,8 @@ class StoryActions {
         url: '$origin${result.path}',
         version: result.version,
         warnings: result.warnings,
-        onOpen: () => context.go(result.path),
+        onOpen: () =>
+            open != null ? open(result.path) : context.go(result.path),
       );
     } on PublishException catch (e) {
       _toast(e.message, SsToastKind.danger);

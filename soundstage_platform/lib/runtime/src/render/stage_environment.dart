@@ -10,8 +10,11 @@ import '../paint/appearance_painter.dart';
 /// How the runtime renders: for readers (`play`) or inside the editor
 /// (`edit`). In edit mode, nodes that fail to lay out or paint, and
 /// placeholders for things that failed to resolve, show an error box; in
-/// play mode they render nothing (architecture §17.2).
-enum StageRenderMode { play, edit }
+/// play mode they render nothing (architecture §17.2). `still` renders for
+/// reading without interactivity (the static player tier, m4.md T4.6):
+/// like `play` (semantics, no error boxes) but behaviours render as
+/// authored and media is not interactive.
+enum StageRenderMode { play, edit, still }
 
 /// Everything render objects need besides their node: the render mode, the
 /// font table, media access and the appearance painter. One per document.

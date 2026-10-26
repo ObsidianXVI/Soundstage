@@ -5,7 +5,7 @@ import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/app/sound_demo.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart'
-    show StageAssetResolver;
+    show StageAssetResolver, StageTier;
 
 import 'not_found_page.dart';
 
@@ -25,16 +25,22 @@ final publishedDocumentProvider = FutureProvider.autoDispose
 
 /// `/s/:slug`: a published story (m4.md T4.2) in the player behind the
 /// enter gate. Anyone can open it; the document and assets are public.
+/// `?tier=lite|static` plays the reduced tiers (m4.md T4.6).
 class PublishedPage extends ConsumerWidget {
-  const PublishedPage({required this.slug, super.key});
+  const PublishedPage({
+    required this.slug,
+    this.tier = StageTier.full,
+    super.key,
+  });
 
   final String slug;
+  final StageTier tier;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       switch (ref.watch(publishedDocumentProvider(slug))) {
         AsyncData(:final value?) => Scaffold(
-          body: GatedStagePlayer(document: value),
+          body: GatedStagePlayer(document: value, tier: tier),
         ),
         AsyncData() => const NotFoundPage(message: 'Story not found'),
         AsyncError(:final error) => NotFoundPage(

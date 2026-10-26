@@ -192,6 +192,24 @@ void main() {
     ); // the tablet's design height
   });
 
+  testWidgets('the tier picker previews the lite and static players', (
+    tester,
+  ) async {
+    final (_, container) = await _pump(tester);
+    await _openPreview(tester);
+    StageTier tier() => tester.widget<StagePlayer>(_player).tier;
+    expect(tier(), StageTier.full);
+    await tester.tap(find.byKey(const ValueKey<String>('preview-tier')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Static').last);
+    await tester.pumpAndSettle();
+    expect(tier(), StageTier.static);
+    expect(container.read(previewProvider).tier, StageTier.static);
+    container.read(previewProvider.notifier).setTier(StageTier.lite);
+    await tester.pump();
+    expect(tier(), StageTier.lite);
+  });
+
   testWidgets('the player rebuilds on a committed edit, not during a gesture', (
     tester,
   ) async {

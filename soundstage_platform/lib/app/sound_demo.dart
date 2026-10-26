@@ -75,7 +75,8 @@ class SoundDemoHarness extends ConsumerWidget {
 }
 
 /// A story behind the enter gate, with its audio: the player the demos and
-/// `/play/:id` use.
+/// `/play/:id` use. [tier] (m4.md T4.6): a static story has no audio and
+/// no gate (nothing to unlock, nothing to enter).
 class GatedStagePlayer extends StatefulWidget {
   const GatedStagePlayer({
     super.key,
@@ -84,9 +85,11 @@ class GatedStagePlayer extends StatefulWidget {
     this.buildOnEnter = false,
     this.wheelNative,
     this.statsOn,
+    this.tier = StageTier.full,
   });
 
   final ir.StageDocument document;
+  final StageTier tier;
   final Offset coverFocal;
   final bool buildOnEnter;
   final bool? wheelNative;
@@ -100,9 +103,9 @@ class _GatedStagePlayerState extends State<GatedStagePlayer> {
   late final StageEnvironment _env = StageEnvironment.forDocument(
     widget.document,
   );
-  late final StageAudioService _audio = StageAudioService.forDocument(
-    widget.document,
-  );
+  late final StageAudioService? _audio = widget.tier == StageTier.static
+      ? null
+      : StageAudioService.forDocument(widget.document);
 
   /// `?stats=1`: logs the decoded-image cache once a second (T0.8 memory
   /// measurement; read it from the browser console).
@@ -147,7 +150,7 @@ class _GatedStagePlayerState extends State<GatedStagePlayer> {
   /// `window.__ss_audio_clock` (compare with the `<audio>` element's
   /// `currentTime`).
   void _publishAudioClock() {
-    final track = _audio.tracks.firstOrNull;
+    final track = _audio?.tracks.firstOrNull;
     final source = track == null ? null : StageAudioClockSource(track);
     Duration? last;
     SchedulerBinding.instance.addPersistentFrameCallback((t) {
@@ -168,13 +171,22 @@ class _GatedStagePlayerState extends State<GatedStagePlayer> {
   @override
   void dispose() {
     _stats?.cancel();
-    _audio.dispose();
+    _audio?.dispose();
     _env.media?.cache.clear();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final player = StagePlayer(
+      document: widget.document,
+      tier: widget.tier,
+      environment: _env,
+      audio: _audio,
+      controller: _controller,
+      wheelSmoothing: demoWheelSmoothing(widget.wheelNative),
+    );
+    if (widget.tier == StageTier.static) return player;
     return StageEnterGate(
       document: widget.document,
       environment: _env,
@@ -189,13 +201,7 @@ class _GatedStagePlayerState extends State<GatedStagePlayer> {
         );
       },
       buildChildOnEnter: widget.buildOnEnter,
-      child: StagePlayer(
-        document: widget.document,
-        environment: _env,
-        audio: _audio,
-        controller: _controller,
-        wheelSmoothing: demoWheelSmoothing(widget.wheelNative),
-      ),
+      child: player,
     );
   }
 }

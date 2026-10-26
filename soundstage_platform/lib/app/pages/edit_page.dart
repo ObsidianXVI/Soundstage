@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:soundstage_platform/app/cloud/cloud.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/persistence/autosave.dart';
 import 'package:soundstage_platform/app/persistence/editor_asset_service.dart';
@@ -14,6 +15,7 @@ import 'package:soundstage_platform/editor/shell/editor_shell.dart';
 import 'not_found_page.dart';
 import 'open_in_new_tab_stub.dart'
     if (dart.library.js_interop) 'open_in_new_tab_web.dart';
+import 'story_actions.dart';
 
 /// `/edit/:id`: the editor for one story.
 ///
@@ -93,6 +95,23 @@ class _EditPageState extends ConsumerState<EditPage> {
             autosave.notifyChanged(doc);
           },
           onSave: () => unawaited(autosave.flush()),
+          onPublish: ref.watch(cloudProvider) == null
+              ? null
+              : (doc) async {
+                  await autosave.flush();
+                  if (!context.mounted) return;
+                  await StoryActions(context, ref).publish(
+                    StorySummary(
+                      id: _id,
+                      title: doc.meta.title.isEmpty
+                          ? 'Untitled story'
+                          : doc.meta.title,
+                      updatedAt: DateTime.now(),
+                    ),
+                    current: doc,
+                    open: openInNewTab,
+                  );
+                },
           saveStatus: SaveIndicator(status: autosave.status),
         ),
       ),

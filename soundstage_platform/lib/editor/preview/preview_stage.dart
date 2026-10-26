@@ -231,6 +231,7 @@ class _PreviewStageState extends ConsumerState<PreviewStage> {
                       child: StagePlayer(
                         key: ValueKey<int>(_epoch),
                         document: doc,
+                        tier: preview.tier,
                         environment: env,
                         audio: audio,
                         controller: _player,

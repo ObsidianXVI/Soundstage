@@ -15,6 +15,8 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/shell/content_mode_screen.dart';
 import 'package:soundstage_platform/editor/shell/editor_shell.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
+import 'package:soundstage_platform/runtime/runtime.dart'
+    show StageEnterGate, StagePlayer, StageTier;
 
 final String _blank = jsonEncode(
   ir.StageDocument.empty(
@@ -160,6 +162,32 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.byType(GatedStagePlayer), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('/play/:id?tier=static plays without a gate', (tester) async {
+    final s = InMemoryStoryRepository(loadAsset: (_) async => _blank);
+    final created = await s.create(title: 'P');
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final router = buildRouter(
+      initialLocation: '/play/${created.id}?tier=static',
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [storyRepositoryProvider.overrideWithValue(s)],
+        child: SoundstageApp(router: router),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(StageEnterGate), findsNothing);
+    expect(
+      tester.widget<StagePlayer>(find.byType(StagePlayer)).tier,
+      StageTier.static,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 

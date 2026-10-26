@@ -40,6 +40,10 @@ class FakeBackend implements CloudBackend {
   Future<void> setStoryMeta(String id, Map<String, Object?> data) async =>
       meta[id] = data;
 
+  @override
+  Future<String?> publishedSlugOf(String id) async =>
+      meta[id]?['publishedSlug'] as String?;
+
   Uint8List fetch(String url) {
     final path = Uri.decodeComponent(
       url.substring('https://cdn.test/o/'.length, url.indexOf('?')),

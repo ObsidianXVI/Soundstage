@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/design_system/gallery/design_system_gallery.dart';
+import 'package:soundstage_platform/runtime/runtime.dart' show StageTier;
 
 import 'pages/demo_page.dart';
 import 'pages/edit_page.dart';
@@ -32,6 +33,7 @@ String? redirectLegacyDemo(Uri uri) {
 /// - `/edit/:id` editor (content mode below 1024 px)
 /// - `/play/:id` the player behind the enter gate
 /// - `/s/:slug` a published story (M4)
+///   (both take `?tier=lite|static`, m4.md T4.6)
 /// - `/demo/:name` the M0 demos; `/demo/design-system` the component gallery
 GoRouter buildRouter({String initialLocation = '/'}) {
   return GoRouter(
@@ -51,12 +53,15 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           storyId: state.pathParameters['id']!,
           wheelNative: _flag(state.uri, 'wheel', 'native'),
           statsOn: _flag(state.uri, 'stats', '1'),
+          tier: StageTier.parse(state.uri.queryParameters['tier']),
         ),
       ),
       GoRoute(
         path: '/s/:slug',
-        builder: (context, state) =>
-            PublishedPage(slug: state.pathParameters['slug']!),
+        builder: (context, state) => PublishedPage(
+          slug: state.pathParameters['slug']!,
+          tier: StageTier.parse(state.uri.queryParameters['tier']),
+        ),
       ),
       GoRoute(
         path: '/demo/design-system',

@@ -142,6 +142,12 @@ class FirebaseCloudBackend implements CloudBackend {
       .set({...record.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
 
   @override
+  Future<String?> publishedSlugOf(String storyId) async {
+    final snap = await _cloud.firestore.doc('stories/$storyId').get();
+    return snap.data()?['publishedSlug'] as String?;
+  }
+
+  @override
   Future<void> setStoryMeta(String storyId, Map<String, Object?> data) =>
       _cloud.firestore.doc('stories/$storyId').set({
         ...data,

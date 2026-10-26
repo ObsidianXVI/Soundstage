@@ -44,6 +44,7 @@ Future<ProviderContainer> _pump(
   WidgetTester tester,
   Size size, {
   List<String>? log,
+  ValueChanged<ir.StageDocument>? onPublish,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -64,6 +65,7 @@ Future<ProviderContainer> _pump(
             document: _doc(),
             onBack: () => log?.add('back'),
             onPreview: () => log?.add('preview'),
+            onPublish: onPublish,
           ),
         ),
       ),
@@ -75,6 +77,30 @@ Future<ProviderContainer> _pump(
 
 void main() {
   for (final w in [1024.0, 1440.0, 1920.0]) {
+    testWidgets('no Publish button without a publish action', (tester) async {
+      await _pump(tester, const Size(1440, 900));
+      expect(
+        find.byKey(const ValueKey<String>('toolbar-publish')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Publish gets the current document', (tester) async {
+      final published = <ir.StageDocument>[];
+      await _pump(tester, const Size(1440, 900), onPublish: published.add);
+      await tester.tap(find.byKey(const ValueKey<String>('toolbar-publish')));
+      await tester.pump();
+      expect(published.single.meta.title, 'The Hour Between');
+      expect(published.single.scenes, hasLength(2));
+    });
+
+    testWidgets('Publish is an icon button below 1280 px', (tester) async {
+      await _pump(tester, const Size(1100, 800), onPublish: (_) {});
+      final publish = find.byKey(const ValueKey<String>('toolbar-publish'));
+      expect(tester.widget(publish), isA<SsIconButton>());
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets(
       'the docked editor lays out at ${w.round()} px without overflow',
       (tester) async {

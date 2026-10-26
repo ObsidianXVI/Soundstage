@@ -13,6 +13,7 @@ export 'src/animator/node_registry.dart';
 export 'src/animator/stage_animator.dart';
 export 'src/animator/text_style_tracks.dart';
 export 'src/clocks/clock_source.dart';
+export 'src/clocks/poster_clocks.dart';
 export 'src/clocks/smoothing.dart';
 export 'src/clocks/timeline_clock.dart';
 export 'src/export/stage_poster.dart';

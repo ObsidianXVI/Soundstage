@@ -24,6 +24,7 @@ class EditorToolbar extends ConsumerWidget {
     required this.onPreview,
     required this.onHelp,
     this.saveStatus,
+    this.onPublish,
     super.key,
   });
 
@@ -34,6 +35,10 @@ class EditorToolbar extends ConsumerWidget {
 
   /// The app's autosave indicator.
   final Widget? saveStatus;
+
+  /// Publishes the story (m4.md T4.2); the button is hidden when null (a
+  /// local-only build).
+  final VoidCallback? onPublish;
 
   static const _tools = <(EditorTool, IconData, String, String)>[
     (EditorTool.move, SsIcons.mousePointer2, 'Move', 'toolMove'),
@@ -219,6 +224,23 @@ class EditorToolbar extends ConsumerWidget {
                 : SsButtonVariant.primary,
             onPressed: onPreview,
           ),
+          if (onPublish != null) ...[
+            const SizedBox(width: SsSpace.s1),
+            if (compact)
+              SsIconButton(
+                key: const ValueKey<String>('toolbar-publish'),
+                icon: SsIcons.globe,
+                semanticLabel: 'Publish',
+                onPressed: onPublish,
+              )
+            else
+              SsButton(
+                key: const ValueKey<String>('toolbar-publish'),
+                label: 'Publish',
+                icon: SsIcons.globe,
+                onPressed: onPublish,
+              ),
+          ],
         ],
       ),
     );

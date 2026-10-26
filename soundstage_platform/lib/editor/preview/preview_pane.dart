@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
+import 'package:soundstage_platform/runtime/runtime.dart' show StageTier;
 
 import '../canvas/canvas_controller.dart' show artboardBreakpoints;
 import '../core/editor_controller.dart';
@@ -92,6 +93,18 @@ class _PreviewPaneState extends ConsumerState<PreviewPane> {
                     fractionDigits: 0,
                     onChanged: notifier.setFreeWidth,
                   ),
+                SsDropdown<StageTier>(
+                  key: const ValueKey<String>('preview-tier'),
+                  semanticLabel: 'Player tier',
+                  width: 96,
+                  value: preview.tier,
+                  items: const [
+                    SsDropdownItem(value: StageTier.full, label: 'Full'),
+                    SsDropdownItem(value: StageTier.lite, label: 'Lite'),
+                    SsDropdownItem(value: StageTier.static, label: 'Static'),
+                  ],
+                  onChanged: notifier.setTier,
+                ),
                 SsIconButton(
                   icon: SsIcons.link,
                   semanticLabel: 'Follow the active scene',

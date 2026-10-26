@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/sound_demo.dart';
+import 'package:soundstage_platform/runtime/runtime.dart' show StageTier;
 
 import 'not_found_page.dart';
 
 /// `/play/:id`: the story in `StagePlayer` behind the enter gate, as the
-/// demo harness plays it. `?wheel=native` and `?stats=1` work as before.
+/// demo harness plays it. `?wheel=native` and `?stats=1` work as before;
+/// `?tier=lite|static` plays the reduced tiers (m4.md T4.6).
 class PlayPage extends ConsumerWidget {
   const PlayPage({
     required this.storyId,
     this.wheelNative,
     this.statsOn,
+    this.tier = StageTier.full,
     super.key,
   });
+
+  final StageTier tier;
 
   final String storyId;
   final bool? wheelNative;
@@ -29,6 +34,7 @@ class PlayPage extends ConsumerWidget {
           buildOnEnter: storyId == 'demo-spike',
           wheelNative: wheelNative,
           statsOn: statsOn,
+          tier: tier,
         ),
       ),
       AsyncData() => const NotFoundPage(message: 'Story not found'),

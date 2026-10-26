@@ -74,6 +74,9 @@ abstract interface class CloudBackend {
 
   /// The author's story metadata (`stories/{storyId}`).
   Future<void> setStoryMeta(String storyId, Map<String, Object?> data);
+
+  /// The slug story [storyId] was last published at, or null.
+  Future<String?> publishedSlugOf(String storyId);
 }
 
 class PublishException implements Exception {

@@ -91,6 +91,34 @@ class StageAnimator implements StageNodeListener {
 
   Map<String, double> _clockOverrides;
 
+  Map<String, double> _heldClocks = const {};
+
+  /// Play mode: clocks held at a value (clock id → value) whatever the
+  /// scroll position or pointer says (the lite player tier holds scroll
+  /// clocks at each scene's poster clock, m4.md T4.6). Timelines and audio
+  /// are not held.
+  Map<String, double> get heldClocks => _heldClocks;
+  set heldClocks(Map<String, double> value) {
+    if (identical(value, _heldClocks)) return;
+    _heldClocks = value;
+    if (mode == StageRenderMode.edit) return;
+    for (final c in _clocks) {
+      final v = value[c.clock.id];
+      if (v != null && _hold(c, v)) _external(c, immediate: true);
+    }
+    _flush();
+  }
+
+  /// Sets [c]'s source to [v] when it is a scroll or pointer source.
+  bool _hold(_Clock c, double v) {
+    final source = c.source;
+    if (source is! StageSceneScrollSource && source is! StagePointerSource) {
+      return false;
+    }
+    (source as StageValueClockSource).value = v;
+    return true;
+  }
+
   /// Edit mode: clock values by clock id (the editor's playheads).
   Map<String, double> get clockOverrides => _clockOverrides;
   set clockOverrides(Map<String, double> value) {
@@ -305,6 +333,9 @@ class StageAnimator implements StageNodeListener {
       c.smoother.smoothing = 0;
       source.reducedMotionChanged(reduced: true);
     }
+    if (_heldClocks[clock.id] case final v? when mode != StageRenderMode.edit) {
+      _hold(c, v);
+    }
     c.value = mode == StageRenderMode.edit ? _frozenValue(c) : source.value;
     c.smoother.reset(c.value);
     return c;
@@ -389,7 +420,9 @@ class StageAnimator implements StageNodeListener {
       for (var i = 0; i < clocks.length; i++) {
         final c = clocks[i];
         final source = c.source;
-        if (source is StageValueClockSource) source.value = progress;
+        if (source is StageValueClockSource) {
+          source.value = _heldClocks[c.clock.id] ?? progress;
+        }
         // Only the scene's own nodes may change during its layout.
         _external(c, immediate: c.sceneId == sceneId);
       }
@@ -405,6 +438,7 @@ class StageAnimator implements StageNodeListener {
     for (final c in _clocks) {
       final source = c.source;
       if (source is! StagePointerSource) continue;
+      if (_heldClocks.containsKey(c.clock.id)) continue;
       final box = registry[source.frameId];
       var v = 0.0;
       if (globalPosition != null &&

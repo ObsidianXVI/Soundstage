@@ -9,6 +9,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../animator/node_registry.dart';
 import '../animator/stage_animator.dart';
+import '../clocks/poster_clocks.dart';
 import '../render/stage_environment.dart';
 import '../scenes/stage_player.dart' show sceneAssetIds, sceneFontFamilyIds;
 import '../widgets/stage_node_widget.dart' show StageScope;
@@ -58,10 +59,12 @@ Future<Uint8List?> renderStagePoster(
     registry: registry,
     vsync: const _NoVsync(),
     mode: StageRenderMode.edit,
-    clockOverrides: {
-      for (final c in scene.clocks)
-        if (c is ir.SceneScrollClock) c.id: at,
-    },
+    clockOverrides: source == null
+        ? {
+            for (final c in scene.clocks)
+              if (c is ir.SceneScrollClock) c.id: at,
+          }
+        : posterClockValues(source, at: at),
   );
   final env = environment.copyWith(mode: StageRenderMode.edit, nodes: registry);
   final size = Size(bp.designSize.width, bp.designSize.height);

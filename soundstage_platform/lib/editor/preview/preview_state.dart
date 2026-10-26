@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:soundstage_platform/runtime/runtime.dart' show StageTier;
 
 /// Narrowest and widest free preview width.
 const double kPreviewMinFreeWidth = 200;
@@ -20,6 +21,7 @@ class PreviewState {
     this.freeWidth = 800,
     this.muted = false,
     this.follow = false,
+    this.tier = StageTier.full,
   });
 
   /// Whether the canvas area is split.
@@ -40,6 +42,9 @@ class PreviewState {
   /// Scroll the preview to the active scene whenever it changes.
   final bool follow;
 
+  /// The player tier previewed (m4.md T4.6).
+  final StageTier tier;
+
   bool get free => breakpointId == kPreviewFreeWidth;
 
   PreviewState copyWith({
@@ -49,6 +54,7 @@ class PreviewState {
     double? freeWidth,
     bool? muted,
     bool? follow,
+    StageTier? tier,
   }) => PreviewState(
     open: open ?? this.open,
     fraction: fraction ?? this.fraction,
@@ -56,6 +62,7 @@ class PreviewState {
     freeWidth: freeWidth ?? this.freeWidth,
     muted: muted ?? this.muted,
     follow: follow ?? this.follow,
+    tier: tier ?? this.tier,
   );
 }
 
@@ -82,6 +89,7 @@ class PreviewNotifier extends Notifier<PreviewState> {
   void setFreeWidth(double width) => chooseFree(width);
   void toggleMuted() => state = state.copyWith(muted: !state.muted);
   void toggleFollow() => state = state.copyWith(follow: !state.follow);
+  void setTier(StageTier tier) => state = state.copyWith(tier: tier);
 }
 
 final previewProvider = NotifierProvider<PreviewNotifier, PreviewState>(

@@ -10,6 +10,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 import '../animator/node_registry.dart';
 import '../animator/stage_animator.dart';
 import '../clocks/clock_source.dart';
+import '../clocks/poster_clocks.dart';
 import '../clocks/timeline_clock.dart';
 import '../interactions/open_url.dart';
 import '../interactions/stage_interactions.dart';
@@ -66,6 +67,25 @@ class StagePlayerController {
   double? clockValue(String clockId) => _animator?.clockValue(clockId);
 }
 
+/// How much of a story plays (m4.md T4.6, DECISIONS 26/10/26 #6).
+/// - `full`: everything.
+/// - `lite`: reduced motion forced. Scroll and pointer clocks hold each
+///   scene's poster clock (the composed state, no animation), pinned scenes
+///   are one viewport long, no transitions, no autoplay or marquee. Scrolling,
+///   taps, carousels by hand, lightboxes and video controls still work.
+/// - `static`: no interactivity at all. Every scene is rendered at its
+///   poster clock, one viewport each, with behaviours as authored, videos
+///   on their first frame and no interactions or scene audio.
+enum StageTier {
+  full,
+  lite,
+  static;
+
+  /// The tier named [name] (`full`, `lite`, `static`), or [full].
+  static StageTier parse(String? name) =>
+      values.where((t) => t.name == name).firstOrNull ?? full;
+}
+
 /// Plays a story (architecture §14): one [SliverStageScene] per scene in a
 /// `CustomScrollView`, with clocks and the animator driving the stage's
 /// render objects.
@@ -78,6 +98,7 @@ class StagePlayerController {
 ///   makes pointer and behaviour clocks inert, and shows error boxes.
 /// - [viewportOverride] renders at a fixed viewport size (editor canvas,
 ///   tests) instead of the available space.
+/// - [tier] reduces the story to its lite or static form (play mode only).
 /// - [initialSceneId] scrolls to that scene's start after the first layout.
 /// - [clockFactories] plugs in `audio` (T0.7) and `behavior` (M3) clocks.
 /// - [audio] plays the document's audio tracks: its clock sources back
@@ -92,6 +113,7 @@ class StagePlayer extends StatefulWidget {
     super.key,
     required this.document,
     this.mode = StageRenderMode.play,
+    this.tier = StageTier.full,
     this.viewportOverride,
     this.initialSceneId,
     this.clockOverrides = const {},
@@ -106,6 +128,7 @@ class StagePlayer extends StatefulWidget {
 
   final ir.StageDocument document;
   final StageRenderMode mode;
+  final StageTier tier;
   final Size? viewportOverride;
   final String? initialSceneId;
 
@@ -187,10 +210,61 @@ class _StagePlayerState extends State<StagePlayer>
 
   void _audioChanged() => _animator.notifyClockChanged();
 
+  /// The tier in effect (the editor's edit mode is always full).
+  StageTier get _tier =>
+      widget.mode == StageRenderMode.play ? widget.tier : StageTier.full;
+
+  /// Static stories freeze their clocks like the editor does.
+  StageRenderMode get _animatorMode =>
+      _tier == StageTier.static ? StageRenderMode.edit : widget.mode;
+
+  StageRenderMode _envModeFor(StagePlayer w) =>
+      w.mode == StageRenderMode.play && w.tier == StageTier.static
+      ? StageRenderMode.still
+      : w.mode;
+
+  ir.StageDocument? _posterDoc;
+  Map<String, double> _posters = const {};
+  Map<String, double> _held = const {};
+
+  /// Every clock at its scene's poster state (static), and (for [_held],
+  /// lite) the scroll and pointer clocks among them, for
+  /// [widget.document].
+  void _updatePosters() {
+    final doc = widget.document;
+    if (identical(doc, _posterDoc)) return;
+    _posterDoc = doc;
+    _posters = {for (final s in doc.scenes) ...posterClockValues(s)};
+    _held = {
+      for (final s in doc.scenes)
+        for (final c in s.clocks)
+          if (c is ir.SceneScrollClock || c is ir.PointerClock)
+            c.id: _posters[c.id]!,
+    };
+  }
+
+  Map<String, double> get _overrides {
+    if (_tier != StageTier.static) return widget.clockOverrides;
+    _updatePosters();
+    return _posters;
+  }
+
+  Map<String, double> get _heldClocks {
+    if (_tier != StageTier.lite) return const {};
+    _updatePosters();
+    return _held;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _applyReducedMotion();
+  }
+
+  void _applyReducedMotion() {
+    final reduced =
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ||
+        _tier != StageTier.full;
     if (reduced == _reducedMotion) return;
     _reducedMotion = reduced;
     _animator.reducedMotion = reduced;
@@ -208,19 +282,20 @@ class _StagePlayerState extends State<StagePlayer>
       (w.environment ??
               StageEnvironment.forDocument(
                 w.document,
-                mode: w.mode,
+                mode: _envModeFor(w),
                 imageCache: _images,
               ))
-          .copyWith(mode: w.mode, nodes: _registry);
+          .copyWith(mode: _envModeFor(w), nodes: _registry);
 
   StageAnimator _newAnimator() =>
       StageAnimator(
           registry: _registry,
           vsync: this,
-          mode: widget.mode,
-          clockOverrides: widget.clockOverrides,
+          mode: _animatorMode,
+          clockOverrides: _overrides,
           factories: _factories,
         )
+        ..heldClocks = _heldClocks
         ..reducedMotion = _reducedMotion
         ..onClockValue = _onClockValue;
 
@@ -250,7 +325,8 @@ class _StagePlayerState extends State<StagePlayer>
   Map<String, ir.IrValue> _variables = const {};
   Map<String, ir.IrValue>? _resolvedVariables;
 
-  bool get _interactive => widget.mode == StageRenderMode.play;
+  bool get _interactive =>
+      widget.mode == StageRenderMode.play && widget.tier != StageTier.static;
 
   void _onClockValue(String clockId, double value) {
     if (_interactive) _interactions.clock(clockId, value);
@@ -343,6 +419,7 @@ class _StagePlayerState extends State<StagePlayer>
     final envChanged =
         !identical(old.environment, widget.environment) ||
         old.mode != widget.mode ||
+        old.tier != widget.tier ||
         (widget.environment == null &&
             !identical(old.document, widget.document));
     if (envChanged) _env = _environmentFor(widget);
@@ -351,6 +428,7 @@ class _StagePlayerState extends State<StagePlayer>
       widget.audio?.addClockListener(_audioChanged);
     }
     if (old.mode != widget.mode ||
+        old.tier != widget.tier ||
         !identical(old.audio, widget.audio) ||
         !identical(old.clockFactories, widget.clockFactories)) {
       _detachController(old.controller);
@@ -358,8 +436,12 @@ class _StagePlayerState extends State<StagePlayer>
       _animator = _newAnimator();
       _resolved = null; // reload into the new animator
       _attachController(widget.controller);
+      _applyReducedMotion();
+      _animator.reducedMotion = _reducedMotion;
     } else {
-      _animator.clockOverrides = widget.clockOverrides;
+      _animator
+        ..clockOverrides = _overrides
+        ..heldClocks = _heldClocks;
       if (!identical(old.controller, widget.controller)) {
         _detachController(old.controller);
         _attachController(widget.controller);
@@ -412,16 +494,19 @@ class _StagePlayerState extends State<StagePlayer>
 
   List<Widget> _buildSlivers(ir.ResolvedDocument resolved, Size viewport) {
     final scenes = resolved.scenes;
+    // Lite and static stories don't move with the scroll: a pinned scene is
+    // one viewport, and scenes simply follow each other.
+    final reduced = _tier != StageTier.full;
     return [
       for (final (i, scene) in scenes.indexed)
         SliverStageScene(
           key: _sceneKeys.putIfAbsent(scene.id, GlobalKey.new),
           kind: scene.kind,
-          scrollLength: scene.scrollLength,
-          transitionIn: i == 0
+          scrollLength: reduced ? 0 : scene.scrollLength,
+          transitionIn: i == 0 || reduced
               ? const ir.SceneTransition()
               : scene.transitionIn,
-          nextTransition: i + 1 < scenes.length
+          nextTransition: i + 1 < scenes.length && !reduced
               ? scenes[i + 1].transitionIn
               : const ir.SceneTransition(),
           estimatedExtent: scene.root.node.common.height,
@@ -433,7 +518,7 @@ class _StagePlayerState extends State<StagePlayer>
               progress: progress,
               visible: visible,
             );
-            if (widget.mode == StageRenderMode.play) {
+            if (_interactive) {
               widget.audio?.sceneVisibilityChanged(scene.id, visible: visible);
               _interactions.sceneVisible(scene.id, visible: visible);
             }
@@ -651,7 +736,7 @@ class _StagePlayerState extends State<StagePlayer>
         }
         _maybeJumpToInitialScene();
         _restoreAnchor();
-        return StageScope(
+        final stage = StageScope(
           environment: _env,
           child: MouseRegion(
             opaque: false,
@@ -711,6 +796,13 @@ class _StagePlayerState extends State<StagePlayer>
               ),
             ),
           ),
+        );
+        if (_tier == StageTier.full) return stage;
+        // Behaviours, media and lightboxes read reduced motion from here.
+        return MediaQuery(
+          data: (MediaQuery.maybeOf(context) ?? const MediaQueryData())
+              .copyWith(disableAnimations: true),
+          child: stage,
         );
       },
     );
