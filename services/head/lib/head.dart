@@ -96,3 +96,42 @@ String injectHead(String html, StoryHead head) {
       : out.replaceFirst('</head>', '  $desc\n</head>');
   return out.replaceFirst('</head>', '$tags</head>');
 }
+
+/// A published story in the sitemap: its slug and when it last changed.
+typedef SitemapEntry = ({String slug, String? lastModified});
+
+/// The entries of one Firestore REST list page of `published` (document
+/// names end in the slug; `updatedAt` is a timestamp value).
+List<SitemapEntry> sitemapEntries(Map<String, Object?> page) {
+  final docs = (page['documents'] as List<Object?>?) ?? const [];
+  return [
+    for (final d in docs.whereType<Map<String, Object?>>())
+      if (d['name'] case final String name)
+        if (_slugPattern.hasMatch(name.split('/').last))
+          (
+            slug: name.split('/').last,
+            lastModified: switch (d['fields']) {
+              {'updatedAt': {'timestampValue': final String t}} => t,
+              _ => null,
+            },
+          ),
+  ];
+}
+
+/// `sitemap.xml` for [site] (no trailing slash): the home page and every
+/// published story.
+String sitemapXml(String site, Iterable<SitemapEntry> entries) {
+  final out = StringBuffer()
+    ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
+    ..writeln('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    ..writeln('  <url><loc>${escapeHtml('$site/')}</loc></url>');
+  for (final e in entries) {
+    out.write('  <url><loc>${escapeHtml('$site/s/${e.slug}')}</loc>');
+    if (e.lastModified case final t?) {
+      out.write('<lastmod>${escapeHtml(t)}</lastmod>');
+    }
+    out.writeln('</url>');
+  }
+  out.writeln('</urlset>');
+  return out.toString();
+}

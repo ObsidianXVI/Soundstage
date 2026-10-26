@@ -70,4 +70,31 @@ void main() {
     expect(out, isNot(contains('og:description')));
     expect(out, contains('content="summary"'));
   });
+
+  test('sitemap from a Firestore list page', () {
+    final entries = sitemapEntries({
+      'documents': [
+        {
+          'name': 'projects/p/databases/(default)/documents/published/night',
+          'fields': {
+            'updatedAt': {'timestampValue': '2026-10-26T04:00:00Z'},
+          },
+        },
+        {'name': 'projects/p/databases/(default)/documents/published/x2'},
+        {'name': 'projects/p/databases/(default)/documents/published/Bad'},
+      ],
+    });
+    expect(entries.map((e) => e.slug), ['night', 'x2']);
+    final xml = sitemapXml('https://site', entries);
+    expect(xml, contains('<loc>https://site/</loc>'));
+    expect(
+      xml,
+      contains(
+        '<url><loc>https://site/s/night</loc>'
+        '<lastmod>2026-10-26T04:00:00Z</lastmod></url>',
+      ),
+    );
+    expect(xml, contains('<url><loc>https://site/s/x2</loc></url>'));
+    expect(sitemapEntries({}), isEmpty);
+  });
 }

@@ -1,0 +1,9 @@
+# Published stories (/s/<slug>) are public; the editor, local players and
+# demos are not content.
+User-agent: *
+Allow: /s/
+Disallow: /edit/
+Disallow: /play/
+Disallow: /demo/
+
+Sitemap: https://project-soundstage.web.app/sitemap.xml

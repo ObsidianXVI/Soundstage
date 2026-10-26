@@ -34,6 +34,18 @@ Future<void> _handle(HttpRequest request) async {
       res.statusCode = HttpStatus.methodNotAllowed;
       return;
     }
+    if (request.uri.path == '/sitemap.xml') {
+      final body = sitemapXml(_site, await _publishedEntries());
+      res
+        ..headers.contentType = ContentType(
+          'application',
+          'xml',
+          charset: 'utf-8',
+        )
+        ..headers.set('cache-control', 'public, max-age=3600, s-maxage=3600');
+      if (request.method == 'GET') res.write(body);
+      return;
+    }
     final shell = await _shell();
     final slug = slugFromPath(request.uri.path);
     var status = HttpStatus.ok;
@@ -107,6 +119,32 @@ Future<Map<String, Object?>?> _published(String slug) async {
   if (status == HttpStatus.notFound) return null;
   if (status != HttpStatus.ok) throw HttpException('firestore: $status');
   return jsonDecode(body) as Map<String, Object?>;
+}
+
+/// Every published slug (at most 5,000; a sitemap holds 50,000).
+Future<List<SitemapEntry>> _publishedEntries() async {
+  final out = <SitemapEntry>[];
+  String? pageToken;
+  for (var page = 0; page < 20; page++) {
+    final uri =
+        Uri.parse(
+          'https://firestore.googleapis.com/v1/projects/$_project/databases/'
+          '(default)/documents/published',
+        ).replace(
+          queryParameters: {
+            'pageSize': '250',
+            'mask.fieldPaths': 'updatedAt',
+            'pageToken': ?pageToken,
+          },
+        );
+    final (status, body) = await _get(uri, bearer: await _token());
+    if (status != HttpStatus.ok) throw HttpException('firestore: $status');
+    final json = jsonDecode(body) as Map<String, Object?>;
+    out.addAll(sitemapEntries(json));
+    pageToken = json['nextPageToken'] as String?;
+    if (pageToken == null) break;
+  }
+  return out;
 }
 
 String? _tokenValue;
