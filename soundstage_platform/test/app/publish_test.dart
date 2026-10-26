@@ -133,11 +133,12 @@ void main() {
       bytesOf: _bytes,
     );
     await go();
-    final first = b.uploads; // 3 assets files + 1 document
-    expect(first, 4);
+    // 3 asset files, the document, the library chunk and the manifest.
+    final first = b.uploads;
+    expect(first, 6);
     final r = await go();
     expect(r.version, 2);
-    expect(b.uploads - first, 1); // only the new document
+    expect(b.uploads - first, 2); // the new document and manifest
   });
 
   test('a slug owned by someone else, or signed out, is refused', () async {
@@ -192,12 +193,113 @@ void main() {
       expect(b.fetch(image), [9, 9]);
       final uploads = b.uploads;
       await go(() async => Uint8List.fromList([9, 9]));
-      expect(b.uploads - uploads, 1); // the document only
+      expect(b.uploads - uploads, 2); // the document and manifest only
       await go(() async => throw StateError('no renderer'));
       expect(b.records['covered']!.image, isEmpty);
       expect(b.records['covered']!.version, 3);
     },
   );
+
+  test(
+    'chunked: manifest, library and scene chunks open scene by scene',
+    () async {
+      final ids = IdGenerator.seeded(9);
+      final base = _doc();
+      Scene scene(String name) => Scene.blankPinned(
+        ids: ids,
+        breakpoint: base.breakpoints.first,
+        name: name,
+      );
+      final scenes = [scene('One'), scene('Two'), scene('Three')];
+      final textId = ids.next();
+      StageDocument withScenes(String text) {
+        final two = scenes[1];
+        return base.copyWith(
+          scenes: [
+            scenes[0],
+            two.copyWith(
+              root: two.root.copyWith(
+                children: [
+                  TextNode(
+                    common: NodeCommon(id: textId, width: 100, height: 20),
+                    content: [
+                      Paragraph(spans: [Span(text: text)]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            scenes[2],
+          ],
+        );
+      }
+
+      final doc = withScenes('hello');
+      final b = FakeBackend('u1');
+      await publishStory(
+        doc,
+        storyId: 'st',
+        slug: 'chunky',
+        backend: b,
+        bytesOf: _bytes,
+      );
+      final rec = b.records['chunky']!;
+      expect(rec.manifest, 'published/u1/chunky/v1.manifest.json');
+      final story = await openPublished(
+        'chunky',
+        backend: b,
+        fetch: (u) async => b.fetch(u),
+      );
+      final chunkedStory = story! as ChunkedPublishedStory;
+      final chunked = chunkedStory.chunked;
+      final two = chunked.document.scenes[1];
+      expect(two.root.children, isEmpty, reason: 'a stub until fetched');
+      expect(two.root.common.height, doc.scenes[1].root.common.height);
+      expect(chunked.document.assets['img']!.uri, startsWith('https://'));
+      final one = chunked.document.scenes[0];
+      expect(await chunkedStory.loadScene(two.id), isTrue);
+      expect(await chunkedStory.loadScene(two.id), isFalse, reason: 'once');
+      expect(chunked.document.scenes[1].root.children, hasLength(1));
+      expect(identical(chunked.document.scenes[0], one), isTrue);
+      expect(chunked.complete, isFalse);
+
+      // Republishing with one scene changed sends only that scene's chunk
+      // (plus the document and the manifest).
+      final before = b.uploads;
+      await publishStory(
+        withScenes('changed'),
+        storyId: 'st',
+        slug: 'chunky',
+        backend: b,
+        bytesOf: _bytes,
+      );
+      expect(b.uploads - before, 3);
+    },
+  );
+
+  test('versions published before chunking open whole', () async {
+    final b = FakeBackend('u1');
+    await publishStory(
+      _doc(),
+      storyId: 'st',
+      slug: 'old',
+      backend: b,
+      bytesOf: _bytes,
+    );
+    final r = b.records['old']!;
+    b.records['old'] = PublishedRecord(
+      ownerId: r.ownerId,
+      storyId: r.storyId,
+      version: r.version,
+      path: r.path,
+    );
+    final story = await openPublished(
+      'old',
+      backend: b,
+      fetch: (u) async => b.fetch(u),
+    );
+    expect(story, isA<WholePublishedStory>());
+  });
 
   test('missing files are reported, not fatal', () async {
     final b = FakeBackend('u1');

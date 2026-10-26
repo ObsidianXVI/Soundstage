@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -6,6 +7,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../persistence/local_asset_store.dart' show extensionForMime;
 import '../persistence/story_package.dart' show AssetBytesSource;
+import 'chunks.dart';
 
 /// The published pointer of a slug (Firestore `published/{slug}`, m4.md
 /// T4.2): who owns it, which story, which frozen version and where its
@@ -19,6 +21,7 @@ class PublishedRecord {
     this.title = '',
     this.description = '',
     this.image = '',
+    this.manifest = '',
   });
 
   factory PublishedRecord.fromMap(Map<String, Object?> m) => PublishedRecord(
@@ -29,6 +32,7 @@ class PublishedRecord {
     title: (m['title'] as String?) ?? '',
     description: (m['description'] as String?) ?? '',
     image: (m['image'] as String?) ?? '',
+    manifest: (m['manifest'] as String?) ?? '',
   );
 
   final String ownerId;
@@ -44,6 +48,11 @@ class PublishedRecord {
   /// or empty.
   final String image;
 
+  /// The Storage path of the chunked manifest
+  /// (`published/<uid>/<slug>/v<n>.manifest.json`), or empty for versions
+  /// published before chunking (T4.4).
+  final String manifest;
+
   Map<String, Object?> toMap() => {
     'ownerId': ownerId,
     'storyId': storyId,
@@ -52,6 +61,7 @@ class PublishedRecord {
     'title': title,
     'description': description,
     'image': image,
+    'manifest': manifest,
   };
 }
 
@@ -130,7 +140,10 @@ String slugFor(String title) {
 ///    image sequences as numbered frames);
 /// 2. the document, its URIs rewritten to public URLs, goes to
 ///    `published/<uid>/<slug>/v<n>.stage.json`;
-/// 3. `published/<slug>` points at it, and the story's metadata records
+/// 3. the same document in chunks (architecture §17.3): a content-named
+///    library chunk and scene chunks (unchanged scenes are not re-sent),
+///    and `v<n>.manifest.json` pointing at them;
+/// 4. `published/<slug>` points at both, and the story's metadata records
 ///    the link.
 ///
 /// [cover] renders the link-preview image (PNG); it is uploaded
@@ -249,6 +262,32 @@ Future<PublishResult> publishStory(
     Uint8List.fromList(utf8.encode(jsonEncode(frozen.toJson()))),
     'application/json',
   );
+
+  final chunks = splitDocument(frozen);
+  Future<String> putJson(String stem, Object? json) async {
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(json)));
+    final path = await put(
+      '$stem-${_short(contentHash(bytes))}.json',
+      bytes,
+      'application/json',
+    );
+    return backend.publicUrl(path);
+  }
+
+  final manifestPath = '$base/v$version.manifest.json';
+  final manifest = {
+    ...chunks.manifest,
+    'library': await putJson('$base/library', chunks.library),
+    'chunks': {
+      for (final MapEntry(:key, :value) in chunks.scenes.entries)
+        key: await putJson('$base/scenes/$key', value),
+    },
+  };
+  await backend.upload(
+    manifestPath,
+    Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
+    'application/json',
+  );
   await backend.setPublished(
     slug,
     PublishedRecord(
@@ -259,6 +298,7 @@ Future<PublishResult> publishStory(
       title: doc.meta.title,
       description: doc.meta.description,
       image: image,
+      manifest: manifestPath,
     ),
   );
   await backend.setStoryMeta(storyId, {
@@ -272,7 +312,71 @@ Future<PublishResult> publishStory(
 
 String _short(String hash) => hash.substring(0, 12);
 
-/// Loads the published document at [slug], or null when nothing is
+/// A published story as the player opens it: the whole document, or a
+/// chunked one that fills in scene by scene.
+sealed class PublishedStory {
+  const PublishedStory();
+}
+
+class WholePublishedStory extends PublishedStory {
+  const WholePublishedStory(this.document);
+
+  final ir.StageDocument document;
+}
+
+class ChunkedPublishedStory extends PublishedStory {
+  ChunkedPublishedStory(this.chunked, this._fetch);
+
+  final ChunkedDocument chunked;
+  final Future<Uint8List> Function(String url) _fetch;
+  final Map<String, Future<bool>> _pending = {};
+
+  /// Fetches scene [sceneId]'s chunk once (concurrent calls share it).
+  /// Completes with whether the document changed.
+  Future<bool> loadScene(String sceneId) {
+    if (chunked.isLoaded(sceneId)) return Future.value(false);
+    return _pending[sceneId] ??= () async {
+      final url = chunked.chunkPath(sceneId);
+      if (url == null) return false;
+      try {
+        final json = jsonDecode(utf8.decode(await _fetch(url)));
+        return chunked.addScene((json as Map).cast<String, Object?>());
+      } finally {
+        unawaited(_pending.remove(sceneId));
+      }
+    }();
+  }
+}
+
+/// Opens the published story at [slug] (null when nothing is published
+/// there): its manifest and library chunk when the version is chunked,
+/// else its whole document. [fetch] gets bytes from a URL.
+Future<PublishedStory?> openPublished(
+  String slug, {
+  required CloudBackend backend,
+  required Future<Uint8List> Function(String url) fetch,
+}) async {
+  final record = await backend.published(slug);
+  if (record == null) return null;
+  Future<Map<String, Object?>> json(String url) async =>
+      (jsonDecode(utf8.decode(await fetch(url))) as Map)
+          .cast<String, Object?>();
+  if (record.manifest.isNotEmpty) {
+    final manifest = await json(backend.publicUrl(record.manifest));
+    final library = await json(manifest['library']! as String);
+    return ChunkedPublishedStory(
+      ChunkedDocument.open(manifest, library),
+      fetch,
+    );
+  }
+  final loaded = ir.loadDocument(
+    utf8.decode(await fetch(backend.publicUrl(record.path))),
+  );
+  final doc = loaded.document;
+  return doc == null ? null : WholePublishedStory(doc);
+}
+
+/// Loads the whole published document at [slug], or null when nothing is
 /// published there. [fetch] gets bytes from a URL.
 Future<ir.LoadResult?> loadPublished(
   String slug, {

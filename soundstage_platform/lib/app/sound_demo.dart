@@ -86,10 +86,14 @@ class GatedStagePlayer extends StatefulWidget {
     this.wheelNative,
     this.statsOn,
     this.tier = StageTier.full,
+    this.onSceneNear,
   });
 
   final ir.StageDocument document;
   final StageTier tier;
+
+  /// See `StagePlayer.onSceneNear` (chunked published stories).
+  final ValueChanged<String>? onSceneNear;
   final Offset coverFocal;
   final bool buildOnEnter;
   final bool? wheelNative;
@@ -185,6 +189,7 @@ class _GatedStagePlayerState extends State<GatedStagePlayer> {
       audio: _audio,
       controller: _controller,
       wheelSmoothing: demoWheelSmoothing(widget.wheelNative),
+      onSceneNear: widget.onSceneNear,
     );
     if (widget.tier == StageTier.static) return player;
     return StageEnterGate(

@@ -129,4 +129,31 @@ void main() {
     await tester.pump();
     expect(controller.animator!.clockValue('sc'), closeTo(0.5, 1e-9));
   });
+
+  testWidgets('onSceneNear reports scenes entering the lazy window', (
+    tester,
+  ) async {
+    setViewport(tester, _viewport);
+    final near = <String>[];
+    final controller = StagePlayerController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StagePlayer(
+          document: _doc(),
+          controller: controller,
+          lazyWindow: 0,
+          onSceneNear: near.add,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(near, ['a']);
+    controller.scrollController!.jumpTo(2000);
+    await tester.pump();
+    expect(near, ['a', 'b']);
+    controller.scrollController!.jumpTo(0);
+    await tester.pump();
+    // Re-entering reports again (the chunk loader fetches once).
+    expect(near, ['a', 'b', 'a']);
+  });
 }

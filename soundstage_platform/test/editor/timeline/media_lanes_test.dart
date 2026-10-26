@@ -41,9 +41,7 @@ StageDocument _audioDoc() {
         mime: 'audio/mpeg',
       ),
     },
-    audioTracks: [
-      const AudioTrack(id: 'at', assetId: 'snd', lyrics: _lyrics),
-    ],
+    audioTracks: [const AudioTrack(id: 'at', assetId: 'snd', lyrics: _lyrics)],
     scenes: [
       s1.copyWith(
         clocks: [

@@ -35,20 +35,27 @@ void main() {
     decoder = () => _peaks([1, 2, 3], 0.03);
   });
 
-  test('upload decodes audio once and stores the peaks with the record', () async {
-    final s = store();
-    final a = await s.put(Uint8List.fromList([1]), 'audio/mpeg', name: 'a.mp3');
-    expect(decodes, 1);
-    final rec = await db.getAsset(a.id);
-    expect(rec!.meta.peaks, [1, 2, 3]);
-    // The analyzer found no duration, so the decode's duration is stored.
-    expect(rec.meta.duration, 0.03);
-    expect(a.duration, 0.03);
-    // A request reads the stored peaks; nothing is decoded again.
-    final p = await s.peaks(a.id);
-    expect(p!.data, [1, 2, 3]);
-    expect(decodes, 1);
-  });
+  test(
+    'upload decodes audio once and stores the peaks with the record',
+    () async {
+      final s = store();
+      final a = await s.put(
+        Uint8List.fromList([1]),
+        'audio/mpeg',
+        name: 'a.mp3',
+      );
+      expect(decodes, 1);
+      final rec = await db.getAsset(a.id);
+      expect(rec!.meta.peaks, [1, 2, 3]);
+      // The analyzer found no duration, so the decode's duration is stored.
+      expect(rec.meta.duration, 0.03);
+      expect(a.duration, 0.03);
+      // A request reads the stored peaks; nothing is decoded again.
+      final p = await s.peaks(a.id);
+      expect(p!.data, [1, 2, 3]);
+      expect(decodes, 1);
+    },
+  );
 
   test('images and video are not decoded for peaks', () async {
     final s = store();

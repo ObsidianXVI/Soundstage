@@ -263,20 +263,23 @@ void main() {
   });
 
   group('R2: replace after a mobile-only image set with This breakpoint', () {
-    test('the mobile artboard resolves the new image; desktop keeps its own', () {
-      final c = editorContainer(_doc(fills: const [_paint]));
-      // "This breakpoint" on mobile: the asset tile (SetImageFill) gives
-      // mobile its own image.
-      c.ctl.setEditScope(EditScope.thisBreakpoint);
-      c.ctl.setEditingBreakpoint('mobile');
-      c.ctl.execute(SetImageFill(['b'], 'img2'));
-      expect(_imageAt(c, 'mobile').assetId, 'img2');
-      expect(_imageAt(c, 'desktop').assetId, 'img1');
-      // Content mode replaces the image mobile shows.
-      c.ctl.setEditScope(EditScope.both);
-      c.ctl.execute(_replace('mobile'));
-      expect(_imageAt(c, 'mobile').assetId, 'new');
-      expect(_imageAt(c, 'desktop').assetId, 'img1');
-    });
+    test(
+      'the mobile artboard resolves the new image; desktop keeps its own',
+      () {
+        final c = editorContainer(_doc(fills: const [_paint]));
+        // "This breakpoint" on mobile: the asset tile (SetImageFill) gives
+        // mobile its own image.
+        c.ctl.setEditScope(EditScope.thisBreakpoint);
+        c.ctl.setEditingBreakpoint('mobile');
+        c.ctl.execute(SetImageFill(['b'], 'img2'));
+        expect(_imageAt(c, 'mobile').assetId, 'img2');
+        expect(_imageAt(c, 'desktop').assetId, 'img1');
+        // Content mode replaces the image mobile shows.
+        c.ctl.setEditScope(EditScope.both);
+        c.ctl.execute(_replace('mobile'));
+        expect(_imageAt(c, 'mobile').assetId, 'new');
+        expect(_imageAt(c, 'desktop').assetId, 'img1');
+      },
+    );
   });
 }

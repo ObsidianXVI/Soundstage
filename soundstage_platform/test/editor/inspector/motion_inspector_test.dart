@@ -89,10 +89,7 @@ void main() {
       findsOneWidget,
     );
     // The X field shows the animated value, 50.
-    expect(
-      tester.widget<EditableText>(fieldText('x')).controller.text,
-      '50',
-    );
+    expect(tester.widget<EditableText>(fieldText('x')).controller.text, '50');
     await tester.tap(_key('kf-next:x'));
     await tester.pump();
     expect(_st(c).playhead, 1);

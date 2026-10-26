@@ -124,6 +124,7 @@ class StagePlayer extends StatefulWidget {
     this.lazyWindow = 1,
     this.physics,
     this.wheelSmoothing,
+    this.onSceneNear,
   });
 
   final ir.StageDocument document;
@@ -153,6 +154,10 @@ class StagePlayer extends StatefulWidget {
   /// browser's native wheel behaviour). Trackpad, touch and keyboard
   /// scrolling always stay native. See [StageWheelSmoothing].
   final StageWheelSmoothing? wheelSmoothing;
+
+  /// Called (outside the build) when a scene enters the lazy window: a
+  /// chunked published story fetches that scene now (architecture §17.3).
+  final ValueChanged<String>? onSceneNear;
 
   @override
   State<StagePlayer> createState() => _StagePlayerState();
@@ -550,7 +555,13 @@ class _StagePlayerState extends State<StagePlayer>
   void _sceneWindowChanged(String sceneId, bool inWindow, double width) {
     final media = _env.media;
     if (inWindow) {
-      if (!_windowScenes.add(sceneId) || media == null) return;
+      if (!_windowScenes.add(sceneId)) return;
+      if (widget.onSceneNear case final near?) {
+        scheduleMicrotask(() {
+          if (mounted) near(sceneId);
+        });
+      }
+      if (media == null) return;
       final dpr = stageDevicePixelRatio();
       for (final id in _sceneAssets[sceneId] ?? const <String>{}) {
         media.prefetch(id, targetWidth: width * dpr);

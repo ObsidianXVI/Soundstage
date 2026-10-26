@@ -7,7 +7,8 @@ import 'fixtures.dart';
 // The T2.0 follow-ups decided on 26/10/26 (DECISIONS "T2.0 open points
 // answered") and the registry's display names.
 
-Keyframe _kf(String id, double t, IrValue v) => Keyframe(id: id, t: t, value: v);
+Keyframe _kf(String id, double t, IrValue v) =>
+    Keyframe(id: id, t: t, value: v);
 
 const _red = StageColor(r: 1, g: 0, b: 0);
 const _green = StageColor(r: 0, g: 1, b: 0);
@@ -52,20 +53,23 @@ Track _track(EditorState s, String target, String property) => s
     .singleWhere((t) => t.target == target && t.property == property);
 
 void main() {
-  test('T2.0-1: auto-key on a pointer clock writes the start keyframe at 0', () {
-    final c = editorContainer(_doc());
-    c.ctl
-      ..setActiveClock('s1', 'px')
-      ..setActivePlayhead(0.5)
-      ..setAutoKey(true);
-    expectRoundTrip(c, SetProperty(['b1'], 'x', const IrValue.number(40)));
-    final t = _track(c.st, 'b1', 'x');
-    expect(t.clockId, 'px');
-    expect(t.keyframes.map((k) => (k.t, k.value)), [
-      (0.0, const IrValue.number(1)),
-      (0.5, const IrValue.number(40)),
-    ]);
-  });
+  test(
+    'T2.0-1: auto-key on a pointer clock writes the start keyframe at 0',
+    () {
+      final c = editorContainer(_doc());
+      c.ctl
+        ..setActiveClock('s1', 'px')
+        ..setActivePlayhead(0.5)
+        ..setAutoKey(true);
+      expectRoundTrip(c, SetProperty(['b1'], 'x', const IrValue.number(40)));
+      final t = _track(c.st, 'b1', 'x');
+      expect(t.clockId, 'px');
+      expect(t.keyframes.map((k) => (k.t, k.value)), [
+        (0.0, const IrValue.number(1)),
+        (0.5, const IrValue.number(40)),
+      ]);
+    },
+  );
 
   group('T2.0-2: a whole-stack write over an animated sub-path is split', () {
     final colorTrack = Track(
