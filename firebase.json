@@ -7,6 +7,13 @@
     ],
     "rewrites": [
       {
+        "source": "/s/**",
+        "run": {
+          "serviceId": "soundstage-head",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -35,7 +42,25 @@
         ]
       },
       {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
         "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/@(edit|play|demo)/**",
         "headers": [
           {
             "key": "Cache-Control",

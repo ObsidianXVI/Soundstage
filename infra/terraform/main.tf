@@ -15,6 +15,10 @@ locals {
     "firestore.googleapis.com",
     "identitytoolkit.googleapis.com",
     "apikeys.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "iam.googleapis.com",
+    "run.googleapis.com",
     "secretmanager.googleapis.com",
     "storage.googleapis.com",
   ]

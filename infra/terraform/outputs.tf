@@ -26,3 +26,15 @@ output "media_bucket" {
 output "tfstate_bucket" {
   value = google_storage_bucket.tfstate.name
 }
+
+output "head_image" {
+  value = local.head_image
+}
+
+output "builder_service_account" {
+  value = google_service_account.builder.email
+}
+
+output "head_service_url" {
+  value = google_cloud_run_v2_service.head.uri
+}

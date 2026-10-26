@@ -15,3 +15,9 @@ variable "auth_domains" {
   type        = list(string)
   default     = ["localhost", "127.0.0.1"]
 }
+
+variable "head_image_tag" {
+  description = "Tag of the soundstage-head image in Artifact Registry (built with services/head/cloudbuild.yaml)."
+  type        = string
+  default     = "v1"
+}

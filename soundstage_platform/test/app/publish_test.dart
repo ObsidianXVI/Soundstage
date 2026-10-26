@@ -169,6 +169,32 @@ void main() {
     );
   });
 
+  test(
+    'the cover is uploaded once and recorded; a failed render is skipped',
+    () async {
+      final b = FakeBackend('u1');
+      Future<PublishResult> go(Future<Uint8List?> Function() cover) =>
+          publishStory(
+            _doc(),
+            storyId: 'st',
+            slug: 'covered',
+            backend: b,
+            bytesOf: _bytes,
+            cover: cover,
+          );
+      await go(() async => Uint8List.fromList([9, 9]));
+      final image = b.records['covered']!.image;
+      expect(image, startsWith('https://cdn.test/o/'));
+      expect(b.fetch(image), [9, 9]);
+      final uploads = b.uploads;
+      await go(() async => Uint8List.fromList([9, 9]));
+      expect(b.uploads - uploads, 1); // the document only
+      await go(() async => throw StateError('no renderer'));
+      expect(b.records['covered']!.image, isEmpty);
+      expect(b.records['covered']!.version, 3);
+    },
+  );
+
   test('missing files are reported, not fatal', () async {
     final b = FakeBackend('u1');
     final r = await publishStory(

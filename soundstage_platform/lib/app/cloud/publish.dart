@@ -18,6 +18,7 @@ class PublishedRecord {
     required this.path,
     this.title = '',
     this.description = '',
+    this.image = '',
   });
 
   factory PublishedRecord.fromMap(Map<String, Object?> m) => PublishedRecord(
@@ -27,6 +28,7 @@ class PublishedRecord {
     path: m['path']! as String,
     title: (m['title'] as String?) ?? '',
     description: (m['description'] as String?) ?? '',
+    image: (m['image'] as String?) ?? '',
   );
 
   final String ownerId;
@@ -38,6 +40,10 @@ class PublishedRecord {
   final String title;
   final String description;
 
+  /// The public URL of the link-preview image (the first scene's poster),
+  /// or empty.
+  final String image;
+
   Map<String, Object?> toMap() => {
     'ownerId': ownerId,
     'storyId': storyId,
@@ -45,6 +51,7 @@ class PublishedRecord {
     'path': path,
     'title': title,
     'description': description,
+    'image': image,
   };
 }
 
@@ -123,6 +130,10 @@ String slugFor(String title) {
 /// 3. `published/<slug>` points at it, and the story's metadata records
 ///    the link.
 ///
+/// [cover] renders the link-preview image (PNG); it is uploaded
+/// content-named next to the versions. A failed render publishes without
+/// one.
+///
 /// Throws [PublishException] when signed out, the slug is invalid or
 /// belongs to someone else. Assets whose bytes are unavailable keep their
 /// URI and are listed in `warnings`.
@@ -132,6 +143,7 @@ Future<PublishResult> publishStory(
   required String slug,
   required CloudBackend backend,
   required AssetBytesSource bytesOf,
+  Future<Uint8List?> Function()? cover,
 }) async {
   final uid = backend.uid;
   if (uid == null) throw const PublishException('Sign in to publish.');
@@ -212,6 +224,22 @@ Future<PublishResult> publishStory(
     assets: assets,
     meta: doc.meta.copyWith(slug: slug),
   );
+  var image = '';
+  try {
+    final png = await cover?.call();
+    if (png != null) {
+      image = backend.publicUrl(
+        await put(
+          '$base/cover-${_short(contentHash(png))}.png',
+          png,
+          'image/png',
+        ),
+      );
+    }
+  } on Object {
+    image = ''; // the preview image is optional
+  }
+
   final docPath = '$base/v$version.stage.json';
   await backend.upload(
     docPath,
@@ -227,6 +255,7 @@ Future<PublishResult> publishStory(
       path: docPath,
       title: doc.meta.title,
       description: doc.meta.description,
+      image: image,
     ),
   );
   await backend.setStoryMeta(storyId, {

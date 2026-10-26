@@ -1,11 +1,11 @@
 {
-    "name": "soundstage_platform",
-    "short_name": "soundstage_platform",
+    "name": "Soundstage",
+    "short_name": "Soundstage",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Immersive stories on Soundstage.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

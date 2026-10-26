@@ -215,6 +215,13 @@ class StoryActions {
         slug: slug,
         backend: cloud.backend,
         bytesOf: (a) => db?.assetBytes(a) ?? Future.value(null),
+        cover: doc.scenes.isEmpty
+            ? null
+            : () => renderStagePoster(
+                doc,
+                StageEnvironment.forDocument(doc, mode: StageRenderMode.edit),
+                sceneId: doc.scenes.first.id,
+              ),
       );
       // Remember the link in the story (the next publish suggests it).
       if (!s.bundled && doc.meta.slug != slug) {
