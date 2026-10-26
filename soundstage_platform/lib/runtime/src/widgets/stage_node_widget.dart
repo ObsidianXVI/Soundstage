@@ -7,6 +7,8 @@ import '../render/render_stage_shape.dart';
 import '../render/render_stage_text.dart';
 import '../render/stage_environment.dart';
 import 'stage_behaviors.dart';
+import 'stage_embed.dart';
+import 'stage_video.dart';
 
 /// Provides the [StageEnvironment] to every stage widget below it.
 class StageScope extends InheritedWidget {
@@ -129,6 +131,18 @@ class StageNodeWidget extends StatelessWidget {
         paragraphs: node.paragraphs ?? const [],
         environment: env,
         repaintBoundary: boundary,
+      ),
+      final ir.VideoNode v => StageHostWidget(
+        node: v,
+        environment: env,
+        repaintBoundary: boundary,
+        child: StageVideoView(node: v, environment: env),
+      ),
+      final ir.EmbedNode e => StageHostWidget(
+        node: e,
+        environment: env,
+        repaintBoundary: boundary,
+        child: StageEmbedView(node: e, environment: env),
       ),
       final ir.Node other => StageShapeWidget(
         node: other,

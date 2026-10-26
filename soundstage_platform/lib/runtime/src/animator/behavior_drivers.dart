@@ -5,6 +5,7 @@
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../render/render_stage_box.dart';
+import '../render/render_stage_host.dart';
 import '../render/render_stage_lyrics.dart';
 import '../render/render_stage_text.dart';
 import '../render/text/text_reveal.dart';
@@ -65,6 +66,17 @@ List<StageBehaviorDriver> behaviorDriversFor(ir.ResolvedScene scene) {
           break;
       }
     }
+    // Media driven by clocks (m3.md T3.6): embed inputs, video scrubbing.
+    switch (node) {
+      case ir.EmbedNode(:final inputBindings):
+        inputBindings.forEach(
+          (input, clockId) => out.add(HostInputDriver(n.id, input, clockId)),
+        );
+      case ir.VideoNode(:final scrubClockId?):
+        out.add(HostInputDriver(n.id, kVideoTimeInput, scrubClockId));
+      default:
+        break;
+    }
     for (final c in n.children) {
       visit(c);
     }
@@ -72,6 +84,49 @@ List<StageBehaviorDriver> behaviorDriversFor(ir.ResolvedScene scene) {
 
   visit(scene.root);
   return out;
+}
+
+/// The host input a video's scrub clock drives (its 0–1 progress).
+const String kVideoTimeInput = '__time__';
+
+/// Feeds a clock into input [input] of the media node [nodeId] (an embed's
+/// Lottie progress or Rive state-machine input, a video's scrub position);
+/// see [RenderStageHost.setInput].
+class HostInputDriver extends StageBehaviorDriver {
+  HostInputDriver(this.nodeId, this.input, this.clockId);
+
+  final String nodeId;
+  final String input;
+
+  @override
+  final String clockId;
+
+  RenderStageHost? _box;
+
+  /// The clock's last value (the box may attach after it was set).
+  double? _last;
+
+  @override
+  List<String> get targetIds => [nodeId];
+
+  @override
+  void attach(RenderStageBox box) {
+    if (box is! RenderStageHost) return;
+    _box = box;
+    final v = _last;
+    if (v != null) box.setInput(input, v);
+  }
+
+  @override
+  void detach(RenderStageBox box) {
+    if (identical(box, _box)) _box = null;
+  }
+
+  @override
+  void update(double value) {
+    _last = value;
+    _box?.setInput(input, value);
+  }
 }
 
 /// Node ids that behaviours repaint every frame (repaint boundaries).

@@ -46,6 +46,10 @@ class BrowserObjectUrls implements ObjectUrlFactory {
 /// The asset kind of a MIME type, or null when the editor does not handle it.
 ir.AssetKind? assetKindForMime(String mime) {
   final m = mime.toLowerCase();
+  if (m == 'application/x-rive') return ir.AssetKind.rive;
+  if (m == 'application/zip+dotlottie' || m == 'application/json') {
+    return ir.AssetKind.lottie;
+  }
   if (m.startsWith('image/')) return ir.AssetKind.image;
   if (m.startsWith('video/')) return ir.AssetKind.video;
   if (m.startsWith('audio/')) return ir.AssetKind.audio;

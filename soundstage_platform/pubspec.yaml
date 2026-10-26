@@ -40,6 +40,9 @@ dependencies:
     sdk: flutter
   web: ^1.1.1
   archive: ^4.5.2
+  video_player: ^2.14.1
+  lottie: ^3.6.1
+  rive: ^0.14.11
 
 dev_dependencies:
   flutter_test:

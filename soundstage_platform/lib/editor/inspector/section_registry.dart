@@ -6,6 +6,7 @@ import 'sections/auto_layout_section.dart';
 import 'sections/behavior_section.dart';
 import 'sections/component_section.dart';
 import 'sections/effects_section.dart';
+import 'sections/embed_section.dart';
 import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
 import 'sections/grid_section.dart';
@@ -17,6 +18,7 @@ import 'sections/motion_section.dart';
 import 'sections/shape_section.dart';
 import 'sections/stroke_section.dart';
 import 'sections/text_section.dart';
+import 'sections/video_section.dart';
 
 /// One inspector section, in Figma's order. A section is declared by an id
 /// (also its remembered collapse key), a title, the selections it applies to
@@ -68,6 +70,8 @@ final List<InspectorSectionSpec> kInspectorSections = [
   effectsSection,
   gridSection,
   textSection,
+  videoSection,
+  embedSection,
   behaviorSection,
   motionSection,
   interactionsSection,

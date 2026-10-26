@@ -161,7 +161,7 @@ class InsertActions {
         height: size.height,
       );
       frames.add(
-        buildImageFrame(
+        buildMediaNode(
           a,
           gen.next(),
           gen.next(),

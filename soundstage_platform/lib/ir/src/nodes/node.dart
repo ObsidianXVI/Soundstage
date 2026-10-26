@@ -15,6 +15,11 @@ part 'node.g.dart';
 
 /// Primitive shape geometry (architecture §4.1). Vector paths are out of
 /// scope.
+/// Playback controls over a video: none, a play/pause button, or a full bar
+/// (play, time, scrub, mute).
+@JsonEnum()
+enum VideoControls { none, minimal, full }
+
 @Freezed(unionKey: 'type')
 sealed class ShapeGeometry with _$ShapeGeometry {
   @FreezedUnionValue('rectangle')
@@ -142,6 +147,22 @@ sealed class Node with _$Node {
     @Default(true) bool autoplay,
     @Default(true) bool loop,
     @Default(true) bool muted,
+
+    /// Playback controls shown over the video (m3.md T3.6).
+    @Default(VideoControls.none) VideoControls controls,
+
+    /// Trim: play from [startTime] to [endTime] seconds (null: the end).
+    @Default(0) double startTime,
+    double? endTime,
+    @Default(1) double playbackRate,
+    @Default(1) double volume,
+
+    /// Play only while on screen (pause when scrolled away).
+    @Default(true) bool playWhenVisible,
+
+    /// When set, the video does not play: its time follows this clock
+    /// (0–1 progress maps to startTime–endTime), e.g. scrubbed by scroll.
+    String? scrubClockId,
   }) = VideoNode;
 
   /// A Rive or Lottie asset (runtime: M3).

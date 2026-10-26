@@ -152,6 +152,29 @@ ir.FrameNode buildImageFrame(
   clipContent: true,
 );
 
+/// The node that places [asset] in [box]: an image frame, a video, or a
+/// Lottie/Rive embed.
+ir.Node buildMediaNode(ir.Asset asset, String id, String paintId, Rect box) {
+  final common = ir.NodeCommon(
+    id: id,
+    name: asset.name.isEmpty ? asset.kind.name : _stem(asset.name),
+    x: box.left,
+    y: box.top,
+    width: box.width,
+    height: box.height,
+    role: ir.NodeRole.figure,
+    altText: asset.alt,
+  );
+  return switch (asset.kind) {
+    ir.AssetKind.video => ir.VideoNode(common: common, assetId: asset.id),
+    ir.AssetKind.lottie || ir.AssetKind.rive => ir.EmbedNode(
+      common: common.copyWith(role: ir.NodeRole.decorative),
+      assetId: asset.id,
+    ),
+    _ => buildImageFrame(asset, id, paintId, box),
+  };
+}
+
 String _stem(String name) {
   final dot = name.lastIndexOf('.');
   return dot > 0 ? name.substring(0, dot) : name;

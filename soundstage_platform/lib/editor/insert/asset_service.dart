@@ -115,6 +115,8 @@ Future<IngestReport> ingestMedia(
     ir.AssetKind.image,
     ir.AssetKind.audio,
     ir.AssetKind.video,
+    ir.AssetKind.lottie,
+    ir.AssetKind.rive,
   },
   Iterable<ir.Asset> existing = const [],
 }) async {
@@ -183,9 +185,18 @@ final editorFilePickerProvider = Provider<EditorFilePicker>(
   dependencies: const [],
 );
 
+/// MIME types of the embed files (browsers give no type for them).
+const String kRiveMime = 'application/x-rive';
+const String kDotLottieMime = 'application/zip+dotlottie';
+
 /// The asset kind of a MIME type, or null when the editor does not handle it.
+/// A JSON file is a Lottie animation (the only JSON media).
 ir.AssetKind? mediaKindForMime(String mime) {
   final m = mime.toLowerCase();
+  if (m == kRiveMime) return ir.AssetKind.rive;
+  if (m == kDotLottieMime || m == 'application/json') {
+    return ir.AssetKind.lottie;
+  }
   if (m.startsWith('image/')) return ir.AssetKind.image;
   if (m.startsWith('video/')) return ir.AssetKind.video;
   if (m.startsWith('audio/')) return ir.AssetKind.audio;
@@ -219,5 +230,8 @@ String? mimeForFileExtension(String extension) =>
       'otf' => 'font/otf',
       'woff' => 'font/woff',
       'woff2' => 'font/woff2',
+      'riv' => kRiveMime,
+      'lottie' => kDotLottieMime,
+      'json' => 'application/json',
       _ => null,
     };

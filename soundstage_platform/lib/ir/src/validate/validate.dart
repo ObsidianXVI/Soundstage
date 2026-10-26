@@ -779,6 +779,7 @@ class _Validator {
           kind: AssetKind.image,
           nodeId: id,
         );
+        if (n.scrubClockId case final c?) _clock(c, '$loc.scrubClockId');
       case EmbedNode():
         _asset(
           n.assetId,

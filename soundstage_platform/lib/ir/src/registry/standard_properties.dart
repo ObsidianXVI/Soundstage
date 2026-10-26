@@ -1776,6 +1776,71 @@ void _videoProps(_Builder b) {
     animatable: false,
   );
   b.add(
+    'controls',
+    _video,
+    _asVideo.leaf(
+      field(
+        enumC(VideoControls.values),
+        (v) => v.controls,
+        (v, c) => v.copyWith(controls: c),
+      ),
+    ),
+    animatable: false,
+  );
+  b.add(
+    'startTime',
+    _video,
+    _asVideo.leaf(
+      field(numC, (v) => v.startTime, (v, t) => v.copyWith(startTime: t)),
+    ),
+    animatable: false,
+  );
+  b.add(
+    'endTime',
+    _video,
+    _asVideo.leaf(
+      optField(numC, (v) => v.endTime, (v, t) => v.copyWith(endTime: t)),
+    ),
+    animatable: false,
+  );
+  b.add(
+    'playbackRate',
+    _video,
+    _asVideo.leaf(
+      field(numC, (v) => v.playbackRate, (v, r) => v.copyWith(playbackRate: r)),
+    ),
+    animatable: false,
+  );
+  b.add(
+    'volume',
+    _video,
+    _asVideo.leaf(field(numC, (v) => v.volume, (v, x) => v.copyWith(volume: x))),
+  );
+  b.add(
+    'playWhenVisible',
+    _video,
+    _asVideo.leaf(
+      field(
+        boolC,
+        (v) => v.playWhenVisible,
+        (v, x) => v.copyWith(playWhenVisible: x),
+      ),
+    ),
+    animatable: false,
+  );
+  b.add(
+    'scrubClockId',
+    _video,
+    _asVideo.leaf(
+      optField(
+        strC,
+        (v) => v.scrubClockId,
+        (v, s) => v.copyWith(scrubClockId: s),
+      ),
+    ),
+    animatable: false,
+  );
+  b.add(
     'muted',
     _video,
     _asVideo.leaf(field(boolC, (v) => v.muted, (v, m) => v.copyWith(muted: m))),

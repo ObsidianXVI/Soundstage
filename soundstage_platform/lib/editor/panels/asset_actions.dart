@@ -39,7 +39,7 @@ class AssetActions {
   /// Opens the picker for images, audio and video and stores the files.
   Future<List<ir.Asset>> uploadMedia() async {
     final files = await _ref.read(editorFilePickerProvider)(
-      accept: 'image/*,audio/*,video/*',
+      accept: 'image/*,audio/*,video/*,.json,.lottie,.riv',
       multiple: true,
     );
     return files.isEmpty ? const [] : _insert.addToLibrary(files);
