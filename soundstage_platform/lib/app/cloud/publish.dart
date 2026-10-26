@@ -236,11 +236,12 @@ Future<PublishResult> publishStory(
     assets[key] = a.copyWith(uri: backend.publicUrl(path));
   }
 
-  // The author's meta-notes are private (m5.md T5.3).
+  // The author's meta-notes and inspiration board are private.
   final frozen = doc.copyWith(
     assets: assets,
     meta: doc.meta.copyWith(slug: slug),
     notes: const {},
+    board: const ir.InspirationBoard(),
   );
   var image = '';
   try {

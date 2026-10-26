@@ -19,6 +19,7 @@ export 'src/animation/track_eval.dart';
 export 'src/assets.dart';
 export 'src/audio.dart';
 export 'src/behaviors.dart';
+export 'src/board.dart';
 export 'src/breakpoint.dart';
 export 'src/components.dart';
 export 'src/diagnostics.dart';

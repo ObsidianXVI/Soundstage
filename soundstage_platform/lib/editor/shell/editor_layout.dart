@@ -62,6 +62,7 @@ class EditorLayoutState {
     this.leftTab = LeftPanelTab.scenes,
     this.mode = EditorMode.design,
     this.agentOpen = false,
+    this.board = false,
   });
 
   final double leftWidth;
@@ -78,6 +79,9 @@ class EditorLayoutState {
   /// The Agent panel shows (in every mode; m6.md T6.4).
   final bool agentOpen;
 
+  /// Write mode shows the draft's inspiration board instead of its text.
+  final bool board;
+
   /// Whether the timeline shows (always in Animation mode).
   bool get showsTimeline => mode == EditorMode.animation || timelineOpen;
 
@@ -91,6 +95,7 @@ class EditorLayoutState {
     LeftPanelTab? leftTab,
     EditorMode? mode,
     bool? agentOpen,
+    bool? board,
   }) => EditorLayoutState(
     leftWidth: leftWidth ?? this.leftWidth,
     rightWidth: rightWidth ?? this.rightWidth,
@@ -101,6 +106,7 @@ class EditorLayoutState {
     leftTab: leftTab ?? this.leftTab,
     mode: mode ?? this.mode,
     agentOpen: agentOpen ?? this.agentOpen,
+    board: board ?? this.board,
   );
 }
 
@@ -146,6 +152,7 @@ class EditorLayoutNotifier extends Notifier<EditorLayoutState> {
       : state.copyWith(timelineOpen: !state.timelineOpen);
   void setMode(EditorMode mode) => state = state.copyWith(mode: mode);
   void toggleAgent() => state = state.copyWith(agentOpen: !state.agentOpen);
+  void showBoard(bool board) => state = state.copyWith(board: board);
   void setLeftTab(LeftPanelTab t) => state = state.copyWith(leftTab: t);
 
   /// The expanded timeline's height, clamped (see [clampTimelineHeight]

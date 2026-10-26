@@ -301,10 +301,17 @@ void main() {
     expect(story, isA<WholePublishedStory>());
   });
 
-  test('meta-notes are never published', () async {
+  test('meta-notes and the board are never published', () async {
     final b = FakeBackend('u1');
     await publishStory(
-      _doc().copyWith(notes: const {'x': 'private'}),
+      _doc().copyWith(
+        notes: const {'x': 'private'},
+        board: const InspirationBoard(
+          items: [
+            BoardItem(id: 'b', kind: BoardItemKind.note, text: 'secret idea'),
+          ],
+        ),
+      ),
       storyId: 'st',
       slug: 'quiet',
       backend: b,
@@ -312,8 +319,10 @@ void main() {
     );
     final whole = utf8.decode(b.files[b.records['quiet']!.path]!);
     expect(whole, isNot(contains('private')));
+    expect(whole, isNot(contains('secret idea')));
     final manifest = utf8.decode(b.files[b.records['quiet']!.manifest]!);
     expect(manifest, isNot(contains('private')));
+    expect(manifest, isNot(contains('secret idea')));
   });
 
   test('missing files are reported, not fatal', () async {

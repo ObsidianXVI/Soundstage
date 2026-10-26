@@ -9,6 +9,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../agent/agent_panel.dart';
 import '../agent/agent_transport.dart';
+import '../board/board_view.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../clipboard/clipboard_actions.dart';
@@ -379,8 +380,9 @@ class _DockedEditor extends ConsumerWidget {
                     notifier: notifier,
                     width: rightW.toDouble(),
                     child: switch (layout.mode) {
-                      EditorMode.writing => PreviewSplit(
-                        canvas: const WritingView(),
+                      EditorMode.writing => _WriteArea(
+                        board: layout.board,
+                        onBoard: notifier.showBoard,
                         onOpenInNewTab: onOpenPreviewInNewTab,
                       ),
                       EditorMode.publish => PublishView(
@@ -475,6 +477,57 @@ class _DockedEditor extends ConsumerWidget {
       ],
     ],
   );
+}
+
+/// Write mode: the story's text (with the preview beside it) or the
+/// draft's inspiration board.
+class _WriteArea extends StatelessWidget {
+  const _WriteArea({
+    required this.board,
+    required this.onBoard,
+    required this.onOpenInNewTab,
+  });
+
+  final bool board;
+  final ValueChanged<bool> onBoard;
+  final VoidCallback? onOpenInNewTab;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.ss.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: SsSpace.s3),
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            color: c.surface1,
+            border: Border(bottom: BorderSide(color: c.borderSubtle)),
+          ),
+          child: SsSegmented<bool>(
+            key: const ValueKey<String>('write-board-switch'),
+            semanticLabel: 'Story or board',
+            selected: board,
+            onChanged: onBoard,
+            segments: const [
+              SsSegment(value: false, label: 'Story'),
+              SsSegment(value: true, label: 'Board'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: board
+              ? const BoardView()
+              : PreviewSplit(
+                  canvas: const WritingView(),
+                  onOpenInNewTab: onOpenInNewTab,
+                ),
+        ),
+      ],
+    );
+  }
 }
 
 class _LeftPanel extends ConsumerWidget {

@@ -181,13 +181,14 @@ String issueTitle(int count) => 'Issue ${count + 1}';
 
 /// [doc] as the start of a new issue: a new document id (node, scene and
 /// asset ids are scoped to a document, so they stay), titled [title],
-/// without the source's link or notes.
+/// without the source's link, notes or board.
 ir.StageDocument issueCopy(ir.StageDocument doc, {required String title}) {
   final ids = ir.IdGenerator();
   return doc.copyWith(
     id: ids.next(),
     meta: doc.meta.copyWith(title: title, slug: ''),
     notes: const {},
+    board: const ir.InspirationBoard(),
   );
 }
 
