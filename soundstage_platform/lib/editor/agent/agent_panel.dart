@@ -5,12 +5,19 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import '../core/core.dart';
 import '../insert/asset_service.dart';
+import 'agent_policy.dart';
 import 'agent_session.dart';
 import 'agent_transport.dart';
 
 /// The agent's model access, supplied by the app (`EditorShell`); null in
 /// a local-only build or when signed out.
 final agentTransportProvider = Provider<AgentTransport?>(
+  (ref) => null,
+  dependencies: const [],
+);
+
+/// Stores a changed agent config (the policy panel); supplied by the app.
+final agentConfigSinkProvider = Provider<ValueChanged<AgentConfig>?>(
   (ref) => null,
   dependencies: const [],
 );
@@ -34,11 +41,19 @@ final agentSessionProvider = Provider<AgentSession?>(
       transport: transport,
       assets: _assetsOf(ref),
     );
+    final watcher = AgentWatcher(session);
+    ref.listen(
+      editorControllerProvider.select((s) => s.revision),
+      (_, _) => watcher.changed(),
+    );
     ref.onDispose(() {
+      watcher.dispose();
       session
         ..stop()
         ..events.dispose()
-        ..running.dispose();
+        ..running.dispose()
+        ..suggestions.dispose()
+        ..reviewing.dispose();
     });
     return session;
   },
@@ -121,13 +136,35 @@ class _AgentPanelState extends ConsumerState<AgentPanel> {
                 SsIcon(SsIcons.sparkles, size: 16, color: t.colors.accent),
                 const SizedBox(width: SsSpace.s2),
                 Expanded(child: Text('Agent', style: t.text.bodyStrong)),
-                if (session != null)
+                if (session != null) ...[
+                  ValueListenableBuilder<bool>(
+                    valueListenable: session.reviewing,
+                    builder: (_, reviewing, _) => SsIconButton(
+                      key: const ValueKey<String>('agent-review'),
+                      icon: SsIcons.scan,
+                      semanticLabel: reviewing
+                          ? 'Reviewing…'
+                          : 'Review the story and suggest',
+                      size: 28,
+                      selected: reviewing,
+                      onPressed: reviewing ? null : session.review,
+                    ),
+                  ),
+                  SsIconButton(
+                    key: const ValueKey<String>('agent-policy'),
+                    icon: SsIcons.slidersHorizontal,
+                    semanticLabel: 'What the agent may do unasked',
+                    size: 28,
+                    selected: session.policy.watch,
+                    onPressed: () => showAgentPolicy(context, ref),
+                  ),
                   SsIconButton(
                     icon: SsIcons.rotateCcw,
                     semanticLabel: 'New conversation',
                     size: 28,
                     onPressed: session.clear,
                   ),
+                ],
                 if (settings != null)
                   SsIconButton(
                     icon: SsIcons.settings,
@@ -144,6 +181,7 @@ class _AgentPanelState extends ConsumerState<AgentPanel> {
               ],
             ),
           ),
+          if (session != null) _Suggestions(session: session),
           Expanded(
             child: session == null
                 ? Padding(
@@ -308,6 +346,251 @@ class _EventView extends StatelessWidget {
           ],
         ),
       },
+    );
+  }
+}
+
+/// The agent's unasked suggestions (DECISIONS 26/10/26 #12).
+class _Suggestions extends StatelessWidget {
+  const _Suggestions({required this.session});
+
+  final AgentSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.ss;
+    return ValueListenableBuilder<List<AgentSuggestion>>(
+      valueListenable: session.suggestions,
+      builder: (context, list, _) {
+        final shown = [
+          for (final s in list.reversed)
+            if (s.status != SuggestionStatus.dismissed) s,
+        ].take(6).toList();
+        if (shown.isEmpty) return const SizedBox.shrink();
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 320),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: t.colors.borderSubtle)),
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(SsSpace.s2),
+            children: [
+              Text('SUGGESTIONS', style: t.text.overline),
+              const SizedBox(height: SsSpace.s1),
+              for (final s in shown) _SuggestionCard(session: session, s: s),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({required this.session, required this.s});
+
+  final AgentSession session;
+  final AgentSuggestion s;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.ss;
+    final status = switch (s.status) {
+      SuggestionStatus.applied => 'Applied',
+      SuggestionStatus.autoApplied => 'Applied automatically (your policy)',
+      SuggestionStatus.failed => 'Could not apply: ${s.message}',
+      _ => '',
+    };
+    return Container(
+      key: ValueKey<String>('suggestion:${s.id}'),
+      margin: const EdgeInsets.only(bottom: SsSpace.s2),
+      padding: const EdgeInsets.all(SsSpace.s2),
+      decoration: BoxDecoration(
+        color: t.colors.surface2,
+        borderRadius: BorderRadius.circular(SsRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.title, style: t.text.bodyStrong),
+          if (s.why.isNotEmpty)
+            Text(
+              s.why,
+              style: t.text.small.copyWith(color: t.colors.textSecondary),
+            ),
+          Text(
+            '${s.actions.length} '
+            '${s.actions.length == 1 ? 'change' : 'changes'}: '
+            '${{for (final a in s.actions) a.tool.replaceAll('_', ' ')}.join(', ')}',
+            style: t.text.caption,
+          ),
+          if (status.isNotEmpty)
+            Text(
+              status,
+              style: t.text.caption.copyWith(
+                color: s.status == SuggestionStatus.failed
+                    ? t.colors.danger
+                    : t.colors.success,
+              ),
+            ),
+          Wrap(
+            spacing: SsSpace.s1,
+            children: [
+              if (s.status == SuggestionStatus.open ||
+                  s.status == SuggestionStatus.failed)
+                SsButton(
+                  key: ValueKey<String>('suggestion-apply:${s.id}'),
+                  label: 'Apply',
+                  variant: SsButtonVariant.primary,
+                  onPressed: s.status == SuggestionStatus.open
+                      ? () => session.apply(s)
+                      : null,
+                ),
+              if (s.status == SuggestionStatus.applied ||
+                  s.status == SuggestionStatus.autoApplied)
+                SsButton(
+                  label: 'Undo',
+                  variant: SsButtonVariant.ghost,
+                  onPressed: () => session.undo(s),
+                ),
+              SsButton(
+                label: 'Dismiss',
+                variant: SsButtonVariant.ghost,
+                onPressed: () => session.dismiss(s),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The author's rules for the agent's unasked help (DECISIONS 26/10/26
+/// #12): watch and suggest, and which kinds of change may apply themselves
+/// within which boundaries.
+///
+/// The dialog opens above the editor's provider scope, so the config and
+/// where to store it are read here and passed in.
+Future<void> showAgentPolicy(BuildContext context, WidgetRef ref) {
+  final config =
+      ref.read(agentTransportProvider)?.config ?? const AgentConfig();
+  final sink = ref.read(agentConfigSinkProvider);
+  return showSsDialog<void>(
+    context,
+    builder: (_) => _PolicyDialog(initial: config, onChanged: sink),
+  );
+}
+
+class _PolicyDialog extends StatefulWidget {
+  const _PolicyDialog({required this.initial, required this.onChanged});
+
+  final AgentConfig initial;
+  final ValueChanged<AgentConfig>? onChanged;
+
+  @override
+  State<_PolicyDialog> createState() => _PolicyDialogState();
+}
+
+class _PolicyDialogState extends State<_PolicyDialog> {
+  late AgentConfig _config = widget.initial;
+
+  void _set(AgentPolicy p) {
+    setState(() => _config = _config.copyWith(policy: p));
+    widget.onChanged?.call(_config);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.ss;
+    final p = _config.policy;
+    return SsDialog(
+      title: 'What the agent may do unasked',
+      width: 460,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Unasked, the agent only suggests; you apply or dismiss. Asked '
+            'in the chat, it acts. Reviews use your Claude key.',
+            style: t.text.small.copyWith(color: t.colors.textSecondary),
+          ),
+          const SizedBox(height: SsSpace.s3),
+          SsToggle(
+            key: const ValueKey<String>('policy-watch'),
+            value: p.watch,
+            label: 'Watch while I work and suggest (after a pause in editing)',
+            onChanged: (v) => _set(p.copyWith(watch: v)),
+          ),
+          const SizedBox(height: SsSpace.s4),
+          Text('AUTO-ACT', style: t.text.overline),
+          const SizedBox(height: SsSpace.s1),
+          Text(
+            'Suggestions made only of these kinds of change apply '
+            'themselves (each is one undo step):',
+            style: t.text.small.copyWith(color: t.colors.textSecondary),
+          ),
+          const SizedBox(height: SsSpace.s1),
+          for (final k in AgentActionKind.values)
+            SsCheckbox(
+              key: ValueKey<String>('policy-auto:${k.name}'),
+              value: p.autoAct.contains(k),
+              label: k.label,
+              onChanged: (v) => _set(
+                p.copyWith(
+                  autoAct: v ? {...p.autoAct, k} : ({...p.autoAct}..remove(k)),
+                ),
+              ),
+            ),
+          const SizedBox(height: SsSpace.s3),
+          Row(
+            children: [
+              Text('Only within', style: t.text.small),
+              const SizedBox(width: SsSpace.s2),
+              SsDropdown<AgentScope>(
+                key: const ValueKey<String>('policy-scope'),
+                semanticLabel: 'Auto-act boundary',
+                width: 200,
+                value: p.scope,
+                items: [
+                  for (final s in AgentScope.values)
+                    SsDropdownItem(value: s, label: s.label),
+                ],
+                onChanged: (s) => _set(p.copyWith(scope: s)),
+              ),
+            ],
+          ),
+          const SizedBox(height: SsSpace.s2),
+          Row(
+            children: [
+              Text('At most', style: t.text.small),
+              const SizedBox(width: SsSpace.s2),
+              SsNumberField(
+                semanticLabel: 'Most changes per suggestion',
+                width: 72,
+                value: p.maxChanges.toDouble(),
+                min: 1,
+                max: 50,
+                fractionDigits: 0,
+                onChanged: (v) => _set(p.copyWith(maxChanges: v.round())),
+              ),
+              const SizedBox(width: SsSpace.s2),
+              Flexible(
+                child: Text('changes per suggestion', style: t.text.small),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        SsButton(
+          label: 'Done',
+          variant: SsButtonVariant.primary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
     );
   }
 }

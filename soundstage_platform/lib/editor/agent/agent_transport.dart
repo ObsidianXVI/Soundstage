@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'agent_policy.dart';
+
 // What the agent needs from outside the editor (m6.md "Architecture"): the
 // app supplies it over the agent service, which holds the author's keys.
 
@@ -9,12 +11,16 @@ class AgentConfig {
     this.claudeModel = 'claude-opus-5-5',
     this.effort = 'medium',
     this.quiverModel = 'arrow-2',
+    this.policy = const AgentPolicy(),
   });
 
   factory AgentConfig.fromJson(Map<String, Object?> m) => AgentConfig(
     claudeModel: (m['claudeModel'] as String?) ?? 'claude-opus-5-5',
     effort: (m['effort'] as String?) ?? 'medium',
     quiverModel: (m['quiverModel'] as String?) ?? 'arrow-2',
+    policy: m['policy'] is Map
+        ? AgentPolicy.fromJson((m['policy']! as Map).cast<String, Object?>())
+        : const AgentPolicy(),
   );
 
   /// A Claude model id (default: the current Opus).
@@ -26,22 +32,28 @@ class AgentConfig {
   /// A Quiver model id for illustrations.
   final String quiverModel;
 
+  /// What the agent may do unasked (DECISIONS 26/10/26 #12).
+  final AgentPolicy policy;
+
   static const List<String> efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
 
   AgentConfig copyWith({
     String? claudeModel,
     String? effort,
     String? quiverModel,
+    AgentPolicy? policy,
   }) => AgentConfig(
     claudeModel: claudeModel ?? this.claudeModel,
     effort: effort ?? this.effort,
     quiverModel: quiverModel ?? this.quiverModel,
+    policy: policy ?? this.policy,
   );
 
-  Map<String, String> toJson() => {
+  Map<String, Object?> toJson() => {
     'claudeModel': claudeModel,
     'effort': effort,
     'quiverModel': quiverModel,
+    'policy': policy.toJson(),
   };
 }
 

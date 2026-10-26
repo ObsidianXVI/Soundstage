@@ -10,8 +10,9 @@ Map<String, double> posterClockValues(ir.Scene scene, {double? at}) => {
   for (final c in scene.clocks)
     c.id: switch (c) {
       ir.SceneScrollClock() => at ?? scene.effectivePosterClock,
-      final ir.TimelineClock t =>
-        (StageTimelineSource(t)..reducedMotionChanged(reduced: true)).value,
+      final ir.TimelineClock t => (StageTimelineSource(
+        t,
+      )..reducedMotionChanged(reduced: true)).value,
       _ => 0,
     },
 };

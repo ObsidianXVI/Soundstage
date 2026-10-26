@@ -52,6 +52,17 @@ const List<Map<String, Object?>> kAgentTools = [
     },
   },
   {
+    'name': 'get_board',
+    'description':
+        'The draft\'s inspiration board: the author\'s rough notes, links '
+        'and images (by name). Read it to know what the author is aiming for.',
+    'input_schema': {
+      'type': 'object',
+      'properties': <String, Object?>{},
+      'additionalProperties': false,
+    },
+  },
+  {
     'name': 'set_text',
     'description':
         'Replaces the words of a text layer (paragraphs separated by \\n). '
@@ -210,6 +221,42 @@ const List<Map<String, Object?>> kAgentTools = [
   },
 ];
 
+/// The tools a review may use: reads only, and `suggest`.
+const Set<String> kReviewReadTools = {'get_outline', 'get_node', 'get_board'};
+
+/// The review's way to propose a change (DECISIONS 26/10/26 #12: unasked,
+/// the agent only suggests).
+const Map<String, Object?> kSuggestTool = {
+  'name': 'suggest',
+  'description':
+      'Proposes one change to the author. Nothing is applied by this call: '
+      'the author applies or dismisses it (some kinds may apply themselves '
+      'under the author\'s policy). actions are the tool calls that make '
+      'the change, in order, each {tool, input} with the editing tools\' '
+      'names and inputs (set_text, set_properties, add_layer, '
+      'delete_layers, add_scene, set_note, add_illustration).',
+  'input_schema': {
+    'type': 'object',
+    'properties': {
+      'title': {'type': 'string'},
+      'why': {'type': 'string'},
+      'actions': {
+        'type': 'array',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'tool': {'type': 'string'},
+            'input': {'type': 'object'},
+          },
+          'required': ['tool', 'input'],
+        },
+      },
+    },
+    'required': ['title', 'why', 'actions'],
+    'additionalProperties': false,
+  },
+};
+
 /// Runs the agent's tools on the open editor.
 class AgentToolbox {
   AgentToolbox({
@@ -234,13 +281,14 @@ class AgentToolbox {
 
   /// Whether [name] changes the document.
   static bool isWrite(String name) =>
-      !const {'get_outline', 'get_node', 'select'}.contains(name);
+      !const {'get_outline', 'get_node', 'get_board', 'select'}.contains(name);
 
   Future<ToolResult> run(String name, Map<String, Object?> input) async {
     try {
       return switch (name) {
         'get_outline' => _ok(outline(input['scene_id'] as String?)),
         'get_node' => _node(_str(input, 'node_id')),
+        'get_board' => _ok(board()),
         'set_text' => _setText(_str(input, 'node_id'), _str(input, 'text')),
         'set_properties' => _setProperties(input),
         'add_layer' => _addLayer(input),
@@ -305,6 +353,20 @@ class AgentToolbox {
       out.writeln('… ${lines - kOutlineLimit} more layers (use get_node).');
     }
     return out.toString();
+  }
+
+  /// The board as lines (see the get_board tool).
+  String board() {
+    final items = _doc.board.items;
+    if (items.isEmpty) return 'The board is empty.';
+    return [
+      for (final i in items)
+        switch (i.kind) {
+          ir.BoardItemKind.note => '- note: ${i.text.replaceAll('\n', ' ')}',
+          ir.BoardItemKind.link => '- link: ${i.uri}',
+          ir.BoardItemKind.image => '- image: ${i.text}',
+        },
+    ].join('\n');
   }
 
   ToolResult _node(String id) {

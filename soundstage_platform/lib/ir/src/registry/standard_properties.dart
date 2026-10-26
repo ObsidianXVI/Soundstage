@@ -1814,7 +1814,9 @@ void _videoProps(_Builder b) {
   b.add(
     'volume',
     _video,
-    _asVideo.leaf(field(numC, (v) => v.volume, (v, x) => v.copyWith(volume: x))),
+    _asVideo.leaf(
+      field(numC, (v) => v.volume, (v, x) => v.copyWith(volume: x)),
+    ),
   );
   b.add(
     'playWhenVisible',

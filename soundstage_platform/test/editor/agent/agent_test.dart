@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/agent/agent_panel.dart';
+import 'package:soundstage_platform/editor/agent/agent_policy.dart';
 import 'package:soundstage_platform/editor/agent/agent_session.dart';
 import 'package:soundstage_platform/editor/agent/agent_tools.dart';
 import 'package:soundstage_platform/editor/agent/agent_transport.dart';
@@ -58,13 +60,14 @@ ir.StageDocument _doc() {
 }
 
 class _FakeTransport implements AgentTransport {
-  _FakeTransport(this.replies);
+  _FakeTransport(this.replies, {this.policy = const AgentPolicy()});
 
   final List<Object Function()> replies;
   final List<Map<String, Object?>> bodies = [];
+  AgentPolicy policy;
 
   @override
-  AgentConfig get config => const AgentConfig(effort: 'low');
+  AgentConfig get config => AgentConfig(effort: 'low', policy: policy);
 
   @override
   Future<Map<String, Object?>> claude(Map<String, Object?> body) async {
@@ -404,5 +407,283 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
+
+  group('policy', () {
+    test('kinds of change', () {
+      expect(kindOf('get_outline', {}), isNull);
+      expect(kindOf('set_text', {}), AgentActionKind.text);
+      expect(
+        kindOf('set_properties', {'node_ids': [], 'x': 1}),
+        AgentActionKind.layout,
+      );
+      expect(
+        kindOf('set_properties', {'node_ids': [], 'fill': '#000'}),
+        AgentActionKind.style,
+      );
+      expect(kindOf('add_scene', {}), AgentActionKind.structure);
+      expect(kindOf('set_note', {}), AgentActionKind.notes);
+      expect(kindOf('add_illustration', {}), AgentActionKind.illustration);
+    });
+
+    test('auto-act needs every kind enabled, the boundary and the cap', () {
+      final doc = _doc();
+      bool allows(
+        AgentPolicy p,
+        List<AgentAction> a, {
+        Set<String> sel = const {},
+      }) => p.allowsAuto(a, document: doc, selection: sel, activeSceneId: 's1');
+      const text = AgentAction('set_text', {'node_id': 'title', 'text': 'x'});
+      const move = AgentAction('set_properties', {
+        'node_ids': ['box'],
+        'x': 1,
+      });
+      expect(
+        allows(const AgentPolicy(), [text]),
+        isFalse,
+        reason: 'suggest only',
+      );
+      const textOnly = AgentPolicy(autoAct: {AgentActionKind.text});
+      expect(allows(textOnly, [text]), isTrue);
+      expect(allows(textOnly, [text, move]), isFalse);
+      const selection = AgentPolicy(
+        autoAct: {AgentActionKind.text},
+        scope: AgentScope.selection,
+      );
+      expect(allows(selection, [text]), isFalse);
+      expect(allows(selection, [text], sel: {'title'}), isTrue);
+      expect(
+        allows(selection, [text], sel: {'stage'}),
+        isTrue,
+        reason: 'inside',
+      );
+      const capped = AgentPolicy(
+        autoAct: {AgentActionKind.text},
+        maxChanges: 1,
+      );
+      expect(allows(capped, [text, text]), isFalse);
+      const structure = AgentPolicy(autoAct: {AgentActionKind.structure});
+      expect(
+        allows(structure, [
+          const AgentAction('add_scene', {'name': 'n'}),
+        ]),
+        isFalse,
+        reason: 'a new scene is outside the active scene',
+      );
+      expect(
+        allows(structure.copyWith(scope: AgentScope.story), [
+          const AgentAction('add_scene', {'name': 'n'}),
+        ]),
+        isTrue,
+      );
+    });
+
+    test('JSON round trip, also inside the agent config', () {
+      const p = AgentPolicy(
+        watch: true,
+        autoAct: {AgentActionKind.notes, AgentActionKind.style},
+        scope: AgentScope.selection,
+        maxChanges: 3,
+      );
+      final back = AgentConfig.fromJson(
+        const AgentConfig(policy: p).toJson(),
+      ).policy;
+      expect(back.watch, isTrue);
+      expect(back.autoAct, p.autoAct);
+      expect(back.scope, AgentScope.selection);
+      expect(back.maxChanges, 3);
+      expect(AgentConfig.fromJson(const {}).policy.autoAct, isEmpty);
+    });
+  });
+
+  group('review', () {
+    Map<String, Object?> suggest(
+      String title,
+      List<Map<String, Object?>> actions,
+    ) => _reply([
+      _toolUse('s', 'suggest', {
+        'title': title,
+        'why': 'Because.',
+        'actions': actions,
+      }),
+    ], 'tool_use');
+
+    test('unasked, it only suggests; applying is one undo step', () async {
+      final (c, editor) = _editor();
+      final t = _FakeTransport([
+        () => _reply([
+          _toolUse('w', 'set_text', {'node_id': 'title', 'text': 'Sneaky'}),
+        ], 'tool_use'),
+        () => suggest('Sharper title', [
+          {
+            'tool': 'set_text',
+            'input': {'node_id': 'title', 'text': 'Dusk'},
+          },
+          {
+            'tool': 'set_properties',
+            'input': {
+              'node_ids': ['title'],
+              'font_size': 64,
+            },
+          },
+        ]),
+        () => _reply([
+          {'type': 'text', 'text': 'Done.'},
+        ], 'end_turn'),
+      ]);
+      final s = AgentSession(
+        editor: editor,
+        readState: () => c.read(editorControllerProvider),
+        transport: t,
+      );
+      await s.review();
+      // No write tools are offered, and a write is refused.
+      final names = [
+        for (final tool in t.bodies.first['tools']! as List)
+          (tool as Map)['name'],
+      ];
+      expect(names, containsAll(['get_outline', 'get_board', 'suggest']));
+      expect(names, isNot(contains('set_text')));
+      expect(
+        (_node(c, 'title') as ir.TextNode).content.single.spans.single.text,
+        'The Hour',
+      );
+
+      final sg = s.suggestions.value.single;
+      expect(sg.status, SuggestionStatus.open);
+      await s.apply(sg);
+      expect(sg.status, SuggestionStatus.applied);
+      expect(
+        (_node(c, 'title') as ir.TextNode).content.single.spans.single.text,
+        'Dusk',
+      );
+      expect(
+        c.read(editorControllerProvider).history.undoLabel,
+        'Agent: Sharper title',
+      );
+      expect(s.undo(sg), isTrue);
+      expect(
+        (_node(c, 'title') as ir.TextNode).content.single.spans.single.text,
+        'The Hour',
+      );
+      s.dismiss(sg);
+      expect(s.suggestions.value, isEmpty);
+    });
+
+    test('a suggestion the policy allows applies itself', () async {
+      final (c, editor) = _editor();
+      final t = _FakeTransport([
+        () => suggest('Leave a note', [
+          {
+            'tool': 'set_note',
+            'input': {'id': 's1', 'text': 'Try a darker sky'},
+          },
+        ]),
+        () => _reply([
+          {'type': 'text', 'text': 'ok'},
+        ], 'end_turn'),
+      ], policy: const AgentPolicy(autoAct: {AgentActionKind.notes}));
+      final s = AgentSession(
+        editor: editor,
+        readState: () => c.read(editorControllerProvider),
+        transport: t,
+      );
+      await s.review();
+      await Future<void>.delayed(Duration.zero);
+      expect(s.suggestions.value.single.status, SuggestionStatus.autoApplied);
+      expect(
+        c.read(editorControllerProvider).document.notes['s1'],
+        'Try a darker sky',
+      );
+    });
+
+    test(
+      'the watcher reviews after a pause, never mid-gesture, rate-limited',
+      () {
+        fakeAsync((async) {
+          final (c, editor) = _editor();
+          var reviews = 0;
+          final t = _FakeTransport([
+            for (var i = 0; i < 10; i++)
+              () {
+                reviews++;
+                return _reply([
+                  {'type': 'text', 'text': 'nothing'},
+                ], 'end_turn');
+              },
+          ]);
+          final s = AgentSession(
+            editor: editor,
+            readState: () => c.read(editorControllerProvider),
+            transport: t,
+          );
+          var now = DateTime(2026);
+          final w = AgentWatcher(
+            s,
+            idle: const Duration(seconds: 30),
+            minGap: const Duration(minutes: 3),
+            now: () => now,
+          );
+          w.changed();
+          async.elapse(const Duration(minutes: 1));
+          expect(reviews, 0, reason: 'not watching');
+
+          t.policy = const AgentPolicy(watch: true);
+          editor.beginGesture();
+          w.changed();
+          async.elapse(const Duration(seconds: 31));
+          expect(reviews, 0, reason: 'mid-gesture');
+          editor.endGesture();
+          async.elapse(const Duration(seconds: 31));
+          expect(reviews, 1);
+
+          now = now.add(const Duration(seconds: 70));
+          w.changed();
+          async.elapse(const Duration(seconds: 31));
+          expect(reviews, 1, reason: 'too soon');
+          now = now.add(const Duration(minutes: 3));
+          async.elapse(const Duration(minutes: 3));
+          expect(reviews, 2);
+          w.dispose();
+        });
+      },
+    );
+  });
+
+  testWidgets('the policy dialog stores the author\'s choices', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final stored = <AgentConfig>[];
+    final root = ProviderContainer();
+    addTearDown(root.dispose);
+    root.read(editorLayoutProvider.notifier).toggleAgent();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: root,
+        child: MaterialApp(
+          builder: (c, child) =>
+              SsScope(theme: SsThemeData.dark(), child: child!),
+          home: Scaffold(
+            body: EditorShell(
+              document: _doc(),
+              onBack: () {},
+              onPreview: () {},
+              agentTransport: _FakeTransport([]),
+              onAgentConfig: stored.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('agent-policy')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('policy-watch')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('policy-auto:notes')));
+    await tester.pump();
+    expect(stored.last.policy.watch, isTrue);
+    expect(stored.last.policy.autoAct, {AgentActionKind.notes});
   });
 }

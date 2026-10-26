@@ -60,6 +60,7 @@ class EditorShell extends StatelessWidget {
     this.publishActions = const [],
     this.agentTransport,
     this.onAgentSettings,
+    this.onAgentConfig,
     super.key,
   });
 
@@ -107,6 +108,9 @@ class EditorShell extends StatelessWidget {
   /// Opens the app's Agent settings (keys and models).
   final VoidCallback? onAgentSettings;
 
+  /// Stores a changed agent config (the agent's policy, set in the panel).
+  final ValueChanged<AgentConfig>? onAgentConfig;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -118,6 +122,7 @@ class EditorShell extends StatelessWidget {
           editorFilePickerProvider.overrideWithValue(picker),
         agentTransportProvider.overrideWithValue(agentTransport),
         agentSettingsProvider.overrideWithValue(onAgentSettings),
+        agentConfigSinkProvider.overrideWithValue(onAgentConfig),
       ],
       child: _EditorScope(
         onBack: onBack,

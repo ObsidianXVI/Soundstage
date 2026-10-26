@@ -20,7 +20,7 @@ void main() {
   AgentServiceClient client({String? token = 'tok'}) => AgentServiceClient(
     baseUrl: 'https://agent.test',
     idToken: () async => token,
-    config: const AgentConfig(
+    readConfig: () => const AgentConfig(
       claudeModel: 'claude-opus-5-5',
       quiverModel: 'arrow-2',
     ),

@@ -110,6 +110,7 @@ class _EditPageState extends ConsumerState<EditPage> {
           onSave: () => unawaited(autosave.flush()),
           publishActions: _exportActions(autosave),
           agentTransport: ref.watch(agentClientProvider),
+          onAgentConfig: (c) => ref.read(agentConfigProvider.notifier).set(c),
           onAgentSettings: ref.watch(cloudProvider) == null
               ? null
               : () => showAgentSettings(context, ref),

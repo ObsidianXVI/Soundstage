@@ -25,7 +25,7 @@ class AgentServiceClient implements AgentTransport {
     required this.idToken,
     required this.send,
     required this.rasterize,
-    required this.config,
+    required this.readConfig,
   });
 
   final String baseUrl;
@@ -33,8 +33,12 @@ class AgentServiceClient implements AgentTransport {
   final JsonSender send;
   final SvgRasterizer rasterize;
 
+  /// The author's current settings (read on every request, so a change
+  /// does not need a new client).
+  final AgentConfig Function() readConfig;
+
   @override
-  final AgentConfig config;
+  AgentConfig get config => readConfig();
 
   /// The providers whose keys the service can hold.
   static const List<String> providers = ['anthropic', 'quiver'];

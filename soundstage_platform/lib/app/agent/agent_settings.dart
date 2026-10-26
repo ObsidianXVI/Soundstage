@@ -53,7 +53,7 @@ final agentClientProvider = Provider<AgentServiceClient?>((ref) {
     idToken: () async => cloud.auth.currentUser?.getIdToken(),
     send: sendJson,
     rasterize: rasterizeSvg,
-    config: ref.watch(agentConfigProvider),
+    readConfig: () => ref.read(agentConfigProvider),
   );
 });
 
