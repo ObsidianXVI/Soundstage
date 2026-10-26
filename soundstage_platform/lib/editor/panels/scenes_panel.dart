@@ -336,6 +336,19 @@ class _ScenesPanelState extends ConsumerState<ScenesPanel> {
                         ],
                       ),
               ),
+              Padding(
+                padding: const EdgeInsets.all(SsSpace.s2),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SsButton(
+                    key: const ValueKey<String>('edit-overlay'),
+                    label: 'Edit overlay',
+                    icon: SsIcons.layers,
+                    variant: SsButtonVariant.ghost,
+                    onPressed: _ctl.enterOverlay,
+                  ),
+                ),
+              ),
             ],
           ),
         );

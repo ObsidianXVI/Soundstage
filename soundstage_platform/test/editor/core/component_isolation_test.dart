@@ -53,6 +53,27 @@ void main() {
     expect(root.children.map((n) => n.id), contains('extra'));
   });
 
+  test('the overlay is edited in isolation; an empty new one is dropped', () {
+    final c = editorContainer();
+    expect(c.doc.overlay, isNull);
+    c.ctl.enterOverlay();
+    expect(c.st.isolation?.isOverlay, isTrue);
+    c.ctl.exitComponent();
+    expect(c.doc.overlay, isNull);
+
+    c.ctl.enterOverlay();
+    final rootId = c.st.isolation!.rootId;
+    c.ctl.execute(
+      _InsertInto(
+        rootId,
+        const ShapeNode(common: NodeCommon(id: 'badge', width: 40, height: 20)),
+      ),
+    );
+    c.ctl.exitComponent();
+    expect(c.doc.overlay?.children.single.id, 'badge');
+    expect(c.doc.scenes.first.id, 's1');
+  });
+
   test('create component from a frame selects its instance', () {
     final c = editorContainer();
     c.ctl.execute(const CreateComponent('b'));
@@ -75,6 +96,24 @@ class _Insert extends EditCommand {
   CommandResult apply(EditorState state) => resultOf(
     state,
     insertNodes(state.document, kIsolationStageId, 1, [node]),
+    label: label,
+  );
+}
+
+/// Inserts [node] into frame [parent].
+class _InsertInto extends EditCommand {
+  const _InsertInto(this.parent, this.node);
+
+  final String parent;
+  final Node node;
+
+  @override
+  String get label => 'Insert';
+
+  @override
+  CommandResult apply(EditorState state) => resultOf(
+    state,
+    insertNodes(state.document, parent, 0, [node]),
     label: label,
   );
 }

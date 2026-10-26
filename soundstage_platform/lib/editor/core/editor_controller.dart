@@ -403,6 +403,28 @@ class EditorController extends Notifier<EditorState> {
     );
   }
 
+  /// Opens the story overlay in isolation mode (an empty one when the
+  /// story has none; it is kept once something is put on it).
+  void enterOverlay() {
+    if (state.isolation?.isOverlay ?? false) return;
+    if (state.isolation != null) exitComponent();
+    final (view, iso) = isolateOverlay(
+      state.document,
+      newRootId: ir.IdGenerator.forDocument(state.document).next(),
+      returnSceneId: state.activeSceneId,
+    );
+    state = state.copyWith(
+      document: view,
+      isolation: iso,
+      activeSceneId: kIsolationSceneId,
+      selection: const {},
+      selectionContext: null,
+      selectedAudioTrackId: null,
+      textEditId: null,
+      hoverId: null,
+    );
+  }
+
   /// Leaves isolation mode, back to the story (and the scene it was on).
   void exitComponent() {
     final iso = state.isolation;

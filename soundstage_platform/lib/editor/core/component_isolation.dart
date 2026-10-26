@@ -23,9 +23,15 @@ class ComponentIsolation {
     required this.scenes,
     required this.overlay,
     this.returnSceneId,
+    this.isOverlay = false,
   });
 
+  /// The component being edited ('' when editing the overlay).
   final String componentId;
+
+  /// Whether the story overlay is being edited instead of a component (its
+  /// root is then the synthetic scene's stage itself).
+  final bool isOverlay;
 
   /// The component root's id (stable while isolated).
   final String rootId;
@@ -93,6 +99,51 @@ const ir.FrameNode _placeholder = ir.FrameNode(
   common: ir.NodeCommon(id: '__component_placeholder__'),
 );
 
+/// The isolation view of [doc]'s story overlay (a new empty overlay, id
+/// [newRootId], when it has none): the overlay root is the synthetic pinned
+/// scene's stage, sized like a scene's.
+(ir.StageDocument, ComponentIsolation) isolateOverlay(
+  ir.StageDocument doc, {
+  required String newRootId,
+  String? returnSceneId,
+}) {
+  final root =
+      doc.overlay ??
+      ir.FrameNode(
+        common: ir.NodeCommon(
+          id: newRootId,
+          name: 'Overlay',
+          width: 1,
+          height: 1,
+        ),
+      );
+  final iso = ComponentIsolation(
+    componentId: '',
+    rootId: root.id,
+    scenes: doc.scenes,
+    overlay: doc.overlay,
+    returnSceneId: returnSceneId,
+    isOverlay: true,
+  );
+  final view = doc.copyWith(
+    scenes: [
+      ir.Scene(
+        id: kIsolationSceneId,
+        name: 'Overlay',
+        root: root,
+        clocks: const [
+          ir.Clock.sceneScroll(
+            id: '__component_clock__',
+            sceneId: kIsolationSceneId,
+          ),
+        ],
+      ),
+    ],
+    overlay: null,
+  );
+  return (view, iso);
+}
+
 final Expando<ir.StageDocument> _folded = Expando('foldIsolation');
 
 /// The story document behind isolation view [view] (cached per view).
@@ -103,6 +154,15 @@ ir.StageDocument foldIsolation(ir.StageDocument view, ComponentIsolation iso) =>
     _folded[view] ??= _fold(view, iso);
 
 ir.StageDocument _fold(ir.StageDocument view, ComponentIsolation iso) {
+  if (iso.isOverlay) {
+    if (view.scenes.isEmpty) return view.copyWith(scenes: iso.scenes);
+    final root = view.scenes.first.root;
+    return view.copyWith(
+      scenes: iso.scenes,
+      // An overlay with nothing on it is no overlay.
+      overlay: root.children.isEmpty && iso.overlay == null ? null : root,
+    );
+  }
   final def = view.components[iso.componentId];
   if (def == null || view.scenes.isEmpty) {
     return view.copyWith(scenes: iso.scenes, overlay: iso.overlay);

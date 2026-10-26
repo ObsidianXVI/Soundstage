@@ -406,7 +406,7 @@ class SelectionInfo {
   /// Selected nodes whose parent is a grid frame (§4.5).
   final int inGrid;
 
-  /// Whether the editor is in component isolation mode.
+  /// Whether the editor is in component isolation mode (not the overlay's).
   final bool isolated;
 
   int get count => ids.length;

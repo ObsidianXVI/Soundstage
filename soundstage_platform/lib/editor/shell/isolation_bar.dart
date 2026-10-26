@@ -17,7 +17,9 @@ class IsolationFrame extends ConsumerWidget {
     if (iso == null) return child;
     final name = ref.watch(
       editorControllerProvider.select(
-        (s) => s.document.components[iso.componentId]?.name ?? 'Component',
+        (s) => iso.isOverlay
+            ? 'Overlay'
+            : s.document.components[iso.componentId]?.name ?? 'Component',
       ),
     );
     final t = context.ss;
