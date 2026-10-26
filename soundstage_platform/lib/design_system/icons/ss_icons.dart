@@ -194,6 +194,7 @@ abstract final class SsIcons {
     fontFamily: fontFamily,
   );
   static const IconData star = IconData(0xe176, fontFamily: fontFamily);
+  static const IconData stickyNote = IconData(0xe303, fontFamily: fontFamily);
   static const IconData strikethrough = IconData(
     0xe177,
     fontFamily: fontFamily,

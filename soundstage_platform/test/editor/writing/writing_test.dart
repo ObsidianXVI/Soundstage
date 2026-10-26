@@ -251,4 +251,31 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('notes: added in the margin, undoable, dropped when published', (
+    tester,
+  ) async {
+    await _pump(tester);
+    final c = _editor(tester);
+    await tester.tap(find.byKey(const ValueKey('note-button:body')));
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('note:body')), 'Tighten');
+    await tester.pump();
+    expect(c.read(editorControllerProvider).document.notes, {
+      'body': 'Tighten',
+    });
+    await tester.tap(find.byKey(const ValueKey('writing:title')));
+    await tester.pump();
+    c.read(editorControllerProvider.notifier).undo();
+    await tester.pump();
+    await tester.pump();
+    expect(c.read(editorControllerProvider).document.notes, isEmpty);
+    // Scene notes too, and an empty note is removed.
+    final ctl = c.read(editorControllerProvider.notifier);
+    ctl.execute(const SetNote('s1', 'Open with the sound'));
+    expect(c.read(editorControllerProvider).document.notes['s1'], isNotNull);
+    ctl.execute(const SetNote('s1', '  '));
+    expect(c.read(editorControllerProvider).document.notes, isEmpty);
+    expect(ctl.execute(const SetNote('nope', 'x')).ok, isFalse);
+  });
 }

@@ -37,7 +37,8 @@ abstract class StageMeta with _$StageMeta {
 ///
 /// Maps keyed by id: `assets`, `fonts`, `components`, `variantSets`.
 /// `scenes` are in reading order. `overlay` is persistent chrome drawn over
-/// every scene.
+/// every scene. `notes` are the author's private meta-notes (m5.md
+/// T5.3), keyed by scene or node id; publishing drops them.
 @freezed
 abstract class StageDocument with _$StageDocument {
   const factory StageDocument({
@@ -54,6 +55,7 @@ abstract class StageDocument with _$StageDocument {
     @Default(<Scene>[]) List<Scene> scenes,
     @Default(<AudioTrack>[]) List<AudioTrack> audioTracks,
     FrameNode? overlay,
+    @Default(<String, String>{}) Map<String, String> notes,
   }) = _StageDocument;
 
   const StageDocument._();

@@ -301,6 +301,21 @@ void main() {
     expect(story, isA<WholePublishedStory>());
   });
 
+  test('meta-notes are never published', () async {
+    final b = FakeBackend('u1');
+    await publishStory(
+      _doc().copyWith(notes: const {'x': 'private'}),
+      storyId: 'st',
+      slug: 'quiet',
+      backend: b,
+      bytesOf: _bytes,
+    );
+    final whole = utf8.decode(b.files[b.records['quiet']!.path]!);
+    expect(whole, isNot(contains('private')));
+    final manifest = utf8.decode(b.files[b.records['quiet']!.manifest]!);
+    expect(manifest, isNot(contains('private')));
+  });
+
   test('missing files are reported, not fatal', () async {
     final b = FakeBackend('u1');
     final r = await publishStory(

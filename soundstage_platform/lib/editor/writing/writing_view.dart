@@ -7,6 +7,7 @@ import 'package:soundstage_platform/runtime/runtime.dart';
 import '../core/core.dart';
 import 'writing_blocks.dart';
 import 'writing_field.dart';
+import 'writing_note.dart';
 
 /// The readable measure of the Writing view.
 const double kWritingMeasure = 720;
@@ -169,10 +170,13 @@ class _SceneSection extends StatelessWidget {
         key: ValueKey<String>('writing-scene:${scene.id}'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            '${index + 1} · ${scene.name.isEmpty ? 'Scene ${index + 1}' : scene.name}'
-                .toUpperCase(),
-            style: t.text.overline,
+          WritingNoted(
+            id: scene.id,
+            child: Text(
+              '${index + 1} · ${scene.name.isEmpty ? 'Scene ${index + 1}' : scene.name}'
+                  .toUpperCase(),
+              style: t.text.overline,
+            ),
           ),
           const SizedBox(height: SsSpace.s1),
           Divider(height: SsSpace.s4, color: t.colors.borderSubtle),
@@ -181,7 +185,12 @@ class _SceneSection extends StatelessWidget {
               'No text in this scene.',
               style: t.text.body.copyWith(color: t.colors.textDisabled),
             ),
-          for (final b in scene.flow) _block(context, b),
+          for (final b in scene.flow)
+            WritingNoted(
+              key: ValueKey<String>('noted:${b.nodeId}'),
+              id: b.nodeId.split('/').first,
+              child: _block(context, b),
+            ),
           if (other.isNotEmpty) ...[
             const SizedBox(height: SsSpace.s3),
             Text('Other text in this scene', style: t.text.caption),
