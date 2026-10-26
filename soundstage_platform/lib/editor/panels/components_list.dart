@@ -4,6 +4,7 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../core/core.dart';
+import '../insert/starter_components.dart';
 
 /// The story's components (Assets ▸ Components; m3.md T3.2). Click inserts
 /// an instance into the active scene (or, in isolation, into the main being
@@ -52,8 +53,66 @@ class _ComponentsListState extends ConsumerState<ComponentsList> {
     );
   }
 
+  void _addStarter(StarterComponent s) {
+    final st = ref.read(editorControllerProvider);
+    final parent = st.isolation?.rootId ?? st.activeScene?.root.id;
+    if (parent == null) return;
+    _ctl.execute(AddStarterComponent(s, parentId: parent));
+  }
+
+  Widget _starters(BuildContext context) {
+    final t = context.ss;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        SsSpace.s3,
+        SsSpace.s1,
+        SsSpace.s1,
+        SsSpace.s1,
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text('COMPONENTS', style: t.text.overline)),
+          Builder(
+            builder: (anchor) => SsIconButton(
+              key: const ValueKey<String>('components:starter'),
+              icon: SsIcons.plus,
+              semanticLabel: 'Add a starter component',
+              tooltip: 'Add a starter component',
+              size: 24,
+              iconSize: 14,
+              onPressed: () {
+                final box = anchor.findRenderObject()! as RenderBox;
+                showSsMenu(
+                  context,
+                  anchor: box.localToGlobal(Offset.zero) & box.size,
+                  placement: SsPlacement.belowEnd,
+                  entries: [
+                    for (final s in StarterComponent.values)
+                      SsMenuItem(
+                        label: starterName(s),
+                        icon: SsIcons.layoutTemplate,
+                        onSelected: () => _addStarter(s),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _starters(context),
+      Expanded(child: _list(context)),
+    ],
+  );
+
+  Widget _list(BuildContext context) {
     final t = context.ss;
     final comps = ref.watch(
       editorControllerProvider.select((s) => s.document.components),
@@ -65,8 +124,8 @@ class _ComponentsListState extends ConsumerState<ComponentsList> {
       return Padding(
         padding: const EdgeInsets.all(SsSpace.s4),
         child: Text(
-          'No components yet. Select a frame and choose "Create component" '
-          'in the inspector.',
+          'No components yet. Make one from a frame (the component button '
+          'in the inspector), or add a starter with +.',
           style: t.text.caption,
           textAlign: TextAlign.center,
         ),
