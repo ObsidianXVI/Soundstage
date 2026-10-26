@@ -1,11 +1,14 @@
 rules_version = '2';
 
-// Soundstage Firestore (m4.md T4.1).
-//   stories/{storyId}   an author's story metadata; the document JSON and
-//                       assets live in Storage under users/{uid}/stories/.
-//   published/{slug}    the public pointer for /s/<slug>: owner, story,
-//                       version, title, description, poster path.
-//   series/{slug}       a project's published issues (/series/<slug>).
+// Soundstage Firestore (m4.md T4.1, m7.md T7.1–T7.2).
+//   stories/{storyId}   an author's story metadata (where it is published).
+//   handles/{handle}    a handle's owner (public); claimed once, with the
+//                       owner's profiles/{uid} in the same batch.
+//   profiles/{uid}      the author's handle and display name (public).
+//   sites/{handle}/drafts/{slug}                    a one-off story's record
+//   sites/{handle}/publications/{pub}               a project's publication
+//   sites/{handle}/publications/{pub}/issues/{slug} an issue's record
+//                       (public read; written by the handle's owner).
 //   config/invites      {emails: [...]}, kept by the admin in the console
 //                       (DECISIONS 26/10/26 "Invites"); never readable.
 //   members/{uid}       a probe: reading your own works only when invited.
@@ -44,30 +47,87 @@ service cloud.firestore {
         && request.resource.data.title.size() <= 200;
     }
 
-    match /published/{slug} {
+    function validSlug(slug) {
+      return slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$');
+    }
+
+    function ownsHandle(handle) {
+      return get(/databases/$(database)/documents/handles/$(handle)).data.ownerId
+        == request.auth.uid;
+    }
+
+    function profile(uid) {
+      return /databases/$(database)/documents/profiles/$(uid);
+    }
+
+    match /handles/{handle} {
       allow read: if true;
-      allow create: if invited() && isOwner(request.resource.data)
-        && slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$')
+      // Existing handles are updates, which nobody may make: a taken handle
+      // stays taken. One handle per author (no profile before).
+      allow create: if invited()
+        && handle.matches('^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$')
+        && !(handle in ['admin', 'api', 'help', 'soundstage', 'support', 'www'])
+        && request.resource.data.ownerId == request.auth.uid
+        && !exists(profile(request.auth.uid))
+        && getAfter(profile(request.auth.uid)).data.handle == handle;
+    }
+
+    match /profiles/{uid} {
+      allow read: if true;
+      allow create: if invited() && request.auth.uid == uid
+        && request.resource.data.handle is string
+        && getAfter(/databases/$(database)/documents/handles/$(request.resource.data.handle)).data.ownerId == uid;
+      allow update: if invited() && request.auth.uid == uid
+        && request.resource.data.handle == resource.data.handle;
+    }
+
+    // A published story's record (a one-off draft or an issue).
+    function createsStory(handle, slug) {
+      return invited() && validSlug(slug) && ownsHandle(handle)
+        && isOwner(request.resource.data)
         && request.resource.data.storyId is string
-        && request.resource.data.version is int;
-      allow update: if invited() && isOwner(resource.data) && keepsOwner()
         && request.resource.data.version is int
-        && request.resource.data.version >= resource.data.version;
+        && request.resource.data.versions is list;
+    }
+
+    // The live version may move back (make a version live, T7.3); the
+    // story stays the same.
+    function updatesStory(handle) {
+      return invited() && ownsHandle(handle)
+        && isOwner(resource.data) && keepsOwner()
+        && request.resource.data.storyId == resource.data.storyId
+        && request.resource.data.version is int
+        && request.resource.data.versions is list;
+    }
+
+    match /sites/{handle}/drafts/{slug} {
+      allow read: if true;
+      allow create: if createsStory(handle, slug);
+      allow update: if updatesStory(handle);
       allow delete: if isOwner(resource.data);
     }
 
-    // A project's public index of its published issues (series page).
-    match /series/{slug} {
+    match /sites/{handle}/publications/{pub} {
       allow read: if true;
-      allow create: if invited() && isOwner(request.resource.data)
-        && slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$')
+      allow create: if invited() && validSlug(pub) && pub != 's'
+        && ownsHandle(handle)
+        && isOwner(request.resource.data)
         && request.resource.data.projectId is string
         && request.resource.data.issues is list
         && request.resource.data.issues.size() <= 500;
-      allow update: if invited() && isOwner(resource.data) && keepsOwner()
+      allow update: if invited() && ownsHandle(handle)
+        && isOwner(resource.data) && keepsOwner()
+        && request.resource.data.projectId == resource.data.projectId
         && request.resource.data.issues is list
         && request.resource.data.issues.size() <= 500;
       allow delete: if isOwner(resource.data);
+
+      match /issues/{slug} {
+        allow read: if true;
+        allow create: if createsStory(handle, slug);
+        allow update: if updatesStory(handle);
+        allow delete: if isOwner(resource.data);
+      }
     }
 
     // The app's access check: the get succeeds (as not-found) only for an

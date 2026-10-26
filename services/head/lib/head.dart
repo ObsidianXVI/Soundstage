@@ -1,32 +1,148 @@
-// Link previews for published stories (m4.md T4.3, DECISIONS 26/10/26
-// "Head metadata"): the app is a single-page Flutter build, so crawlers
-// would see one generic <head> for every /s/<slug>. This rewrites the
-// shell's head with the story's title, description and cover image.
+// Link previews for published work (m4.md T4.3, m7.md T7.2, DECISIONS
+// 26/10/26 "Head metadata" and "Handles and URLs"): the app is a
+// single-page Flutter build, so crawlers would see one generic <head> for
+// every page. This rewrites the shell's head with the page's title,
+// description and cover image.
 
 final RegExp _slugPattern = RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$');
+final RegExp _handlePattern = RegExp(r'^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$');
 
-/// The slug of a `/s/<slug>` path (a trailing slash is allowed), or null.
-String? slugFromPath(String path) {
-  final m = RegExp(r'^/s/([^/]+)/?$').firstMatch(path);
-  final slug = m?.group(1);
-  return slug != null && _slugPattern.hasMatch(slug) ? slug : null;
+/// A page under `/@<handle>` with its Firestore document.
+sealed class HeadRoute {
+  const HeadRoute(this.handle);
+
+  final String handle;
+
+  /// The Firestore document path (under `documents/`).
+  String get docPath;
+
+  /// The page's path on the site.
+  String get path;
+
+  /// The route of [path] (a trailing slash is allowed), or null.
+  static HeadRoute? parse(String path) {
+    var parts = path.split('/');
+    if (parts.isNotEmpty && parts.first.isEmpty) parts = parts.sublist(1);
+    if (parts.isNotEmpty && parts.last.isEmpty) {
+      parts = parts.sublist(0, parts.length - 1);
+    }
+    if (parts.isEmpty || parts.length > 3 || !parts.first.startsWith('@')) {
+      return null;
+    }
+    final handle = parts.first.substring(1).toLowerCase();
+    if (!_handlePattern.hasMatch(handle)) return null;
+    final rest = parts.sublist(1);
+    if (!rest.every(_slugPattern.hasMatch)) return null;
+    return switch (rest) {
+      [] => SiteRoute(handle),
+      ['s'] => null,
+      ['s', final slug] => DraftRoute(handle, slug),
+      [final pub] => PublicationRoute(handle, pub),
+      [final pub, final slug] => IssueRoute(handle, pub, slug),
+      _ => null,
+    };
+  }
+
+  /// The route of a Firestore document [name]
+  /// (`projects/…/documents/sites/<h>/drafts/<slug>` and the like), or
+  /// null.
+  static HeadRoute? fromDocumentName(String name) {
+    final i = name.indexOf('/documents/sites/');
+    if (i < 0) return null;
+    final parts = name.substring(i + '/documents/sites/'.length).split('/');
+    return switch (parts) {
+      [final h, 'drafts', final slug] => DraftRoute(h, slug),
+      [final h, 'publications', final pub] => PublicationRoute(h, pub),
+      [final h, 'publications', final pub, 'issues', final slug] => IssueRoute(
+        h,
+        pub,
+        slug,
+      ),
+      _ => null,
+    };
+  }
 }
 
-/// The slug of a `/series/<slug>` path, or null.
-String? seriesSlugFromPath(String path) {
-  final m = RegExp(r'^/series/([^/]+)/?$').firstMatch(path);
-  final slug = m?.group(1);
-  return slug != null && _slugPattern.hasMatch(slug) ? slug : null;
+/// `/@<handle>`.
+class SiteRoute extends HeadRoute {
+  const SiteRoute(super.handle);
+
+  @override
+  String get docPath => 'handles/$handle';
+
+  @override
+  String get path => '/@$handle';
 }
 
-/// A series' preview from its Firestore REST document: its title, how
+/// `/@<handle>/s/<slug>`.
+class DraftRoute extends HeadRoute {
+  const DraftRoute(super.handle, this.slug);
+
+  final String slug;
+
+  @override
+  String get docPath => 'sites/$handle/drafts/$slug';
+
+  @override
+  String get path => '/@$handle/s/$slug';
+}
+
+/// `/@<handle>/<pub>`.
+class PublicationRoute extends HeadRoute {
+  const PublicationRoute(super.handle, this.publication);
+
+  final String publication;
+
+  @override
+  String get docPath => 'sites/$handle/publications/$publication';
+
+  @override
+  String get path => '/@$handle/$publication';
+}
+
+/// `/@<handle>/<pub>/<slug>`.
+class IssueRoute extends HeadRoute {
+  const IssueRoute(super.handle, this.publication, this.slug);
+
+  final String publication;
+  final String slug;
+
+  @override
+  String get docPath => 'sites/$handle/publications/$publication/issues/$slug';
+
+  @override
+  String get path => '/@$handle/$publication/$slug';
+}
+
+String _text(Map<String, Object?> fields, String name) =>
+    switch (fields[name]) {
+      {'stringValue': final String t} => t.trim(),
+      _ => '',
+    };
+
+Map<String, Object?> _fields(Map<String, Object?> doc) =>
+    (doc['fields'] as Map<String, Object?>?) ?? const {};
+
+/// The preview of [route] from its Firestore REST document [doc], shown at
+/// [url].
+StoryHead headFor(HeadRoute route, Map<String, Object?> doc, String url) =>
+    switch (route) {
+      SiteRoute(:final handle) => () {
+        final name = _text(_fields(doc), 'name');
+        return StoryHead(
+          title: name.isEmpty ? '@$handle' : '$name (@$handle)',
+          description: 'Stories by @$handle on Soundstage.',
+          url: url,
+        );
+      }(),
+      PublicationRoute() => publicationHead(doc, url),
+      DraftRoute() || IssueRoute() => StoryHead.fromFirestore(doc, url),
+    };
+
+/// A publication's preview from its Firestore REST document: its title, how
 /// many issues, and the newest issue's cover.
-StoryHead seriesHead(Map<String, Object?> doc, String url) {
-  final fields = (doc['fields'] as Map<String, Object?>?) ?? const {};
-  final title = switch (fields['title']) {
-    {'stringValue': final String t} => t.trim(),
-    _ => '',
-  };
+StoryHead publicationHead(Map<String, Object?> doc, String url) {
+  final fields = _fields(doc);
   final issues = switch (fields['issues']) {
     {'arrayValue': {'values': final List<Object?> v}} => v,
     _ => const <Object?>[],
@@ -37,17 +153,13 @@ StoryHead seriesHead(Map<String, Object?> doc, String url) {
           {'mapValue': {'fields': final Map<String, Object?> f}} => f,
           _ => null,
         };
-  final image = switch (first?['image']) {
-    {'stringValue': final String s} => s,
-    _ => '',
-  };
   final n = issues.length;
   return StoryHead(
-    title: title,
+    title: _text(fields, 'title'),
     description: n == 0
-        ? 'A series on Soundstage.'
-        : 'A series on Soundstage: $n ${n == 1 ? 'issue' : 'issues'}.',
-    image: image,
+        ? 'A publication on Soundstage.'
+        : 'A publication on Soundstage: $n ${n == 1 ? 'issue' : 'issues'}.',
+    image: first == null ? '' : _text(first, 'image'),
     url: url,
   );
 }
@@ -137,19 +249,19 @@ String injectHead(String html, StoryHead head) {
   return out.replaceFirst('</head>', '$tags</head>');
 }
 
-/// A published story in the sitemap: its slug and when it last changed.
-typedef SitemapEntry = ({String slug, String? lastModified});
+/// A published page in the sitemap: its path and when it last changed.
+typedef SitemapEntry = ({String path, String? lastModified});
 
-/// The entries of one Firestore REST list page of `published` (document
-/// names end in the slug; `updatedAt` is a timestamp value).
-List<SitemapEntry> sitemapEntries(Map<String, Object?> page) {
-  final docs = (page['documents'] as List<Object?>?) ?? const [];
+/// The entries of a Firestore REST `runQuery` reply (a list of
+/// `{"document": {...}}`; `updatedAt` is a timestamp value).
+List<SitemapEntry> sitemapEntries(Object? reply) {
+  final rows = reply is List ? reply : const <Object?>[];
   return [
-    for (final d in docs.whereType<Map<String, Object?>>())
-      if (d['name'] case final String name)
-        if (_slugPattern.hasMatch(name.split('/').last))
+    for (final r in rows.whereType<Map<String, Object?>>())
+      if (r['document'] case {'name': final String name} && final Map d)
+        if (HeadRoute.fromDocumentName(name) case final route?)
           (
-            slug: name.split('/').last,
+            path: route.path,
             lastModified: switch (d['fields']) {
               {'updatedAt': {'timestampValue': final String t}} => t,
               _ => null,
@@ -158,26 +270,23 @@ List<SitemapEntry> sitemapEntries(Map<String, Object?> page) {
   ];
 }
 
-/// `sitemap.xml` for [site] (no trailing slash): the home page and every
-/// published story.
-String sitemapXml(
-  String site,
-  Iterable<SitemapEntry> entries, {
-  Iterable<SitemapEntry> series = const [],
-}) {
+/// `sitemap.xml` for [site] (no trailing slash): the home page, every
+/// handle with published work, and every published page.
+String sitemapXml(String site, Iterable<SitemapEntry> entries) {
+  final list = entries.toList();
+  final handles = {
+    for (final e in list)
+      if (HeadRoute.parse(e.path) case final r?) r.handle,
+  };
   final out = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     ..writeln('  <url><loc>${escapeHtml('$site/')}</loc></url>');
-  for (final e in entries) {
-    out.write('  <url><loc>${escapeHtml('$site/s/${e.slug}')}</loc>');
-    if (e.lastModified case final t?) {
-      out.write('<lastmod>${escapeHtml(t)}</lastmod>');
-    }
-    out.writeln('</url>');
+  for (final h in handles) {
+    out.writeln('  <url><loc>${escapeHtml('$site/@$h')}</loc></url>');
   }
-  for (final e in series) {
-    out.write('  <url><loc>${escapeHtml('$site/series/${e.slug}')}</loc>');
+  for (final e in list) {
+    out.write('  <url><loc>${escapeHtml('$site${e.path}')}</loc>');
     if (e.lastModified case final t?) {
       out.write('<lastmod>${escapeHtml(t)}</lastmod>');
     }

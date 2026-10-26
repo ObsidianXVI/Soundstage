@@ -21,8 +21,9 @@ class EditorPublishAction {
 }
 
 /// Publish mode (m5.md T5.1): the live player at full size with the width
-/// and tier pickers (Full / Lite / Static are what readers get at
-/// `/s/<slug>` and `?tier=`), and beside it Publish and the app's exports.
+/// and tier pickers (Full / Lite / Static are what readers get at their
+/// published link with `?tier=`), and beside it Publish and the app's
+/// exports.
 class PublishView extends ConsumerWidget {
   const PublishView({
     this.onPublish,

@@ -13,13 +13,30 @@ const _shell = '''<!DOCTYPE html>
 </html>''';
 
 void main() {
-  test('slugs come from /s/<slug> paths only', () {
-    expect(slugFromPath('/s/night-walk'), 'night-walk');
-    expect(slugFromPath('/s/night-walk/'), 'night-walk');
-    expect(slugFromPath('/s/Night'), isNull);
-    expect(slugFromPath('/s/a/b'), isNull);
-    expect(slugFromPath('/edit/x'), isNull);
-    expect(slugFromPath('/s/'), isNull);
+  test('routes come from /@<handle>/… paths only', () {
+    expect(HeadRoute.parse('/@ada'), isA<SiteRoute>());
+    expect(HeadRoute.parse('/@Ada/')!.handle, 'ada');
+    final d = HeadRoute.parse('/@ada/s/night-walk')! as DraftRoute;
+    expect(d.slug, 'night-walk');
+    expect(d.docPath, 'sites/ada/drafts/night-walk');
+    expect(d.path, '/@ada/s/night-walk');
+    final p = HeadRoute.parse('/@ada/weekly')! as PublicationRoute;
+    expect(p.docPath, 'sites/ada/publications/weekly');
+    final i = HeadRoute.parse('/@ada/weekly/one/')! as IssueRoute;
+    expect(i.docPath, 'sites/ada/publications/weekly/issues/one');
+    expect(i.path, '/@ada/weekly/one');
+    for (final bad in [
+      '/@ada/s',
+      '/@ad',
+      '/ada',
+      '/@ada/Night',
+      '/@ada/a/b/c',
+      '/edit/x',
+      '/s/x',
+      '/',
+    ]) {
+      expect(HeadRoute.parse(bad), isNull, reason: bad);
+    }
   });
 
   test('Firestore REST fields', () {
@@ -71,37 +88,50 @@ void main() {
     expect(out, contains('content="summary"'));
   });
 
-  test('sitemap from a Firestore list page', () {
-    final entries = sitemapEntries({
-      'documents': [
-        {
-          'name': 'projects/p/databases/(default)/documents/published/night',
+  test('sitemap from collection-group queries', () {
+    const root = 'projects/p/databases/(default)/documents';
+    final entries = sitemapEntries([
+      {
+        'document': {
+          'name': '$root/sites/ada/drafts/night',
           'fields': {
             'updatedAt': {'timestampValue': '2026-10-26T04:00:00Z'},
           },
         },
-        {'name': 'projects/p/databases/(default)/documents/published/x2'},
-        {'name': 'projects/p/databases/(default)/documents/published/Bad'},
-      ],
-    });
-    expect(entries.map((e) => e.slug), ['night', 'x2']);
+      },
+      {
+        'document': {'name': '$root/sites/ada/publications/weekly'},
+      },
+      {
+        'document': {'name': '$root/sites/bob/publications/weekly/issues/one'},
+      },
+      {
+        'document': {'name': '$root/stories/x'},
+      },
+      {'readTime': '2026-10-26T04:00:00Z'}, // an empty reply has one of these
+    ]);
+    expect(entries.map((e) => e.path), [
+      '/@ada/s/night',
+      '/@ada/weekly',
+      '/@bob/weekly/one',
+    ]);
     final xml = sitemapXml('https://site', entries);
     expect(xml, contains('<loc>https://site/</loc>'));
+    expect(xml, contains('<url><loc>https://site/@ada</loc></url>'));
+    expect(xml, contains('<url><loc>https://site/@bob</loc></url>'));
     expect(
       xml,
       contains(
-        '<url><loc>https://site/s/night</loc>'
+        '<url><loc>https://site/@ada/s/night</loc>'
         '<lastmod>2026-10-26T04:00:00Z</lastmod></url>',
       ),
     );
-    expect(xml, contains('<url><loc>https://site/s/x2</loc></url>'));
+    expect(xml, contains('<url><loc>https://site/@bob/weekly/one</loc></url>'));
     expect(sitemapEntries({}), isEmpty);
   });
 
-  test('series previews and sitemap entries', () {
-    expect(seriesSlugFromPath('/series/weekly'), 'weekly');
-    expect(seriesSlugFromPath('/s/weekly'), isNull);
-    final h = seriesHead({
+  test('previews of a publication and a handle', () {
+    final h = headFor(const PublicationRoute('ada', 'weekly'), {
       'fields': {
         'title': {'stringValue': 'Weekly'},
         'issues': {
@@ -121,15 +151,22 @@ void main() {
           },
         },
       },
-    }, 'https://site/series/weekly');
+    }, 'https://site/@ada/weekly');
     expect(h.title, 'Weekly');
     expect(h.description, contains('2 issues'));
     expect(h.image, 'https://cdn/c.png');
-    final xml = sitemapXml(
-      'https://site',
-      const [],
-      series: const [(slug: 'weekly', lastModified: null)],
-    );
-    expect(xml, contains('<loc>https://site/series/weekly</loc>'));
+    final site = headFor(const SiteRoute('ada'), {
+      'fields': {
+        'name': {'stringValue': 'Ada'},
+      },
+    }, 'https://site/@ada');
+    expect(site.title, 'Ada (@ada)');
+    expect(headFor(const SiteRoute('ada'), const {}, 'u').title, '@ada');
+    final story = headFor(const DraftRoute('ada', 'x'), {
+      'fields': {
+        'title': {'stringValue': 'Night'},
+      },
+    }, 'u');
+    expect(story.title, 'Night');
   });
 }

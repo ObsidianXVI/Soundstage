@@ -175,6 +175,11 @@ class StoryRow extends ConsumerWidget {
           icon: SsIcons.globe,
           onSelected: () => actions.publish(story),
         ),
+        SsMenuItem(
+          label: 'Published versions…',
+          icon: SsIcons.layers,
+          onSelected: () => actions.versions(story),
+        ),
       ],
       const SsMenuDivider(),
       SsMenuItem(

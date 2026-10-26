@@ -7,26 +7,26 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import 'not_found_page.dart';
 
-/// The series at a slug (null: none, or a local-only build).
-final seriesProvider = FutureProvider.autoDispose.family<SeriesRecord?, String>(
-  (ref, slug) async {
-    final cloud = ref.watch(cloudProvider);
-    if (cloud == null) return null;
-    return cloud.backend.series(slug);
-  },
-);
+/// The publication at a ref (null: none, or a local-only build).
+final seriesProvider = FutureProvider.autoDispose
+    .family<SeriesRecord?, PublicationRef>((ref, at) async {
+      final cloud = ref.watch(cloudProvider);
+      if (cloud == null) return null;
+      return cloud.backend.series(at);
+    });
 
-/// `/series/:slug`: a project's published issues, newest first
-/// (DECISIONS 26/10/26 #11). Each opens its story at `/s/<slug>`.
+/// `/@<handle>/<pub>`: a project's published issues, newest first
+/// (DECISIONS 26/10/26 #11, m7.md T7.2). Each opens at
+/// `/@<handle>/<pub>/<issue>`.
 class SeriesPage extends ConsumerWidget {
-  const SeriesPage({required this.slug, super.key});
+  const SeriesPage({required this.publication, super.key});
 
-  final String slug;
+  final PublicationRef publication;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.ss;
-    return switch (ref.watch(seriesProvider(slug))) {
+    return switch (ref.watch(seriesProvider(publication))) {
       AsyncData(:final value?) => Scaffold(
         backgroundColor: t.colors.surface0,
         body: SafeArea(
@@ -39,10 +39,15 @@ class SeriesPage extends ConsumerWidget {
                   vertical: SsSpace.s8,
                 ),
                 children: [
-                  Text('SERIES', style: t.text.overline),
+                  SsInteractive(
+                    semanticLabel: '@${publication.handle}',
+                    onTap: () => context.go('/@${publication.handle}'),
+                    builder: (context, _) =>
+                        Text('@${publication.handle}', style: t.text.overline),
+                  ),
                   const SizedBox(height: SsSpace.s1),
                   Text(
-                    value.title.isEmpty ? slug : value.title,
+                    value.title.isEmpty ? publication.slug : value.title,
                     style: t.text.heading.copyWith(fontSize: 32, height: 1.2),
                   ),
                   const SizedBox(height: SsSpace.s6),
@@ -53,26 +58,42 @@ class SeriesPage extends ConsumerWidget {
                         color: t.colors.textSecondary,
                       ),
                     ),
-                  for (final i in value.issues) _IssueRow(issue: i),
+                  for (final i in value.issues)
+                    PublishedEntryRow(
+                      title: i.title,
+                      description: i.description,
+                      image: i.image,
+                      route: '${publication.route}/${i.slug}',
+                    ),
                 ],
               ),
             ),
           ),
         ),
       ),
-      AsyncData() => const NotFoundPage(message: 'Series not found'),
+      AsyncData() => const NotFoundPage(message: 'Publication not found'),
       AsyncError(:final error) => NotFoundPage(
-        message: 'Could not open the series: $error',
+        message: 'Could not open the publication: $error',
       ),
       _ => Scaffold(backgroundColor: t.colors.surface0),
     };
   }
 }
 
-class _IssueRow extends StatelessWidget {
-  const _IssueRow({required this.issue});
+/// A published story or publication as a card: cover, title, text.
+class PublishedEntryRow extends StatelessWidget {
+  const PublishedEntryRow({
+    required this.title,
+    required this.route,
+    this.description = '',
+    this.image = '',
+    super.key,
+  });
 
-  final SeriesIssue issue;
+  final String title;
+  final String route;
+  final String description;
+  final String image;
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +102,8 @@ class _IssueRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: SsSpace.s3),
       child: SsInteractive(
-        semanticLabel: issue.title,
-        onTap: () => context.go('/s/${issue.slug}'),
+        semanticLabel: title,
+        onTap: () => context.go(route),
         builder: (context, s) => Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -93,12 +114,12 @@ class _IssueRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (issue.image.isNotEmpty)
+              if (image.isNotEmpty)
                 SizedBox(
                   width: 160,
                   height: 100,
                   child: Image.network(
-                    issue.image,
+                    image,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(color: c.surface3),
                   ),
@@ -109,11 +130,11 @@ class _IssueRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(issue.title, style: t.text.title),
-                      if (issue.description.isNotEmpty) ...[
+                      Text(title, style: t.text.title),
+                      if (description.isNotEmpty) ...[
                         const SizedBox(height: SsSpace.s1),
                         Text(
-                          issue.description,
+                          description,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: t.text.small.copyWith(color: c.textSecondary),

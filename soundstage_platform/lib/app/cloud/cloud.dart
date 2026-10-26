@@ -123,9 +123,55 @@ class FirebaseCloudBackend implements CloudBackend {
   FirebaseCloudBackend(this._cloud);
 
   final Cloud _cloud;
+  (String, String?)? _handle; // (uid, handle) once read
+
+  FirebaseFirestore get _db => _cloud.firestore;
 
   @override
   String? get uid => _cloud.auth.currentUser?.uid;
+
+  @override
+  Future<String?> handle() async {
+    final uid = this.uid;
+    if (uid == null) return null;
+    final cached = _handle;
+    if (cached != null && cached.$1 == uid && cached.$2 != null) {
+      return cached.$2;
+    }
+    final h = (await _db.doc('profiles/$uid').get()).data()?['handle'];
+    _handle = (uid, h as String?);
+    return h;
+  }
+
+  @override
+  Future<void> claimHandle(String handle, {String name = ''}) async {
+    final uid = this.uid;
+    if (uid == null) throw const PublishException('Sign in first.');
+    if (!isValidHandle(handle)) {
+      throw const PublishException(
+        'Use 3–30 lowercase letters, digits and dashes.',
+      );
+    }
+    if ((await _db.doc('handles/$handle').get()).exists) {
+      throw PublishException('@$handle is taken. Choose another.');
+    }
+    try {
+      await (_db.batch()
+            ..set(_db.doc('handles/$handle'), {
+              'ownerId': uid,
+              'name': name,
+              'createdAt': FieldValue.serverTimestamp(),
+            })
+            ..set(_db.doc('profiles/$uid'), {'handle': handle, 'name': name}))
+          .commit();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        throw PublishException('@$handle is taken. Choose another.');
+      }
+      rethrow;
+    }
+    _handle = (uid, handle);
+  }
 
   @override
   Future<bool> exists(String path) async {
@@ -165,52 +211,85 @@ class FirebaseCloudBackend implements CloudBackend {
   }
 
   @override
-  Future<PublishedRecord?> published(String slug) async {
-    final snap = await _cloud.firestore.doc('published/$slug').get();
-    final data = snap.data();
+  Future<PublishedRecord?> published(PublishTarget target) async {
+    final data = (await _db.doc(target.docPath).get()).data();
     return data == null ? null : PublishedRecord.fromMap(data);
   }
 
   @override
-  Future<void> setPublished(String slug, PublishedRecord record) => _cloud
-      .firestore
-      .doc('published/$slug')
+  Future<void> setPublished(PublishTarget target, PublishedRecord record) => _db
+      .doc(target.docPath)
       .set({...record.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
 
   @override
-  Future<String?> publishedSlugOf(String storyId) async {
-    final snap = await _cloud.firestore.doc('stories/$storyId').get();
-    return snap.data()?['publishedSlug'] as String?;
+  Future<PublishTarget?> publishedTargetOf(String storyId) async {
+    final snap = await _db.doc('stories/$storyId').get();
+    return PublishTarget.fromMap(snap.data()?['published']);
   }
 
   @override
-  Future<SeriesRecord?> series(String slug) async {
-    final data = (await _cloud.firestore.doc('series/$slug').get()).data();
+  Future<SeriesRecord?> series(PublicationRef ref) async {
+    final data = (await _db.doc(ref.docPath).get()).data();
     return data == null ? null : SeriesRecord.fromMap(data);
   }
 
   @override
-  Future<void> setSeries(String slug, SeriesRecord record) => _cloud.firestore
-      .doc('series/$slug')
+  Future<void> setSeries(PublicationRef ref, SeriesRecord record) => _db
+      .doc(ref.docPath)
       .set({...record.toMap(), 'updatedAt': FieldValue.serverTimestamp()});
 
   @override
-  Future<String?> seriesSlugOf(String projectId) async {
-    final uid = this.uid;
-    if (uid == null) return null;
-    final q = await _cloud.firestore
-        .collection('series')
-        .where('ownerId', isEqualTo: uid)
+  Future<PublicationRef?> publicationOf(String projectId) async {
+    final h = await handle();
+    if (h == null) return null;
+    final q = await _db
+        .collection('sites/$h/publications')
         .where('projectId', isEqualTo: projectId)
         .limit(1)
         .get();
-    return q.docs.isEmpty ? null : q.docs.first.id;
+    return q.docs.isEmpty ? null : PublicationRef(h, q.docs.first.id);
+  }
+
+  @override
+  Future<SiteListing?> site(String handle) async {
+    final owner = (await _db.doc('handles/$handle').get()).data();
+    if (owner == null) return null;
+    final pubs = await _db.collection('sites/$handle/publications').get();
+    final drafts = await _db.collection('sites/$handle/drafts').get();
+    return SiteListing(
+      handle: handle,
+      name: (owner['name'] as String?) ?? '',
+      publications: [
+        for (final d in pubs.docs)
+          _publicationEntry(handle, d.id, SeriesRecord.fromMap(d.data())),
+      ],
+      drafts: [
+        for (final d in drafts.docs)
+          _draftEntry(handle, d.id, PublishedRecord.fromMap(d.data())),
+      ],
+    );
   }
 
   @override
   Future<void> setStoryMeta(String storyId, Map<String, Object?> data) =>
-      _cloud.firestore.doc('stories/$storyId').set({
+      _db.doc('stories/$storyId').set({
         ...data,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 }
+
+SiteEntry _publicationEntry(String handle, String slug, SeriesRecord r) =>
+    SiteEntry(
+      route: PublicationRef(handle, slug).route,
+      title: r.title.isEmpty ? slug : r.title,
+      image: r.issues.firstOrNull?.image ?? '',
+      issueCount: r.issues.length,
+    );
+
+SiteEntry _draftEntry(String handle, String slug, PublishedRecord r) =>
+    SiteEntry(
+      route: DraftTarget(handle, slug).route,
+      title: r.title.isEmpty ? slug : r.title,
+      description: r.description,
+      image: r.image,
+    );

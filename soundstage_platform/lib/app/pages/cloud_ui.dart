@@ -301,21 +301,156 @@ String authErrorText(String code) => switch (code) {
   _ => 'Sign-in failed ($code).',
 };
 
-/// Asks for the published link of a story: [suggested] is prefilled.
-/// Returns the chosen slug, or null when cancelled.
+/// The signed-in author's handle; asks them to choose one the first time
+/// (DECISIONS 26/10/26 "Handles and URLs"). Null when cancelled or it
+/// could not be read.
+Future<String?> ensureHandle(BuildContext context, Cloud cloud) async {
+  try {
+    final h = await cloud.backend.handle();
+    if (h != null || !context.mounted) return h;
+  } on Object {
+    if (context.mounted) {
+      SsToast.show(
+        context,
+        'Could not reach Soundstage. Check the network.',
+        kind: SsToastKind.danger,
+      );
+    }
+    return null;
+  }
+  return showSsDialog<String>(
+    context,
+    builder: (ctx) => _HandleDialog(
+      backend: cloud.backend,
+      suggested: handleFor(cloud.auth.currentUser?.email ?? ''),
+    ),
+  );
+}
+
+class _HandleDialog extends StatefulWidget {
+  const _HandleDialog({required this.backend, required this.suggested});
+
+  final CloudBackend backend;
+  final String suggested;
+
+  @override
+  State<_HandleDialog> createState() => _HandleDialogState();
+}
+
+class _HandleDialogState extends State<_HandleDialog> {
+  late final _handle = TextEditingController(text: widget.suggested);
+  final _name = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _handle.dispose();
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final h = _handle.text.trim();
+    if (!isValidHandle(h)) return setState(() {});
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.backend.claimHandle(h, name: _name.text.trim());
+      if (mounted) Navigator.of(context).pop(h);
+    } on PublishException catch (e) {
+      setState(() {
+        _busy = false;
+        _error = e.message;
+      });
+    } on Object catch (e) {
+      setState(() {
+        _busy = false;
+        _error = 'Could not save the handle: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.ss;
+    final h = _handle.text.trim();
+    final valid = isValidHandle(h);
+    return SsDialog(
+      title: 'Choose your handle',
+      width: 440,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Everything you publish lives under your handle. It cannot be '
+            'changed later.',
+            style: t.text.small.copyWith(color: t.colors.textSecondary),
+          ),
+          const SizedBox(height: SsSpace.s3),
+          SsTextField(
+            key: const ValueKey<String>('handle:handle'),
+            controller: _handle,
+            autofocus: true,
+            selectAllOnFocus: true,
+            semanticLabel: 'Handle',
+            prefix: Text('${Uri.base.origin}/@', style: t.text.small),
+            errorText: valid || h.isEmpty
+                ? _error
+                : '3–30 lowercase letters, digits and dashes',
+            onChanged: (_) => setState(() => _error = null),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: SsSpace.s2),
+          SsTextField(
+            key: const ValueKey<String>('handle:name'),
+            controller: _name,
+            placeholder: 'Display name (optional)',
+            semanticLabel: 'Display name',
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        SsButton(
+          label: 'Cancel',
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+        ),
+        SsButton(
+          key: const ValueKey<String>('handle:submit'),
+          label: _busy ? 'Saving…' : 'Use this handle',
+          variant: SsButtonVariant.primary,
+          onPressed: valid && !_busy ? _submit : null,
+        ),
+      ],
+    );
+  }
+}
+
+/// Asks for the published link of a story or publication: [suggested] is
+/// prefilled after [prefix] (the link up to the slug). [valid] checks the
+/// slug (default [isValidSlug]). Returns the chosen slug, or null when
+/// cancelled.
 Future<String?> showPublishDialog(
   BuildContext context, {
   required String title,
   required String suggested,
-  required String origin,
-  String path = 's',
+  required String prefix,
+  String? note,
+  String action = 'Publish',
+  bool Function(String slug) valid = isValidSlug,
 }) => showSsDialog<String>(
   context,
   builder: (ctx) => _PublishDialog(
     title: title,
     suggested: suggested,
-    origin: origin,
-    path: path,
+    prefix: prefix,
+    note: note,
+    action: action,
+    valid: valid,
   ),
 );
 
@@ -323,16 +458,18 @@ class _PublishDialog extends StatefulWidget {
   const _PublishDialog({
     required this.title,
     required this.suggested,
-    required this.origin,
-    this.path = 's',
+    required this.prefix,
+    required this.action,
+    required this.valid,
+    this.note,
   });
 
   final String title;
   final String suggested;
-  final String origin;
-
-  /// The route the link lives under (`s` for stories, `series`).
-  final String path;
+  final String prefix;
+  final String? note;
+  final String action;
+  final bool Function(String slug) valid;
 
   @override
   State<_PublishDialog> createState() => _PublishDialogState();
@@ -348,7 +485,7 @@ class _PublishDialogState extends State<_PublishDialog> {
   }
 
   void _submit() {
-    if (isValidSlug(_slug.text.trim())) {
+    if (widget.valid(_slug.text.trim())) {
       Navigator.of(context).pop(_slug.text.trim());
     } else {
       setState(() {});
@@ -359,17 +496,18 @@ class _PublishDialogState extends State<_PublishDialog> {
   Widget build(BuildContext context) {
     final t = context.ss;
     final slug = _slug.text.trim();
-    final valid = isValidSlug(slug);
+    final valid = widget.valid(slug);
     return SsDialog(
-      title: 'Publish "${widget.title}"',
+      title: '${widget.action} "${widget.title}"',
       width: 440,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Anyone with the link can read the published version. '
-            'Publishing again updates it.',
+            widget.note ??
+                'Anyone with the link can read the published version. '
+                    'Publishing again adds a version and makes it live.',
             style: t.text.small.copyWith(color: t.colors.textSecondary),
           ),
           const SizedBox(height: SsSpace.s3),
@@ -379,10 +517,7 @@ class _PublishDialogState extends State<_PublishDialog> {
             autofocus: true,
             selectAllOnFocus: true,
             semanticLabel: 'Link',
-            prefix: Text(
-              '${widget.origin}/${widget.path}/',
-              style: t.text.small,
-            ),
+            prefix: Text(widget.prefix, style: t.text.small),
             errorText: valid || slug.isEmpty
                 ? null
                 : 'Lowercase letters, digits and dashes',
@@ -395,7 +530,7 @@ class _PublishDialogState extends State<_PublishDialog> {
         SsButton(label: 'Cancel', onPressed: () => Navigator.of(context).pop()),
         SsButton(
           key: const ValueKey<String>('publish:submit'),
-          label: 'Publish',
+          label: widget.action,
           variant: SsButtonVariant.primary,
           onPressed: valid ? _submit : null,
         ),

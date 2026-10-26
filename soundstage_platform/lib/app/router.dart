@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/design_system/gallery/design_system_gallery.dart';
 import 'package:soundstage_platform/runtime/runtime.dart' show StageTier;
 
+import 'cloud/targets.dart';
 import 'pages/demo_page.dart';
 import 'pages/edit_page.dart';
 import 'pages/not_found_page.dart';
@@ -9,6 +10,7 @@ import 'pages/play_page.dart';
 import 'pages/project_page.dart';
 import 'pages/published_page.dart';
 import 'pages/series_page.dart';
+import 'pages/site_page.dart';
 import 'pages/story_list_page.dart';
 
 bool? _flag(Uri uri, String key, String value) =>
@@ -35,9 +37,10 @@ String? redirectLegacyDemo(Uri uri) {
 /// - `/project/:id` a project's issues
 /// - `/edit/:id` editor (content mode below 1024 px)
 /// - `/play/:id` the player behind the enter gate
-/// - `/s/:slug` a published story (M4)
-/// - `/series/:slug` a project's published issues
-///   (both take `?tier=lite|static`, m4.md T4.6)
+/// - `/@<handle>` an author's published work (m7.md T7.2)
+/// - `/@<handle>/s/:slug` a published one-off story
+/// - `/@<handle>/:pub` a project's publication, `/@<handle>/:pub/:issue`
+///   one of its issues (stories take `?tier=lite|static`, m4.md T4.6)
 /// - `/demo/:name` the M0 demos; `/demo/design-system` the component gallery
 GoRouter buildRouter({String initialLocation = '/'}) {
   return GoRouter(
@@ -66,18 +69,6 @@ GoRouter buildRouter({String initialLocation = '/'}) {
         ),
       ),
       GoRoute(
-        path: '/s/:slug',
-        builder: (context, state) => PublishedPage(
-          slug: state.pathParameters['slug']!,
-          tier: StageTier.parse(state.uri.queryParameters['tier']),
-        ),
-      ),
-      GoRoute(
-        path: '/series/:slug',
-        builder: (context, state) =>
-            SeriesPage(slug: state.pathParameters['slug']!),
-      ),
-      GoRoute(
         path: '/demo/design-system',
         builder: (context, state) => const DesignSystemGallery(),
       ),
@@ -89,6 +80,64 @@ GoRouter buildRouter({String initialLocation = '/'}) {
           statsOn: _flag(state.uri, 'stats', '1'),
         ),
       ),
+      // Last: any other one-segment path; only `@<handle>` is a page.
+      GoRoute(
+        path: '/:who',
+        builder: (context, state) => switch (_handle(state)) {
+          final h? => SitePage(handle: h),
+          null => const NotFoundPage(),
+        },
+        routes: [
+          GoRoute(
+            path: 's/:slug',
+            builder: (context, state) => switch (_handle(state)) {
+              final h? => PublishedPage(
+                target: DraftTarget(h, state.pathParameters['slug']!),
+                tier: StageTier.parse(state.uri.queryParameters['tier']),
+              ),
+              null => const NotFoundPage(),
+            },
+          ),
+          GoRoute(
+            path: ':pub',
+            builder: (context, state) =>
+                switch ((_handle(state), state.pathParameters['pub']!)) {
+                  (final h?, final p) when isValidPublication(p) => SeriesPage(
+                    publication: PublicationRef(h, p),
+                  ),
+                  _ => const NotFoundPage(),
+                },
+            routes: [
+              GoRoute(
+                path: ':issue',
+                builder: (context, state) => switch ((
+                  _handle(state),
+                  state.pathParameters['pub']!,
+                )) {
+                  (final h?, final p) when isValidPublication(p) =>
+                    PublishedPage(
+                      target: IssueTarget(
+                        PublicationRef(h, p),
+                        state.pathParameters['issue']!,
+                      ),
+                      tier: StageTier.parse(state.uri.queryParameters['tier']),
+                    ),
+                  _ => const NotFoundPage(),
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
     ],
   );
+}
+
+/// The handle of a `/@<handle>/…` path, or null for any other first
+/// segment.
+String? _handle(GoRouterState state) {
+  final who = state.pathParameters['who']!;
+  if (!who.startsWith('@')) return null;
+  final h = who.substring(1).toLowerCase();
+  return isValidHandle(h) ? h : null;
 }

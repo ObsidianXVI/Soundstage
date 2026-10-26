@@ -7,7 +7,11 @@ import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
 import 'cloud_ui.dart'
-    show ensureCloudAccess, showPublishDialog, showPublishedDialog;
+    show
+        ensureCloudAccess,
+        ensureHandle,
+        showPublishDialog,
+        showPublishedDialog;
 import 'not_found_page.dart';
 import 'story_list_page.dart' show StoryRow;
 
@@ -137,29 +141,36 @@ class ProjectActions {
     return true;
   }
 
-  /// Publishes the project's series page (`/series/<slug>`): its
-  /// published issues, newest first. Publishing an issue later refreshes it.
+  /// Publishes the project's publication page (`/@<handle>/<pub>`): its
+  /// published issues, newest first. Publishing an issue later refreshes
+  /// it.
   Future<void> publishSeries(ProjectSummary p) async {
     final cloud = ref.read(cloudProvider);
     if (cloud == null) return;
     if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
-    final existing = await cloud.backend.seriesSlugOf(p.id);
-    if (!context.mounted) return;
-    final origin = Uri.base.origin;
-    final slug = await showPublishDialog(
-      context,
-      title: p.title,
-      suggested: existing ?? pub.slugFor(p.title),
-      origin: origin,
-      path: 'series',
-    );
-    if (slug == null || !context.mounted) return;
+    final handle = await ensureHandle(context, cloud);
+    if (handle == null || !context.mounted) return;
     try {
+      final existing = await cloud.backend.publicationOf(p.id);
+      if (!context.mounted) return;
+      final origin = Uri.base.origin;
+      final slug = await showPublishDialog(
+        context,
+        title: p.title,
+        suggested: existing?.slug ?? pub.slugFor(p.title),
+        prefix: '$origin/@$handle/',
+        note:
+            'The publication lists the published issues of this project, '
+            'newest first. Publishing an issue updates it.',
+        valid: pub.isValidPublication,
+      );
+      if (slug == null || !context.mounted) return;
+      final at = pub.PublicationRef(handle, slug);
       final stories = await _repo.list();
       final record = await pub.publishSeries(
         projectId: p.id,
         title: p.title,
-        slug: slug,
+        ref: at,
         issueIds: [
           for (final s in stories)
             if (s.projectId == p.id) s.id,
@@ -169,17 +180,28 @@ class ProjectActions {
       if (!context.mounted) return;
       await showPublishedDialog(
         context,
-        url: '$origin/series/$slug',
+        url: '$origin${at.route}',
         version: 1,
         warnings: [
           if (record.issues.isEmpty)
             'No issue is published yet: publish issues and they appear here.',
+          if (existing != null && existing != at)
+            'Issues published under ${existing.route} stay there; publish '
+                'them again to move them here.',
         ],
-        onOpen: () => context.go('/series/$slug'),
+        onOpen: () => context.go(at.route),
       );
     } on pub.PublishException catch (e) {
       if (context.mounted) {
         SsToast.show(context, e.message, kind: SsToastKind.danger);
+      }
+    } on Object catch (e) {
+      if (context.mounted) {
+        SsToast.show(
+          context,
+          'Publishing failed: $e',
+          kind: SsToastKind.danger,
+        );
       }
     }
   }

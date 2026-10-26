@@ -7,14 +7,7 @@
     ],
     "rewrites": [
       {
-        "source": "/s/**",
-        "run": {
-          "serviceId": "soundstage-head",
-          "region": "us-central1"
-        }
-      },
-      {
-        "source": "/series/**",
+        "regex": "^/@[^/]+(/.*)?$",
         "run": {
           "serviceId": "soundstage-head",
           "region": "us-central1"

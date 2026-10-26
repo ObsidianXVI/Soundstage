@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:soundstage_head/head.dart';
 
-// Cloud Run service behind the Hosting rewrite `/s/**` (firebase.json,
+// Cloud Run service behind the Hosting rewrite `/@**` (firebase.json,
 // infra/terraform/head.tf). For each request it serves the app shell from
 // Hosting with the story's head; anything that fails serves the plain
 // shell, so the player always loads. Responses are cached by the Hosting
@@ -35,11 +35,10 @@ Future<void> _handle(HttpRequest request) async {
       return;
     }
     if (request.uri.path == '/sitemap.xml') {
-      final body = sitemapXml(
-        _site,
-        await _publishedEntries('published'),
-        series: await _publishedEntries('series'),
-      );
+      final body = sitemapXml(_site, [
+        for (final c in ['drafts', 'publications', 'issues'])
+          ...await _published(c),
+      ]);
       res
         ..headers.contentType = ContentType(
           'application',
@@ -51,56 +50,25 @@ Future<void> _handle(HttpRequest request) async {
       return;
     }
     final shell = await _shell();
-    final seriesSlug = seriesSlugFromPath(request.uri.path);
-    if (seriesSlug != null) {
-      final doc = await _document('series', seriesSlug);
-      res
-        ..statusCode = doc == null ? HttpStatus.notFound : HttpStatus.ok
-        ..headers.contentType = ContentType.html
-        ..headers.set(
-          'cache-control',
-          'public, max-age=60, s-maxage=${doc == null ? 60 : 600}',
-        )
-        ..headers.set('cross-origin-opener-policy', 'same-origin')
-        ..headers.set('cross-origin-embedder-policy', 'credentialless');
-      if (request.method == 'GET') {
-        res.write(
-          doc == null
-              ? shell
-              : injectHead(shell, seriesHead(doc, '$_site/series/$seriesSlug')),
-        );
-      }
-      return;
-    }
-    final slug = slugFromPath(request.uri.path);
-    var status = HttpStatus.ok;
-    var body = shell;
-    var maxAge = 60;
-    var sMaxAge = 600;
-    if (slug == null) {
-      status = HttpStatus.notFound;
-    } else {
-      final doc = await _published(slug);
-      if (doc == null) {
-        status = HttpStatus.notFound;
-        sMaxAge = 60; // a story may be published here soon
-      } else {
-        body = injectHead(
-          shell,
-          StoryHead.fromFirestore(doc, '$_site/s/$slug'),
-        );
-      }
-    }
+    final route = HeadRoute.parse(request.uri.path);
+    final doc = route == null ? null : await _document(route.docPath);
     res
-      ..statusCode = status
+      ..statusCode = doc == null ? HttpStatus.notFound : HttpStatus.ok
       ..headers.contentType = ContentType.html
+      // A missing page may be published soon: cache it briefly.
       ..headers.set(
         'cache-control',
-        'public, max-age=$maxAge, s-maxage=$sMaxAge',
+        'public, max-age=60, s-maxage=${doc == null ? 60 : 600}',
       )
       ..headers.set('cross-origin-opener-policy', 'same-origin')
       ..headers.set('cross-origin-embedder-policy', 'credentialless');
-    if (request.method == 'GET') res.write(body);
+    if (request.method == 'GET') {
+      res.write(
+        route == null || doc == null
+            ? shell
+            : injectHead(shell, headFor(route, doc, '$_site${route.path}')),
+      );
+    }
   } on Object catch (e) {
     stderr.writeln('soundstage-head: ${request.uri.path}: $e');
     // The plain shell when we have it; the app shows its own errors.
@@ -126,23 +94,21 @@ Future<String> _shell() async {
       DateTime.now().difference(_shellAt) < const Duration(minutes: 5)) {
     return cached;
   }
-  final (status, body) = await _get(Uri.parse('$_site/index.html'));
+  final (status, body) = await _send('GET', Uri.parse('$_site/index.html'));
   if (status != HttpStatus.ok) throw HttpException('index.html: $status');
   _shellAt = DateTime.now();
   return _shellCache = body;
 }
 
-/// The Firestore document `published/{slug}` (REST), or null.
-Future<Map<String, Object?>?> _published(String slug) =>
-    _document('published', slug);
+String get _documents =>
+    'https://firestore.googleapis.com/v1/projects/$_project/databases/'
+    '(default)/documents';
 
-/// The Firestore document `[collection]/[id]` (REST), or null.
-Future<Map<String, Object?>?> _document(String collection, String id) async {
-  final (status, body) = await _get(
-    Uri.parse(
-      'https://firestore.googleapis.com/v1/projects/$_project/databases/'
-      '(default)/documents/$collection/$id',
-    ),
+/// The Firestore document at [path] (REST), or null.
+Future<Map<String, Object?>?> _document(String path) async {
+  final (status, body) = await _send(
+    'GET',
+    Uri.parse('$_documents/$path'),
     bearer: await _token(),
   );
   if (status == HttpStatus.notFound) return null;
@@ -150,30 +116,29 @@ Future<Map<String, Object?>?> _document(String collection, String id) async {
   return jsonDecode(body) as Map<String, Object?>;
 }
 
-/// Every slug of [collection] (`published` or `series`; at most 5,000).
-Future<List<SitemapEntry>> _publishedEntries(String collection) async {
-  final out = <SitemapEntry>[];
-  String? pageToken;
-  for (var page = 0; page < 20; page++) {
-    final uri =
-        Uri.parse(
-          'https://firestore.googleapis.com/v1/projects/$_project/databases/'
-          '(default)/documents/$collection',
-        ).replace(
-          queryParameters: {
-            'pageSize': '250',
-            'mask.fieldPaths': 'updatedAt',
-            'pageToken': ?pageToken,
-          },
-        );
-    final (status, body) = await _get(uri, bearer: await _token());
-    if (status != HttpStatus.ok) throw HttpException('firestore: $status');
-    final json = jsonDecode(body) as Map<String, Object?>;
-    out.addAll(sitemapEntries(json));
-    pageToken = json['nextPageToken'] as String?;
-    if (pageToken == null) break;
-  }
-  return out;
+/// Every published page in collection group [collectionId] (`drafts`,
+/// `publications` or `issues`; at most 5,000).
+Future<List<SitemapEntry>> _published(String collectionId) async {
+  final (status, body) = await _send(
+    'POST',
+    Uri.parse('$_documents:runQuery'),
+    bearer: await _token(),
+    body: jsonEncode({
+      'structuredQuery': {
+        'from': [
+          {'collectionId': collectionId, 'allDescendants': true},
+        ],
+        'select': {
+          'fields': [
+            {'fieldPath': 'updatedAt'},
+          ],
+        },
+        'limit': 5000,
+      },
+    }),
+  );
+  if (status != HttpStatus.ok) throw HttpException('firestore: $status');
+  return sitemapEntries(jsonDecode(body));
 }
 
 String? _tokenValue;
@@ -183,7 +148,8 @@ DateTime _tokenExpiry = DateTime(0);
 Future<String> _token() async {
   final cached = _tokenValue;
   if (cached != null && DateTime.now().isBefore(_tokenExpiry)) return cached;
-  final (status, body) = await _get(
+  final (status, body) = await _send(
+    'GET',
     Uri.parse(
       'http://metadata.google.internal/computeMetadata/v1/instance/'
       'service-accounts/default/token',
@@ -197,15 +163,22 @@ Future<String> _token() async {
   return _tokenValue = json['access_token']! as String;
 }
 
-Future<(int, String)> _get(
+Future<(int, String)> _send(
+  String method,
   Uri uri, {
   String? bearer,
+  String? body,
   Map<String, String> headers = const {},
 }) async {
-  final req = await _http.getUrl(uri).timeout(const Duration(seconds: 5));
+  final req = await _http
+      .openUrl(method, uri)
+      .timeout(const Duration(seconds: 5));
   if (bearer != null) req.headers.set('authorization', 'Bearer $bearer');
   headers.forEach(req.headers.set);
+  if (body != null) {
+    req.headers.contentType = ContentType.json;
+    req.add(utf8.encode(body));
+  }
   final res = await req.close().timeout(const Duration(seconds: 5));
-  final body = await res.transform(utf8.decoder).join();
-  return (res.statusCode, body);
+  return (res.statusCode, await res.transform(utf8.decoder).join());
 }

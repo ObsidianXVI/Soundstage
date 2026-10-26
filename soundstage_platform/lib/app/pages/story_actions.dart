@@ -206,7 +206,7 @@ class StoryActions {
           nodeId: nodeId,
           pixelRatio: 2,
         ),
-        await _backlinkFor(s.id, doc),
+        await _backlinkFor(s.id),
       );
       platform.downloadFile(name, bytes, mime);
     } on Object catch (e) {
@@ -214,23 +214,23 @@ class StoryActions {
     }
   }
 
-  /// The slug story [storyId] is published at (the document's, else the
-  /// cloud's record), or null when it is not published or the cloud is
-  /// unavailable.
-  Future<String?> _publishedSlug(String storyId, ir.StageDocument doc) async {
+  /// Where story [storyId] is published, or null when it is not published
+  /// or the cloud is unavailable.
+  Future<PublishTarget?> _publishedTarget(String storyId) async {
     final cloud = ref.read(cloudProvider);
     if (cloud == null || cloud.auth.currentUser == null) return null;
     try {
-      final slug = await cloud.backend.publishedSlugOf(storyId);
-      return slug ?? (doc.meta.slug.isEmpty ? null : doc.meta.slug);
+      return await cloud.backend.publishedTargetOf(storyId);
     } on Object {
       return null;
     }
   }
 
-  Future<Backlink?> _backlinkFor(String storyId, ir.StageDocument doc) async {
-    final slug = await _publishedSlug(storyId, doc);
-    return slug == null ? null : Backlink('${Uri.base.origin}/s/$slug');
+  Future<Backlink?> _backlinkFor(String storyId) async {
+    final target = await _publishedTarget(storyId);
+    return target == null
+        ? null
+        : Backlink('${Uri.base.origin}${target.route}');
   }
 
   /// Puts the story on the clipboard as rich text for Medium or Substack
@@ -242,16 +242,16 @@ class StoryActions {
       final doc = await _repo.load(s.id);
       if (doc == null) throw StateError('the story is gone');
       final story = linearize(doc);
-      final slug = await _publishedSlug(s.id, doc);
-      final backlink = slug == null
+      final target = await _publishedTarget(s.id);
+      final backlink = target == null
           ? null
-          : Backlink('${Uri.base.origin}/s/$slug');
+          : Backlink('${Uri.base.origin}${target.route}');
       Map<String, ir.Asset> published = const {};
       final cloud = ref.read(cloudProvider);
-      if (slug != null && cloud != null) {
+      if (target != null && cloud != null) {
         try {
           final loaded = await loadPublished(
-            slug,
+            target,
             backend: cloud.backend,
             fetch: StageAssetResolver().load,
           );
@@ -282,9 +282,9 @@ class StoryActions {
         );
   }
 
-  /// Republishes the series of [storyId]'s project, if it has one, so a
-  /// newly published issue is listed. Failures are quiet: the issue itself
-  /// is published.
+  /// Republishes the publication of [storyId]'s project, if it has one,
+  /// so a newly published issue is listed. Failures are quiet: the issue
+  /// itself is published.
   Future<void> refreshSeriesOf(String storyId) async {
     final cloud = ref.read(cloudProvider);
     if (cloud == null) return;
@@ -292,15 +292,15 @@ class StoryActions {
       final stories = await _repo.list();
       final pid = stories.where((x) => x.id == storyId).firstOrNull?.projectId;
       if (pid == null) return;
-      final slug = await cloud.backend.seriesSlugOf(pid);
-      if (slug == null) return;
+      final pub = await cloud.backend.publicationOf(pid);
+      if (pub == null) return;
       final project = (await _repo.projects())
           .where((p) => p.id == pid)
           .firstOrNull;
       await publishSeries(
         projectId: pid,
         title: project?.title ?? '',
-        slug: slug,
+        ref: pub,
         issueIds: [
           for (final x in stories)
             if (x.projectId == pid) x.id,
@@ -312,11 +312,14 @@ class StoryActions {
     }
   }
 
-  /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,
-  /// upload, then show the link. [current] is the editor's document (the
-  /// editor's Publish button): it is published as is, and the story is not
-  /// written to (the editor's autosave owns it). [open] opens the
-  /// published link (default: navigate to it).
+  /// Publishes the story (m4.md T4.2, m7.md T7.2): check access, choose
+  /// a handle the first time, choose the link, upload, then show it. A
+  /// one-off draft publishes at `/@<handle>/s/<slug>`; a project's issue
+  /// at `/@<handle>/<publication>/<slug>`, after the project's publication
+  /// link is chosen once. [current] is the editor's document (the editor's
+  /// Publish button): it is published as is, and the story is not written
+  /// to (the editor's autosave owns it). [open] opens the published link
+  /// (default: navigate to it).
   Future<void> publish(
     StorySummary s, {
     ir.StageDocument? current,
@@ -326,31 +329,51 @@ class StoryActions {
     final db = _db;
     if (cloud == null) return;
     if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
+    final handle = await ensureHandle(context, cloud);
+    if (handle == null || !context.mounted) return;
     try {
       final doc = current ?? await _repo.load(s.id);
       if (doc == null || !context.mounted) return;
       final origin = Uri.base.origin;
-      var suggested = doc.meta.slug;
-      if (suggested.isEmpty) {
-        try {
-          suggested = await cloud.backend.publishedSlugOf(s.id) ?? '';
-        } on Object {
-          suggested = ''; // not published yet, or offline
-        }
+      final before = await _publishedTarget(s.id);
+      final projectId = (await _repo.list())
+          .where((x) => x.id == s.id)
+          .firstOrNull
+          ?.projectId;
+      PublicationRef? pub;
+      if (projectId != null) {
+        pub = await _publicationFor(cloud, handle, projectId);
+        if (pub == null) return;
       }
       if (!context.mounted) return;
+      final previous = switch (before) {
+        IssueTarget(:final publication, :final slug) when publication == pub =>
+          slug,
+        DraftTarget(handle: final h, :final slug)
+            when pub == null && h == handle =>
+          slug,
+        _ => '',
+      };
+      final suggested = previous.isNotEmpty
+          ? previous
+          : doc.meta.slug.isNotEmpty
+          ? doc.meta.slug
+          : slugFor(s.title);
       final slug = await showPublishDialog(
         context,
         title: s.title,
-        suggested: suggested.isNotEmpty ? suggested : slugFor(s.title),
-        origin: origin,
+        suggested: suggested,
+        prefix: pub == null ? '$origin/@$handle/s/' : '$origin${pub.route}/',
       );
       if (slug == null) return;
+      final target = pub == null
+          ? DraftTarget(handle, slug)
+          : IssueTarget(pub, slug);
       _toast('Publishing "${s.title}"…');
       final result = await publishStory(
         doc,
         storyId: s.id,
-        slug: slug,
+        target: target,
         backend: cloud.backend,
         bytesOf: (a) => db?.assetBytes(a) ?? Future.value(null),
         cover: doc.scenes.isEmpty
@@ -361,7 +384,7 @@ class StoryActions {
                 sceneId: doc.scenes.first.id,
               ),
       );
-      // An issue's series lists it.
+      // An issue's publication lists it.
       await refreshSeriesOf(s.id);
       // Remember the link in the story (the next publish suggests it).
       if (current == null && !s.bundled && doc.meta.slug != slug) {
@@ -383,6 +406,109 @@ class StoryActions {
       _toast(e.message, SsToastKind.danger);
     } on Object catch (e) {
       _toast('Publishing failed: ${_describe(e)}', SsToastKind.danger);
+    }
+  }
+
+  /// Project [projectId]'s publication; asks for its link (and creates
+  /// it, empty) the first time. Null when cancelled.
+  Future<PublicationRef?> _publicationFor(
+    Cloud cloud,
+    String handle,
+    String projectId,
+  ) async {
+    final existing = await cloud.backend.publicationOf(projectId);
+    if (existing != null || !context.mounted) return existing;
+    final project = (await _repo.projects())
+        .where((p) => p.id == projectId)
+        .firstOrNull;
+    final title = project?.title ?? 'Project';
+    if (!context.mounted) return null;
+    final slug = await showPublishDialog(
+      context,
+      title: title,
+      suggested: slugFor(title),
+      prefix: '${Uri.base.origin}/@$handle/',
+      note:
+          'Issues of this project are published under this link, and it '
+          'lists them, newest first.',
+      action: 'Name the publication of',
+      valid: isValidPublication,
+    );
+    if (slug == null) return null;
+    final ref = PublicationRef(handle, slug);
+    await publishSeries(
+      projectId: projectId,
+      title: title,
+      ref: ref,
+      issueIds: const [],
+      backend: cloud.backend,
+    );
+    return ref;
+  }
+
+  /// The published versions of [s] (DECISIONS 26/10/26 "Releases"),
+  /// newest first; any can be made live (readers get it at once; nothing
+  /// is rebuilt).
+  Future<void> versions(StorySummary s) async {
+    final cloud = ref.read(cloudProvider);
+    if (cloud == null) return;
+    if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
+    try {
+      final target = await cloud.backend.publishedTargetOf(s.id);
+      final record = target == null
+          ? null
+          : await cloud.backend.published(target);
+      if (!context.mounted) return;
+      if (target == null || record == null || record.versions.isEmpty) {
+        _toast('"${s.title}" is not published yet.');
+        return;
+      }
+      final chosen = await showSsDialog<int>(
+        context,
+        builder: (ctx) => SsDialog(
+          title: 'Published versions of "${s.title}"',
+          width: 480,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SelectableText(
+                '${Uri.base.origin}${target.route}',
+                style: ctx.ss.text.small,
+              ),
+              const SizedBox(height: SsSpace.s2),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 360),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final v in record.versions.reversed)
+                      _VersionRow(
+                        version: v,
+                        live: v.version == record.version,
+                        onMakeLive: () => Navigator.of(ctx).pop(v.version),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            SsButton(label: 'Close', onPressed: () => Navigator.of(ctx).pop()),
+          ],
+        ),
+      );
+      if (chosen == null) return;
+      await makeLive(target, chosen, backend: cloud.backend);
+      await refreshSeriesOf(s.id);
+      _toast('Version $chosen is live.', SsToastKind.success);
+    } on PublishException catch (e) {
+      _toast(e.message, SsToastKind.danger);
+    } on Object catch (e) {
+      _toast(
+        'Could not change the version: ${_describe(e)}',
+        SsToastKind.danger,
+      );
     }
   }
 
@@ -443,6 +569,61 @@ class StoryActions {
   }
 
   void open(StorySummary s) => context.go('/edit/${s.id}');
+}
+
+class _VersionRow extends StatelessWidget {
+  const _VersionRow({
+    required this.version,
+    required this.live,
+    required this.onMakeLive,
+  });
+
+  final PublishedVersion version;
+  final bool live;
+  final VoidCallback onMakeLive;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.ss;
+    final at = version.publishedAt == 0
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(version.publishedAt).toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final when = at == null
+        ? ''
+        : '  ·  ${at.year}-${two(at.month)}-${two(at.day)} '
+              '${two(at.hour)}:${two(at.minute)}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: SsSpace.s1),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Version ${version.version}${live ? '  (live)' : ''}',
+                  style: t.text.bodyStrong,
+                ),
+                Text(
+                  '${version.title.isEmpty ? 'Untitled' : version.title}$when',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.text.caption,
+                ),
+              ],
+            ),
+          ),
+          if (!live)
+            SsButton(
+              key: ValueKey<String>('versions:live:${version.version}'),
+              label: 'Make live',
+              onPressed: onMakeLive,
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RevisionRow extends StatelessWidget {

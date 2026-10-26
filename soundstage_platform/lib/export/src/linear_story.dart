@@ -154,7 +154,7 @@ class LinearStory {
 class Backlink {
   const Backlink(this.storyUrl);
 
-  /// The published story, e.g. `https://soundstage.app/s/<slug>`.
+  /// The published story, e.g. `https://soundstage.app/@<handle>/s/<slug>`.
   final String storyUrl;
 
   static const String label = 'View interactive article on Soundstage';

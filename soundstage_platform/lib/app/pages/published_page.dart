@@ -10,35 +10,36 @@ import 'package:soundstage_platform/runtime/runtime.dart'
 
 import 'not_found_page.dart';
 
-/// The published story at a slug (null: nothing published there, or a
+/// The published story at a target (null: nothing published there, or a
 /// local-only build).
 final publishedStoryProvider = FutureProvider.autoDispose
-    .family<PublishedStory?, String>((ref, slug) async {
+    .family<PublishedStory?, PublishTarget>((ref, target) async {
       final cloud = ref.watch(cloudProvider);
       if (cloud == null) return null;
       return openPublished(
-        slug,
+        target,
         backend: cloud.backend,
         fetch: StageAssetResolver().load,
       );
     });
 
-/// `/s/:slug`: a published story (m4.md T4.2) in the player behind the
-/// enter gate. Anyone can open it; the document and assets are public.
-/// `?tier=lite|static` plays the reduced tiers (m4.md T4.6).
+/// `/@<handle>/s/:slug` or `/@<handle>/<pub>/:issue`: a published story
+/// (m4.md T4.2, m7.md T7.2) in the player behind the enter gate. Anyone
+/// can open it; the document and assets are public. `?tier=lite|static`
+/// plays the reduced tiers (m4.md T4.6).
 class PublishedPage extends ConsumerWidget {
   const PublishedPage({
-    required this.slug,
+    required this.target,
     this.tier = StageTier.full,
     super.key,
   });
 
-  final String slug;
+  final PublishTarget target;
   final StageTier tier;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
-      switch (ref.watch(publishedStoryProvider(slug))) {
+      switch (ref.watch(publishedStoryProvider(target))) {
         AsyncData(value: WholePublishedStory(:final document)) => Scaffold(
           body: GatedStagePlayer(document: document, tier: tier),
         ),

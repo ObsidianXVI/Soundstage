@@ -11,10 +11,25 @@ class FakeBackend implements CloudBackend {
   @override
   String? uid;
 
+  /// uid → handle.
+  final handles = <String, String>{'u1': 'ada', 'u2': 'bob'};
   final files = <String, Uint8List>{};
+
+  /// Firestore path → record.
   final records = <String, PublishedRecord>{};
   final meta = <String, Map<String, Object?>>{};
   int uploads = 0;
+
+  @override
+  Future<String?> handle() async => handles[uid];
+
+  @override
+  Future<void> claimHandle(String handle, {String name = ''}) async {
+    if (handles.containsValue(handle)) {
+      throw PublishException('@$handle is taken.');
+    }
+    handles[uid!] = handle;
+  }
 
   @override
   Future<bool> exists(String path) async => files.containsKey(path);
@@ -30,34 +45,41 @@ class FakeBackend implements CloudBackend {
       'https://cdn.test/o/${Uri.encodeComponent(path)}?alt=media';
 
   @override
-  Future<PublishedRecord?> published(String slug) async => records[slug];
+  Future<PublishedRecord?> published(PublishTarget t) async =>
+      records[t.docPath];
 
   @override
-  Future<void> setPublished(String slug, PublishedRecord r) async =>
-      records[slug] = r;
+  Future<void> setPublished(PublishTarget t, PublishedRecord r) async =>
+      records[t.docPath] = r;
 
   @override
   Future<void> setStoryMeta(String id, Map<String, Object?> data) async =>
-      meta[id] = data;
+      meta[id] = {...?meta[id], ...data};
 
   @override
-  Future<String?> publishedSlugOf(String id) async =>
-      meta[id]?['publishedSlug'] as String?;
+  Future<PublishTarget?> publishedTargetOf(String id) async =>
+      PublishTarget.fromMap(meta[id]?['published']);
 
-  final seriesRecords = <String, SeriesRecord>{};
-
-  @override
-  Future<SeriesRecord?> series(String slug) async => seriesRecords[slug];
+  final seriesRecords = <PublicationRef, SeriesRecord>{};
 
   @override
-  Future<void> setSeries(String slug, SeriesRecord r) async =>
-      seriesRecords[slug] = r;
+  Future<SeriesRecord?> series(PublicationRef ref) async => seriesRecords[ref];
 
   @override
-  Future<String?> seriesSlugOf(String projectId) async => seriesRecords.entries
-      .where((e) => e.value.ownerId == uid && e.value.projectId == projectId)
+  Future<void> setSeries(PublicationRef ref, SeriesRecord r) async =>
+      seriesRecords[ref] = r;
+
+  @override
+  Future<PublicationRef?> publicationOf(String projectId) async => seriesRecords
+      .entries
+      .where(
+        (e) => e.key.handle == handles[uid] && e.value.projectId == projectId,
+      )
       .map((e) => e.key)
       .firstOrNull;
+
+  @override
+  Future<SiteListing?> site(String handle) async => null;
 
   Uint8List fetch(String url) {
     final path = Uri.decodeComponent(
@@ -66,6 +88,8 @@ class FakeBackend implements CloudBackend {
     return files[path]!;
   }
 }
+
+DraftTarget _d(String slug) => DraftTarget('ada', slug);
 
 StageDocument _doc() =>
     StageDocument.empty(
@@ -97,6 +121,26 @@ Future<Uint8List?> _bytes(Asset a) async => switch (a.uri) {
 };
 
 void main() {
+  test('handles and targets', () {
+    expect(isValidHandle('ada'), isTrue);
+    expect(isValidHandle('ad'), isFalse);
+    expect(isValidHandle('admin'), isFalse);
+    expect(isValidHandle('Ada'), isFalse);
+    expect(handleFor('Ada.Lovelace@example.org'), 'ada-lovelace');
+    expect(handleFor('x@y.z'), 'xxx');
+    expect(handleFor('admin@y.z'), 'admin-1');
+    expect(isValidPublication('weekly'), isTrue);
+    expect(isValidPublication('s'), isFalse);
+    final issue = IssueTarget(const PublicationRef('ada', 'weekly'), 'one');
+    expect(issue.route, '/@ada/weekly/one');
+    expect(issue.docPath, 'sites/ada/publications/weekly/issues/one');
+    expect(issue.storagePrefix('u1'), 'published/u1/ada/weekly/one');
+    expect(PublishTarget.fromMap(issue.toMap()), issue);
+    expect(PublishTarget.fromMap(_d('x').toMap()), _d('x'));
+    expect(_d('x').route, '/@ada/s/x');
+    expect(PublishTarget.fromMap(null), isNull);
+  });
+
   test('slugs', () {
     expect(slugFor('My first story!'), 'my-first-story');
     expect(slugFor('???'), 'story');
@@ -110,20 +154,21 @@ void main() {
     final r = await publishStory(
       _doc(),
       storyId: 'st',
-      slug: 'night-walk',
+      target: _d('night-walk'),
       backend: b,
       bytesOf: _bytes,
     );
     expect(r.version, 1);
-    expect(r.path, '/s/night-walk');
+    expect(r.path, '/@ada/s/night-walk');
     expect(r.warnings, isEmpty);
-    final rec = b.records['night-walk']!;
+    final rec = b.records[_d('night-walk').docPath]!;
     expect(rec.ownerId, 'u1');
-    expect(rec.path, 'published/u1/night-walk/v1.stage.json');
-    expect(b.meta['st']!['publishedSlug'], 'night-walk');
+    expect(rec.path, 'published/u1/ada/s/night-walk/v1.stage.json');
+    expect(b.meta['st']!['published'], {'handle': 'ada', 'slug': 'night-walk'});
+    expect(await b.publishedTargetOf('st'), _d('night-walk'));
 
     final loaded = (await loadPublished(
-      'night-walk',
+      _d('night-walk'),
       backend: b,
       fetch: (u) async => b.fetch(u),
     ))!;
@@ -143,7 +188,7 @@ void main() {
     Future<PublishResult> go() => publishStory(
       _doc(),
       storyId: 'st',
-      slug: 'night-walk',
+      target: _d('night-walk'),
       backend: b,
       bytesOf: _bytes,
     );
@@ -156,35 +201,92 @@ void main() {
     expect(b.uploads - first, 2); // the new document and manifest
   });
 
-  test('a slug owned by someone else, or signed out, is refused', () async {
+  test('another handle, another story, or signed out is refused', () async {
     final b = FakeBackend('u1');
     await publishStory(
       _doc(),
       storyId: 'st',
-      slug: 'taken',
+      target: _d('taken'),
       backend: b,
       bytesOf: _bytes,
     );
+    Future<PublishResult> go(String story, PublishTarget t) => publishStory(
+      _doc(),
+      storyId: story,
+      target: t,
+      backend: b,
+      bytesOf: _bytes,
+    );
+    // Another of the author's stories cannot replace it.
+    await expectLater(go('x', _d('taken')), throwsA(isA<PublishException>()));
+    // Someone else cannot publish under @ada.
     b.uid = 'u2';
+    await expectLater(go('x', _d('free')), throwsA(isA<PublishException>()));
+    expect((await go('x', const DraftTarget('bob', 'taken'))).version, 1);
+    b.uid = null;
+    await expectLater(go('x', _d('free')), throwsA(isA<PublishException>()));
+    // An author without a handle is asked for one first.
+    b.uid = 'u3';
     await expectLater(
-      publishStory(
-        _doc(),
-        storyId: 'x',
-        slug: 'taken',
-        backend: b,
-        bytesOf: _bytes,
-      ),
+      go('y', const DraftTarget('cy', 'free')),
       throwsA(isA<PublishException>()),
     );
-    b.uid = null;
-    await expectLater(
-      publishStory(
-        _doc(),
-        storyId: 'x',
-        slug: 'free',
+  });
+
+  test('versions are listed, and any can be made live', () async {
+    final b = FakeBackend('u1');
+    for (final (i, title) in ['One', 'Two', 'Three'].indexed) {
+      await publishStory(
+        _doc().copyWith(meta: StageMeta(title: title)),
+        storyId: 'st',
+        target: _d('walk'),
         backend: b,
         bytesOf: _bytes,
-      ),
+        now: DateTime.utc(2026, 10, 26, i),
+      );
+    }
+    var rec = b.records[_d('walk').docPath]!;
+    expect(rec.version, 3);
+    expect(rec.latest, 3);
+    expect(rec.versions.map((v) => v.version), [1, 2, 3]);
+    expect(
+      rec.versions.first.publishedAt,
+      DateTime.utc(2026, 10, 26).millisecondsSinceEpoch,
+    );
+
+    rec = await makeLive(_d('walk'), 1, backend: b);
+    expect(rec.version, 1);
+    expect(rec.title, 'One');
+    expect(rec.path, rec.versions.first.path);
+    expect(rec.latest, 3);
+    final back = PublishedRecord.fromMap(rec.toMap());
+    expect(back.versions, hasLength(3));
+    expect(back.version, 1);
+    // Readers get version 1.
+    final loaded = await loadPublished(
+      _d('walk'),
+      backend: b,
+      fetch: (u) async => b.fetch(u),
+    );
+    expect(loaded!.document!.meta.title, 'One');
+
+    // Publishing again continues the numbering and goes live.
+    final r = await publishStory(
+      _doc(),
+      storyId: 'st',
+      target: _d('walk'),
+      backend: b,
+      bytesOf: _bytes,
+    );
+    expect(r.version, 4);
+    expect(b.records[_d('walk').docPath]!.version, 4);
+    await expectLater(
+      makeLive(_d('walk'), 9, backend: b),
+      throwsA(isA<PublishException>()),
+    );
+    b.uid = 'u2';
+    await expectLater(
+      makeLive(_d('walk'), 1, backend: b),
       throwsA(isA<PublishException>()),
     );
   });
@@ -197,21 +299,21 @@ void main() {
           publishStory(
             _doc(),
             storyId: 'st',
-            slug: 'covered',
+            target: _d('covered'),
             backend: b,
             bytesOf: _bytes,
             cover: cover,
           );
       await go(() async => Uint8List.fromList([9, 9]));
-      final image = b.records['covered']!.image;
+      final image = b.records[_d('covered').docPath]!.image;
       expect(image, startsWith('https://cdn.test/o/'));
       expect(b.fetch(image), [9, 9]);
       final uploads = b.uploads;
       await go(() async => Uint8List.fromList([9, 9]));
       expect(b.uploads - uploads, 2); // the document and manifest only
       await go(() async => throw StateError('no renderer'));
-      expect(b.records['covered']!.image, isEmpty);
-      expect(b.records['covered']!.version, 3);
+      expect(b.records[_d('covered').docPath]!.image, isEmpty);
+      expect(b.records[_d('covered').docPath]!.version, 3);
     },
   );
 
@@ -254,14 +356,14 @@ void main() {
       await publishStory(
         doc,
         storyId: 'st',
-        slug: 'chunky',
+        target: _d('chunky'),
         backend: b,
         bytesOf: _bytes,
       );
-      final rec = b.records['chunky']!;
-      expect(rec.manifest, 'published/u1/chunky/v1.manifest.json');
+      final rec = b.records[_d('chunky').docPath]!;
+      expect(rec.manifest, 'published/u1/ada/s/chunky/v1.manifest.json');
       final story = await openPublished(
-        'chunky',
+        _d('chunky'),
         backend: b,
         fetch: (u) async => b.fetch(u),
       );
@@ -284,7 +386,7 @@ void main() {
       await publishStory(
         withScenes('changed'),
         storyId: 'st',
-        slug: 'chunky',
+        target: _d('chunky'),
         backend: b,
         bytesOf: _bytes,
       );
@@ -297,19 +399,19 @@ void main() {
     await publishStory(
       _doc(),
       storyId: 'st',
-      slug: 'old',
+      target: _d('old'),
       backend: b,
       bytesOf: _bytes,
     );
-    final r = b.records['old']!;
-    b.records['old'] = PublishedRecord(
+    final r = b.records[_d('old').docPath]!;
+    b.records[_d('old').docPath] = PublishedRecord(
       ownerId: r.ownerId,
       storyId: r.storyId,
       version: r.version,
       path: r.path,
     );
     final story = await openPublished(
-      'old',
+      _d('old'),
       backend: b,
       fetch: (u) async => b.fetch(u),
     );
@@ -337,67 +439,82 @@ void main() {
         ],
       ),
       storyId: 'st',
-      slug: 'quiet',
+      target: _d('quiet'),
       backend: b,
       bytesOf: _bytes,
     );
-    final whole = utf8.decode(b.files[b.records['quiet']!.path]!);
+    final whole = utf8.decode(b.files[b.records[_d('quiet').docPath]!.path]!);
     expect(whole, isNot(contains('private')));
     expect(whole, isNot(contains('secret idea')));
     expect(whole, isNot(contains('draft mark')));
-    final manifest = utf8.decode(b.files[b.records['quiet']!.manifest]!);
+    final manifest = utf8.decode(
+      b.files[b.records[_d('quiet').docPath]!.manifest]!,
+    );
     expect(manifest, isNot(contains('private')));
     expect(manifest, isNot(contains('secret idea')));
   });
 
   test(
-    'a series lists the published issues, in order, and is its own',
+    'a publication lists its published issues, in order, and is its own',
     () async {
       final b = FakeBackend('u1');
+      const weekly = PublicationRef('ada', 'weekly');
       for (final (id, slug) in [('i2', 'issue-two'), ('i1', 'issue-one')]) {
-        await publishStory(
+        final r = await publishStory(
           _doc(),
           storyId: id,
-          slug: slug,
+          target: IssueTarget(weekly, slug),
           backend: b,
           bytesOf: _bytes,
         );
+        expect(r.path, '/@ada/weekly/$slug');
       }
+      expect(
+        b.records['sites/ada/publications/weekly/issues/issue-one'],
+        isNotNull,
+      );
+      expect(
+        b.files.keys,
+        contains('published/u1/ada/weekly/issue-one/v1.stage.json'),
+      );
+      // A one-off draft is not an issue of it.
+      await publishStory(
+        _doc(),
+        storyId: 'i4',
+        target: _d('loose'),
+        backend: b,
+        bytesOf: _bytes,
+      );
       final r = await publishSeries(
         projectId: 'p',
         title: 'Weekly',
-        slug: 'weekly',
-        issueIds: ['i3', 'i2', 'i1'], // i3 is not published
+        ref: weekly,
+        issueIds: ['i3', 'i2', 'i4', 'i1'], // i3 is not published
         backend: b,
       );
       expect(r.issues.map((i) => i.slug), ['issue-two', 'issue-one']);
-      expect(b.seriesRecords['weekly']!.title, 'Weekly');
-      expect(await b.seriesSlugOf('p'), 'weekly');
+      expect(b.seriesRecords[weekly]!.title, 'Weekly');
+      expect(await b.publicationOf('p'), weekly);
       final back = SeriesRecord.fromMap(r.toMap());
       expect(back.issues.first.title, r.issues.first.title);
 
-      // Another project, or another author, cannot take the link.
+      // Another project cannot take the link; nor another handle; nor a
+      // reserved slug.
+      Future<SeriesRecord> go(String project, PublicationRef ref) =>
+          publishSeries(
+            projectId: project,
+            title: 'X',
+            ref: ref,
+            issueIds: const [],
+            backend: b,
+          );
+      await expectLater(go('other', weekly), throwsA(isA<PublishException>()));
       await expectLater(
-        publishSeries(
-          projectId: 'other',
-          title: 'X',
-          slug: 'weekly',
-          issueIds: const [],
-          backend: b,
-        ),
+        go('p', const PublicationRef('ada', 's')),
         throwsA(isA<PublishException>()),
       );
       b.uid = 'u2';
-      await expectLater(
-        publishSeries(
-          projectId: 'p',
-          title: 'X',
-          slug: 'weekly',
-          issueIds: const [],
-          backend: b,
-        ),
-        throwsA(isA<PublishException>()),
-      );
+      await expectLater(go('p', weekly), throwsA(isA<PublishException>()));
     },
   );
 
@@ -406,13 +523,13 @@ void main() {
     final r = await publishStory(
       _doc(),
       storyId: 'st',
-      slug: 'gaps',
+      target: _d('gaps'),
       backend: b,
       bytesOf: (a) async => null,
     );
     expect(r.warnings, hasLength(2));
     expect(
-      jsonDecode(utf8.decode(b.files[b.records['gaps']!.path]!)),
+      jsonDecode(utf8.decode(b.files[b.records[_d('gaps').docPath]!.path]!)),
       isA<Map<String, Object?>>(),
     );
   });

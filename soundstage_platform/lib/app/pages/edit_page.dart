@@ -182,6 +182,8 @@ extension on _EditPageState {
         SsIcons.file,
         (a, s) => a.exportLetterpress(s),
       ),
+      if (ref.read(cloudProvider) != null)
+        action('Published versions', SsIcons.layers, (a, s) => a.versions(s)),
       // Straight from the click: the clipboard needs the user's gesture.
       EditorPublishAction(
         label: 'Copy as rich text',
