@@ -270,14 +270,16 @@ class StoryActions {
         plain: toMarkdown(story, pathOf: urlOf, backlink: backlink),
       );
     }();
-    clip.copyRichText(content).then(
-      (_) => _toast(
-        'Copied "${s.title}". Paste it into Medium or Substack.',
-        SsToastKind.success,
-      ),
-      onError: (Object e) =>
-          _toast('Could not copy: ${_describe(e)}', SsToastKind.danger),
-    );
+    clip
+        .copyRichText(content)
+        .then(
+          (_) => _toast(
+            'Copied "${s.title}". Paste it into Medium or Substack.',
+            SsToastKind.success,
+          ),
+          onError: (Object e) =>
+              _toast('Could not copy: ${_describe(e)}', SsToastKind.danger),
+        );
   }
 
   /// Publishes the story (m4.md T4.2): sign in if needed, choose the link,

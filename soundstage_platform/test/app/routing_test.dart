@@ -80,16 +80,16 @@ void main() {
   testWidgets('/ builds the story list with the demos', (tester) async {
     await _pump(tester, '/');
     expect(find.text('Stories'), findsOneWidget);
-    expect(find.text('New story'), findsOneWidget);
+    expect(find.text('New draft'), findsOneWidget);
     expect(find.text('The Hour Between (spike)'), findsOneWidget);
     expect(find.text('Static layout demo'), findsOneWidget);
   });
 
-  testWidgets('New story creates a blank document and opens the editor', (
+  testWidgets('New draft creates a blank document and opens the editor', (
     tester,
   ) async {
     final app = await _pump(tester, '/');
-    await tester.tap(find.text('New story'));
+    await tester.tap(find.text('New draft'));
     await tester.pumpAndSettle();
     expect(app.uri.path, startsWith('/edit/'));
     expect(find.byType(EditorShell), findsOneWidget);
@@ -103,7 +103,7 @@ void main() {
     'back from the editor returns to the list, which shows the new story',
     (tester) async {
       final app = await _pump(tester, '/');
-      await tester.tap(find.text('New story'));
+      await tester.tap(find.text('New draft'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.text(String.fromCharCode(SsIcons.arrowLeft.codePoint)),
@@ -113,6 +113,47 @@ void main() {
       expect(find.text('Untitled story'), findsOneWidget);
     },
   );
+
+  testWidgets('projects: listed on /, issues on /project/:id, back to it', (
+    tester,
+  ) async {
+    final app = await _pump(tester, '/');
+    await tester.tap(find.text('New project'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText).last, 'Weekly');
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    expect(app.uri.path, startsWith('/project/'));
+    final projectPath = app.uri.path;
+    expect(find.text('Weekly'), findsOneWidget);
+    expect(find.textContaining('No issues yet'), findsOneWidget);
+
+    // The first issue is blank; the editor's back goes to the project.
+    await tester.tap(find.byKey(const ValueKey('new-issue')));
+    await tester.pumpAndSettle();
+    expect(app.uri.path, startsWith('/edit/'));
+    await tester.tap(
+      find.text(String.fromCharCode(SsIcons.arrowLeft.codePoint)),
+    );
+    await tester.pumpAndSettle();
+    expect(app.uri.path, projectPath);
+    expect(find.text('Issue 1'), findsOneWidget);
+
+    // Later issues offer the earlier ones as templates.
+    await tester.tap(find.byKey(const ValueKey('new-issue')));
+    await tester.pumpAndSettle();
+    expect(find.text('Copy of Issue 1'), findsOneWidget);
+    await tester.tap(find.text('Copy of Issue 1'));
+    await tester.pumpAndSettle();
+    expect(app.uri.path, startsWith('/edit/'));
+
+    // Home lists the project, not its issues.
+    app.router.go('/');
+    await tester.pumpAndSettle();
+    expect(find.text('PROJECTS'), findsOneWidget);
+    expect(find.textContaining('2 issues'), findsOneWidget);
+    expect(find.text('Issue 1'), findsNothing);
+  });
 
   testWidgets('/edit/:id builds the docked editor at desktop width', (
     tester,

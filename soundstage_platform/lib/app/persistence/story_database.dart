@@ -19,6 +19,11 @@ abstract interface class StoryDatabase {
   /// Deletes the story row and all of its revisions in one transaction.
   Future<void> deleteStory(String id);
 
+  Future<List<ProjectRecord>> listProjects();
+  Future<ProjectRecord?> getProject(String id);
+  Future<void> putProject(ProjectRecord record);
+  Future<void> deleteProject(String id);
+
   Future<void> putRevision(RevisionRecord record);
   Future<RevisionRecord?> getRevision(String storyId, int rev);
 
@@ -46,6 +51,7 @@ class MemoryStoryDatabase implements StoryDatabase {
   int? quotaBytes;
 
   final Map<String, StoryRecord> _stories = {};
+  final Map<String, ProjectRecord> _projects = {};
   final Map<String, Map<int, RevisionRecord>> _revisions = {};
   final Map<String, AssetRecord> _assets = {};
 
@@ -82,6 +88,19 @@ class MemoryStoryDatabase implements StoryDatabase {
     _stories.remove(id);
     _revisions.remove(id);
   }
+
+  @override
+  Future<List<ProjectRecord>> listProjects() async => _projects.values.toList();
+
+  @override
+  Future<ProjectRecord?> getProject(String id) async => _projects[id];
+
+  @override
+  Future<void> putProject(ProjectRecord record) async =>
+      _projects[record.id] = record;
+
+  @override
+  Future<void> deleteProject(String id) async => _projects.remove(id);
 
   @override
   Future<void> putRevision(RevisionRecord record) async {

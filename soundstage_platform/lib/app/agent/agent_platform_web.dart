@@ -43,10 +43,7 @@ Future<Uint8List> rasterizeSvg(String svg, int width, int height) async {
     final ctx = canvas.getContext('2d')! as web.CanvasRenderingContext2D;
     ctx.drawImage(img, 0, 0, width, height);
     final done = Completer<web.Blob?>();
-    canvas.toBlob(
-      ((web.Blob? b) => done.complete(b)).toJS,
-      'image/png',
-    );
+    canvas.toBlob(((web.Blob? b) => done.complete(b)).toJS, 'image/png');
     final png = await done.future;
     if (png == null) throw StateError('The illustration could not be drawn.');
     final buffer = await png.arrayBuffer().toDart;

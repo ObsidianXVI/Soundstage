@@ -15,10 +15,8 @@ Future<void> copyRichText(Future<RichClip> content) async {
   JSPromise<web.Blob> part(String Function(RichClip) pick, String type) =>
       content
           .then(
-            (c) => web.Blob(
-              [pick(c).toJS].toJS,
-              web.BlobPropertyBag(type: type),
-            ),
+            (c) =>
+                web.Blob([pick(c).toJS].toJS, web.BlobPropertyBag(type: type)),
           )
           .toJS;
   final items = JSObject()

@@ -307,5 +307,102 @@ void repositoryContract(
         expect(await h.assets.get('${orphan.id}_0001'), isNull);
       },
     );
+
+    test('projects: issues share one library', () async {
+      final p = await h.repo.createProject(title: 'Weekly');
+      expect((await h.repo.projects()).single.title, 'Weekly');
+
+      // Issue 1: blank; give it a token collection.
+      final i1 = await h.repo.createIssue(p.id);
+      expect(i1.title, 'Issue 1');
+      expect(i1.projectId, p.id);
+      final d1 = (await h.repo.load(i1.id))!;
+      final tokens = d1.tokens.copyWith(
+        collections: [
+          const ir.VariableCollection(
+            id: 'c',
+            name: 'Brand',
+            modes: [ir.TokenMode(id: 'm', name: 'Default')],
+            defaultModeId: 'm',
+          ),
+        ],
+      );
+      await h.repo.save(i1.id, d1.copyWith(tokens: tokens));
+
+      // Issue 2 (blank) starts with the library.
+      final i2 = await h.repo.createIssue(p.id);
+      expect(i2.title, 'Issue 2');
+      final d2 = (await h.repo.load(i2.id))!;
+      expect(d2.tokens.collections.single.name, 'Brand');
+
+      // A library change in issue 2 reaches issue 1 when it opens.
+      await h.repo.save(
+        i2.id,
+        d2.copyWith(
+          tokens: d2.tokens.copyWith(
+            collections: [
+              d2.tokens.collections.single.copyWith(name: 'Brand 2'),
+            ],
+          ),
+        ),
+      );
+      final again = (await h.repo.open(i1.id))!.document!;
+      expect(again.tokens.collections.single.name, 'Brand 2');
+
+      // Issue 3 copies issue 2 as its template (scenes and all).
+      final i3 = await h.repo.createIssue(p.id, fromStoryId: i2.id);
+      final d3 = (await h.repo.load(i3.id))!;
+      expect(d3.id, isNot(d2.id));
+      expect(d3.scenes.map((s) => s.id), d2.scenes.map((s) => s.id));
+      expect(d3.meta.title, 'Issue 3');
+
+      final listed = await h.repo.projects();
+      expect(listed.single.issueCount, 3);
+      final standalone = await h.repo.create(title: 'Alone');
+      expect(
+        (await h.repo.list())
+            .firstWhere((s) => s.id == standalone.id)
+            .projectId,
+        isNull,
+      );
+
+      await h.repo.renameProject(p.id, 'Weekly letter');
+      expect((await h.repo.projects()).single.title, 'Weekly letter');
+      await h.repo.deleteProject(p.id);
+      expect(await h.repo.projects(), isEmpty);
+      expect(await h.repo.load(i1.id), isNull);
+      expect(await h.repo.load(standalone.id), isNotNull);
+    });
+
+    test('a draft moved into a project lends it its library', () async {
+      final p = await h.repo.createProject();
+      final s = await h.repo.create(title: 'Loose');
+      final d = (await h.repo.load(s.id))!;
+      await h.repo.save(
+        s.id,
+        d.copyWith(
+          tokens: d.tokens.copyWith(
+            collections: [
+              const ir.VariableCollection(
+                id: 'c',
+                name: 'Mine',
+                modes: [ir.TokenMode(id: 'm', name: 'Default')],
+                defaultModeId: 'm',
+              ),
+            ],
+          ),
+        ),
+      );
+      await h.repo.moveToProject(s.id, p.id);
+      expect(
+        (await h.repo.list()).firstWhere((x) => x.id == s.id).projectId,
+        p.id,
+      );
+      final next = await h.repo.createIssue(p.id);
+      expect(
+        (await h.repo.load(next.id))!.tokens.collections.single.name,
+        'Mine',
+      );
+    });
   });
 }

@@ -10,10 +10,12 @@ import 'package:soundstage_platform/design_system/design_system.dart';
 
 import 'cloud_ui.dart' show AccountButton;
 import 'demo_page.dart';
+import 'project_page.dart' show ProjectActions, askText;
 import 'story_actions.dart';
 
-/// `/`: the story list. Lists the author's stories (in memory until T1.11)
-/// and the bundled demos; "New story" creates a blank document.
+/// `/`: the author's projects and drafts (DECISIONS 26/10/26 #11) and the
+/// bundled demos. A draft is one story; a project holds many drafts
+/// (issues) sharing a library.
 class StoryListPage extends ConsumerWidget {
   const StoryListPage({super.key});
 
@@ -57,7 +59,13 @@ class StoryListPage extends ConsumerWidget {
                           onPressed: () => StoryActions(context, ref).import(),
                         ),
                         SsButton(
-                          label: 'New story',
+                          label: 'New project',
+                          icon: SsIcons.folder,
+                          onPressed: () =>
+                              ProjectActions(context, ref).create(),
+                        ),
+                        SsButton(
+                          label: 'New draft',
                           icon: SsIcons.plus,
                           variant: SsButtonVariant.primary,
                           onPressed: () => _create(context, ref),
@@ -67,10 +75,22 @@ class StoryListPage extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: SsSpace.s6),
+                if (ref.watch(projectListProvider).value case final projects?
+                    when projects.isNotEmpty) ...[
+                  Text('PROJECTS', style: t.text.overline),
+                  const SizedBox(height: SsSpace.s2),
+                  for (final p in projects) _ProjectRow(project: p),
+                  const SizedBox(height: SsSpace.s4),
+                  Text('DRAFTS', style: t.text.overline),
+                  const SizedBox(height: SsSpace.s2),
+                ],
                 switch (stories) {
                   AsyncData(:final value) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [for (final s in value) _StoryRow(story: s)],
+                    children: [
+                      for (final s in value)
+                        if (s.projectId == null) StoryRow(story: s),
+                    ],
                   ),
                   AsyncError(:final error) => Text(
                     'Could not load stories: $error',
@@ -109,8 +129,9 @@ class StoryListPage extends ConsumerWidget {
   }
 }
 
-class _StoryRow extends ConsumerWidget {
-  const _StoryRow({required this.story});
+/// A draft in a list (the home page, a project's issues).
+class StoryRow extends ConsumerWidget {
+  const StoryRow({required this.story, super.key});
 
   final StorySummary story;
 
@@ -139,6 +160,14 @@ class _StoryRow extends ConsumerWidget {
           icon: SsIcons.pencil,
           onSelected: () => _rename(context, ref),
         ),
+      if (!story.bundled && story.projectId == null)
+        if (ref.read(projectListProvider).value case final projects?
+            when projects.isNotEmpty)
+          SsMenuItem(
+            label: 'Move to project…',
+            icon: SsIcons.folder,
+            onSelected: () => _move(context, ref, projects),
+          ),
       if (ref.read(cloudProvider) != null) ...[
         const SsMenuDivider(),
         SsMenuItem(
@@ -203,31 +232,47 @@ class _StoryRow extends ConsumerWidget {
   }
 
   Future<void> _rename(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController(text: story.title);
-    final name = await showSsDialog<String>(
+    final name = await askText(
+      context,
+      title: 'Rename story',
+      label: 'Story name',
+      initial: story.title,
+      confirm: 'Rename',
+    );
+    if (name == null) return;
+    await ref.read(storyRepositoryProvider).rename(story.id, name);
+    ref.read(storyListRevisionProvider.notifier).bump();
+  }
+
+  Future<void> _move(
+    BuildContext context,
+    WidgetRef ref,
+    List<ProjectSummary> projects,
+  ) async {
+    final target = await showSsDialog<ProjectSummary>(
       context,
       builder: (ctx) => SsDialog(
-        title: 'Rename story',
-        content: SsTextField(
-          controller: controller,
-          autofocus: true,
-          selectAllOnFocus: true,
-          semanticLabel: 'Story name',
-          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        title: 'Move "${story.title}" to a project',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final p in projects)
+              SsButton(
+                label: p.title,
+                icon: SsIcons.folder,
+                variant: SsButtonVariant.ghost,
+                onPressed: () => Navigator.of(ctx).pop(p),
+              ),
+          ],
         ),
         actions: [
           SsButton(label: 'Cancel', onPressed: () => Navigator.of(ctx).pop()),
-          SsButton(
-            label: 'Rename',
-            variant: SsButtonVariant.primary,
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-          ),
         ],
       ),
     );
-    controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
-    await ref.read(storyRepositoryProvider).rename(story.id, name.trim());
+    if (target == null) return;
+    await ref.read(storyRepositoryProvider).moveToProject(story.id, target.id);
     ref.read(storyListRevisionProvider.notifier).bump();
   }
 
@@ -249,7 +294,12 @@ class _StoryRow extends ConsumerWidget {
     final t = context.ss;
     final c = t.colors;
     final meta = [
-      if (story.bundled) 'Bundled demo (read-only)' else 'Draft',
+      if (story.bundled)
+        'Bundled demo (read-only)'
+      else if (story.projectId != null)
+        'Issue'
+      else
+        'Draft',
       if (story.sceneCount != null)
         '${story.sceneCount} ${story.sceneCount == 1 ? 'scene' : 'scenes'}',
     ].join('  ·  ');
@@ -310,6 +360,110 @@ class _StoryRow extends ConsumerWidget {
                         anchor: ssGlobalRect(btnContext),
                         placement: SsPlacement.belowEnd,
                         entries: _menu(context, ref),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A project on the home page: its issues are on `/project/:id`.
+class _ProjectRow extends ConsumerWidget {
+  const _ProjectRow({required this.project});
+
+  final ProjectSummary project;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.ss;
+    final c = t.colors;
+    final actions = ProjectActions(context, ref);
+    final meta =
+        'Project  ·  ${project.issueCount} '
+        '${project.issueCount == 1 ? 'issue' : 'issues'}';
+    List<SsMenuEntry> menu() => [
+      SsMenuItem(
+        label: 'Open',
+        icon: SsIcons.folder,
+        onSelected: () => context.go('/project/${project.id}'),
+      ),
+      SsMenuItem(
+        label: 'New issue',
+        icon: SsIcons.plus,
+        onSelected: () => actions.newIssue(project),
+      ),
+      SsMenuItem(
+        label: 'Rename',
+        icon: SsIcons.pencil,
+        onSelected: () => actions.rename(project),
+      ),
+      const SsMenuDivider(),
+      SsMenuItem(
+        label: 'Delete',
+        icon: SsIcons.trash2,
+        danger: true,
+        onSelected: () => actions.delete(project),
+      ),
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SsSpace.s2),
+      child: SsContextMenuRegion(
+        entries: menu,
+        child: SsInteractive(
+          semanticLabel: '${project.title}, $meta',
+          onTap: () => context.go('/project/${project.id}'),
+          builder: (context, s) => SsFocusRing(
+            visible: s.contains(WidgetState.focused),
+            color: c.focusRing,
+            borderRadius: SsRadius.brLg,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(
+                SsSpace.s4,
+                SsSpace.s3,
+                SsSpace.s2,
+                SsSpace.s3,
+              ),
+              decoration: BoxDecoration(
+                color: s.contains(WidgetState.hovered)
+                    ? c.surface2
+                    : c.surface1,
+                borderRadius: SsRadius.brLg,
+                border: Border.all(color: c.border),
+              ),
+              child: Row(
+                children: [
+                  SsIcon(SsIcons.folder, size: 18, color: c.accent),
+                  const SizedBox(width: SsSpace.s3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          project.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.text.bodyStrong,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(meta, style: t.text.caption),
+                      ],
+                    ),
+                  ),
+                  Builder(
+                    builder: (b) => SsIconButton(
+                      icon: SsIcons.ellipsis,
+                      semanticLabel: 'More actions for ${project.title}',
+                      onPressed: () => showSsMenu(
+                        b,
+                        anchor: ssGlobalRect(b),
+                        placement: SsPlacement.belowEnd,
+                        entries: menu(),
                       ),
                     ),
                   ),

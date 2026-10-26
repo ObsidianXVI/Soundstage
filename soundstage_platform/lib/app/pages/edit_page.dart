@@ -91,7 +91,16 @@ class _EditPageState extends ConsumerState<EditPage> {
           document: value!.document!,
           assetService: ref.watch(appEditorAssetServiceProvider),
           filePicker: pickEditorFiles,
-          onBack: () => context.go('/'),
+          // An issue goes back to its project.
+          onBack: () {
+            final pid = ref
+                .read(storyListProvider)
+                .value
+                ?.where((s) => s.id == _id)
+                .firstOrNull
+                ?.projectId;
+            context.go(pid == null ? '/' : '/project/$pid');
+          },
           onPreview: () => context.go('/play/$_id'),
           onOpenPreviewInNewTab: () => openInNewTab('/play/$_id'),
           onDocumentChanged: (doc) {

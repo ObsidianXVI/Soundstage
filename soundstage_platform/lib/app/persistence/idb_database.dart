@@ -11,11 +11,12 @@ import 'story_database.dart';
 const String _kStories = 'stories';
 const String _kRevisions = 'revisions';
 const String _kAssets = 'assets';
+const String _kProjects = 'projects';
 const String _kByStory = 'byStory';
 
 /// The IndexedDB schema version. Bump with an upgrade step in
 /// [IndexedDbStoryDatabase.open].
-const int kIdbVersion = 1;
+const int kIdbVersion = 2;
 
 /// [StoryDatabase] on IndexedDB, through `package:web` and `dart:js_interop`
 /// (no wrapper package: the API surface is small, and the wrappers on pub.dev
@@ -28,6 +29,8 @@ const int kIdbVersion = 1;
 ///   reads a document.
 /// - `assets`: key `assetId`; the file is a `Blob`; audio rows also hold
 ///   `peaks`, a `Uint8Array` of waveform peaks (10 ms buckets).
+/// - `projects` (version 2): key `id`; a story row's `projectId` names its
+///   project.
 ///
 /// Every public method is a single transaction. Code inside a transaction
 /// never awaits, so it cannot outlive the transaction's active window.
@@ -72,6 +75,13 @@ class IndexedDbStoryDatabase implements StoryDatabase {
         db.createObjectStore(
           _kAssets,
           web.IDBObjectStoreParameters(keyPath: 'assetId'.toJS),
+        );
+      }
+      // Version 2: projects (DECISIONS 26/10/26 #11).
+      if (!stores.contains(_kProjects)) {
+        db.createObjectStore(
+          _kProjects,
+          web.IDBObjectStoreParameters(keyPath: 'id'.toJS),
         );
       }
     }).toJS;
@@ -198,6 +208,7 @@ class IndexedDbStoryDatabase implements StoryDatabase {
     headRevision: _int(o, 'headRevision') ?? 0,
     coverAssetId: _str(o, 'coverAssetId'),
     sceneCount: _int(o, 'sceneCount'),
+    projectId: _str(o, 'projectId'),
   );
 
   @override
@@ -237,6 +248,7 @@ class IndexedDbStoryDatabase implements StoryDatabase {
             'headRevision': s.headRevision.toJS,
             'coverAssetId': s.coverAssetId?.toJS,
             'sceneCount': s.sceneCount?.toJS,
+            'projectId': s.projectId?.toJS,
           }),
         );
   });
@@ -249,6 +261,60 @@ class IndexedDbStoryDatabase implements StoryDatabase {
       });
 
   // ---- revisions ----------------------------------------------------------
+
+  // ---- projects -----------------------------------------------------------
+
+  ProjectRecord _project(JSObject o) => ProjectRecord(
+    id: _str(o, 'id')!,
+    title: _str(o, 'title') ?? '',
+    createdAt: _int(o, 'createdAt') ?? 0,
+    updatedAt: _int(o, 'updatedAt') ?? 0,
+    libraryJson: _str(o, 'libraryJson'),
+  );
+
+  @override
+  Future<List<ProjectRecord>> listProjects() async {
+    final out = <ProjectRecord>[];
+    await _tx([_kProjects], false, (tx) {
+      _onResult(tx.objectStore(_kProjects).getAll(), (r) {
+        for (final v in (r! as JSArray<JSObject>).toDart) {
+          out.add(_project(v));
+        }
+      });
+    });
+    return out;
+  }
+
+  @override
+  Future<ProjectRecord?> getProject(String id) async {
+    ProjectRecord? out;
+    await _tx([_kProjects], false, (tx) {
+      _onResult(tx.objectStore(_kProjects).get(id.toJS), (r) {
+        if (!r.isUndefinedOrNull) out = _project(r! as JSObject);
+      });
+    });
+    return out;
+  }
+
+  @override
+  Future<void> putProject(ProjectRecord p) => _tx([_kProjects], true, (tx) {
+    tx
+        .objectStore(_kProjects)
+        .put(
+          _obj({
+            'id': p.id.toJS,
+            'title': p.title.toJS,
+            'createdAt': p.createdAt.toJS,
+            'updatedAt': p.updatedAt.toJS,
+            'libraryJson': p.libraryJson?.toJS,
+          }),
+        );
+  });
+
+  @override
+  Future<void> deleteProject(String id) => _tx([_kProjects], true, (tx) {
+    tx.objectStore(_kProjects).delete(id.toJS);
+  });
 
   @override
   Future<void> putRevision(RevisionRecord r) => _tx([_kRevisions], true, (tx) {

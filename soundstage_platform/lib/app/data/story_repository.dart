@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import '../persistence/records.dart' show RevisionInfo, StoryNotFoundException;
+import 'project_library.dart';
 
 export '../persistence/records.dart'
     show
@@ -41,17 +42,37 @@ class StorySummary {
     required this.updatedAt,
     this.sceneCount,
     this.bundled = false,
+    this.projectId,
   });
 
   final String id;
   final String title;
   final DateTime updatedAt;
 
+  /// The project this draft is an issue of; null for a standalone draft.
+  final String? projectId;
+
   /// Null when the document has not been loaded yet.
   final int? sceneCount;
 
   /// A bundled demo story (listed alongside the author's own).
   final bool bundled;
+}
+
+/// A project as listed (DECISIONS 26/10/26 #11): many drafts (issues)
+/// sharing one library.
+class ProjectSummary {
+  const ProjectSummary({
+    required this.id,
+    required this.title,
+    required this.updatedAt,
+    this.issueCount = 0,
+  });
+
+  final String id;
+  final String title;
+  final DateTime updatedAt;
+  final int issueCount;
 }
 
 /// The outcome of opening a story: the document plus what the load found
@@ -128,6 +149,46 @@ abstract interface class StoryRepository {
 
   /// Stores [document] as a new story with a fresh id and returns it.
   Future<StorySummary> createFrom(ir.StageDocument document);
+
+  // ---- Projects (DECISIONS 26/10/26 #11) ---------------------------------
+
+  /// All projects, most recently updated first.
+  Future<List<ProjectSummary>> projects();
+
+  Future<ProjectSummary> createProject({String title = 'Untitled project'});
+
+  Future<void> renameProject(String id, String title);
+
+  /// Deletes the project and every issue in it.
+  Future<void> deleteProject(String id);
+
+  /// Adds an issue to project [projectId]: a copy of issue [fromStoryId]
+  /// (the template: same scenes and design, new ids), or else a blank
+  /// issue with the project's library.
+  Future<StorySummary> createIssue(
+    String projectId, {
+    String? fromStoryId,
+    String? title,
+  });
+
+  /// Moves a standalone draft into project [projectId] (its library becomes
+  /// the project's when the project has none yet).
+  Future<void> moveToProject(String storyId, String projectId);
+}
+
+/// The next issue's title in a project with [count] issues.
+String issueTitle(int count) => 'Issue ${count + 1}';
+
+/// [doc] as the start of a new issue: a new document id (node, scene and
+/// asset ids are scoped to a document, so they stay), titled [title],
+/// without the source's link or notes.
+ir.StageDocument issueCopy(ir.StageDocument doc, {required String title}) {
+  final ids = ir.IdGenerator();
+  return doc.copyWith(
+    id: ids.next(),
+    meta: doc.meta.copyWith(title: title, slug: ''),
+    notes: const {},
+  );
 }
 
 /// A bundled demo story: route id, title and asset path.
@@ -181,6 +242,8 @@ class InMemoryStoryRepository implements StoryRepository {
   final Map<String, StorySummary> _own = <String, StorySummary>{};
   final Map<String, String> _renamed = <String, String>{};
   final Set<String> _deletedBundled = <String>{};
+  final Map<String, ProjectSummary> _projects = {};
+  final Map<String, ProjectLibrary> _libraries = {};
 
   BundledStory? _bundled(String id) {
     for (final b in kBundledStories) {
@@ -241,7 +304,11 @@ class InMemoryStoryRepository implements StoryRepository {
         title: document.meta.title.isEmpty ? own.title : document.meta.title,
         updatedAt: _now(),
         sceneCount: document.scenes.length,
+        projectId: own.projectId,
       );
+      if (own.projectId case final pid?) {
+        _libraries[pid] = ProjectLibrary.of(document);
+      }
     }
   }
 
@@ -254,6 +321,7 @@ class InMemoryStoryRepository implements StoryRepository {
         title: title,
         updatedAt: _now(),
         sceneCount: own.sceneCount,
+        projectId: own.projectId,
       );
     } else if (_bundled(id) != null) {
       _renamed[id] = title;
@@ -269,8 +337,10 @@ class InMemoryStoryRepository implements StoryRepository {
 
   @override
   Future<StoryLoad?> open(String id) async {
-    final doc = await load(id);
+    var doc = await load(id);
     if (doc == null) return null;
+    final library = _libraries[_own[id]?.projectId];
+    if (library != null) doc = library.applyTo(doc);
     return StoryLoad(document: doc, diagnostics: ir.validateDocument(doc));
   }
 
@@ -292,7 +362,12 @@ class InMemoryStoryRepository implements StoryRepository {
   }
 
   @override
-  Future<StorySummary> createFrom(ir.StageDocument document) async {
+  Future<StorySummary> createFrom(ir.StageDocument document) => _add(document);
+
+  Future<StorySummary> _add(
+    ir.StageDocument document, {
+    String? projectId,
+  }) async {
     final id = ir.IdGenerator().next();
     final doc = document.copyWith(id: id);
     final summary = StorySummary(
@@ -300,10 +375,87 @@ class InMemoryStoryRepository implements StoryRepository {
       title: doc.meta.title.isEmpty ? 'Untitled story' : doc.meta.title,
       updatedAt: _now(),
       sceneCount: doc.scenes.length,
+      projectId: projectId,
     );
     _docs[id] = doc;
     _own[id] = summary;
     return summary;
+  }
+
+  @override
+  Future<List<ProjectSummary>> projects() async => [
+    for (final p in _projects.values)
+      ProjectSummary(
+        id: p.id,
+        title: p.title,
+        updatedAt: p.updatedAt,
+        issueCount: _own.values.where((s) => s.projectId == p.id).length,
+      ),
+  ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+  @override
+  Future<ProjectSummary> createProject({
+    String title = 'Untitled project',
+  }) async {
+    final p = ProjectSummary(
+      id: ir.IdGenerator().next(),
+      title: title,
+      updatedAt: _now(),
+    );
+    _projects[p.id] = p;
+    return p;
+  }
+
+  @override
+  Future<void> renameProject(String id, String title) async {
+    final p = _projects[id];
+    if (p == null) throw StoryNotFoundException(id);
+    _projects[id] = ProjectSummary(id: id, title: title, updatedAt: _now());
+  }
+
+  @override
+  Future<void> deleteProject(String id) async {
+    _projects.remove(id);
+    _libraries.remove(id);
+    for (final s in _own.values.where((s) => s.projectId == id).toList()) {
+      await delete(s.id);
+    }
+  }
+
+  @override
+  Future<StorySummary> createIssue(
+    String projectId, {
+    String? fromStoryId,
+    String? title,
+  }) async {
+    if (!_projects.containsKey(projectId)) {
+      throw StoryNotFoundException(projectId);
+    }
+    final count = _own.values.where((s) => s.projectId == projectId).length;
+    final name = title ?? issueTitle(count);
+    final from = fromStoryId == null ? null : await load(fromStoryId);
+    final library = _libraries[projectId] ?? const ProjectLibrary();
+    final doc = from != null
+        ? issueCopy(library.applyTo(from), title: name)
+        : library.blankIssue(title: name);
+    return _add(doc, projectId: projectId);
+  }
+
+  @override
+  Future<void> moveToProject(String storyId, String projectId) async {
+    final s = _own[storyId];
+    if (s == null || !_projects.containsKey(projectId)) {
+      throw StoryNotFoundException(storyId);
+    }
+    _own[storyId] = StorySummary(
+      id: s.id,
+      title: s.title,
+      updatedAt: _now(),
+      sceneCount: s.sceneCount,
+      projectId: projectId,
+    );
+    final doc = _docs[storyId];
+    if (doc != null) await save(storyId, doc);
   }
 }
 
@@ -328,6 +480,12 @@ final storyListRevisionProvider = NotifierProvider<StoryListRevision, int>(
 final storyListProvider = FutureProvider<List<StorySummary>>((ref) {
   ref.watch(storyListRevisionProvider);
   return ref.watch(storyRepositoryProvider).list();
+});
+
+/// The projects (DECISIONS 26/10/26 #11), refreshed with the story list.
+final projectListProvider = FutureProvider<List<ProjectSummary>>((ref) {
+  ref.watch(storyListRevisionProvider);
+  return ref.watch(storyRepositoryProvider).projects();
 });
 
 /// Writes still in flight per story (the editor's final autosave flush when

@@ -17,6 +17,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Stories'), findsOneWidget);
-    expect(find.text('New story'), findsOneWidget);
+    expect(find.text('New draft'), findsOneWidget);
   });
 }

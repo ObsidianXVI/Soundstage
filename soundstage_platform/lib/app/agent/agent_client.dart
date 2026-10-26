@@ -69,11 +69,11 @@ class AgentServiceClient implements AgentTransport {
   }
 
   @override
-  Future<Map<String, Object?>> claude(Map<String, Object?> body) =>
-      _call('POST', '/anthropic/messages', {
-        ...body,
-        'model': config.claudeModel,
-      });
+  Future<Map<String, Object?>> claude(Map<String, Object?> body) => _call(
+    'POST',
+    '/anthropic/messages',
+    {...body, 'model': config.claudeModel},
+  );
 
   @override
   Future<Uint8List> illustrate(
@@ -112,6 +112,5 @@ class AgentServiceClient implements AgentTransport {
   Future<void> setKey(String provider, String key) =>
       _call('PUT', '/keys/$provider', {'key': key});
 
-  Future<void> removeKey(String provider) =>
-      _call('DELETE', '/keys/$provider');
+  Future<void> removeKey(String provider) => _call('DELETE', '/keys/$provider');
 }

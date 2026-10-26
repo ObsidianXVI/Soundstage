@@ -6,6 +6,7 @@ import 'pages/demo_page.dart';
 import 'pages/edit_page.dart';
 import 'pages/not_found_page.dart';
 import 'pages/play_page.dart';
+import 'pages/project_page.dart';
 import 'pages/published_page.dart';
 import 'pages/story_list_page.dart';
 
@@ -30,6 +31,7 @@ String? redirectLegacyDemo(Uri uri) {
 /// The app's routes (path URLs):
 ///
 /// - `/` story list
+/// - `/project/:id` a project's issues
 /// - `/edit/:id` editor (content mode below 1024 px)
 /// - `/play/:id` the player behind the enter gate
 /// - `/s/:slug` a published story (M4)
@@ -46,6 +48,11 @@ GoRouter buildRouter({String initialLocation = '/'}) {
         path: '/edit/:id',
         builder: (context, state) =>
             EditPage(storyId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/project/:id',
+        builder: (context, state) =>
+            ProjectPage(projectId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/play/:id',

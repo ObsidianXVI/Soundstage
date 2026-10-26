@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../data/project_library.dart';
 import 'local_asset_store.dart';
 import 'records.dart';
 import 'story_database.dart';
@@ -112,6 +113,7 @@ class DbStoryRepository implements StoryRepository {
           title: s.title,
           updatedAt: DateTime.fromMillisecondsSinceEpoch(s.updatedAt),
           sceneCount: s.sceneCount,
+          projectId: s.projectId,
         ),
       for (final b in kBundledStories)
         StorySummary(
@@ -140,10 +142,11 @@ class DbStoryRepository implements StoryRepository {
       }
       final story = await db.getStory(id);
       if (story == null) return null;
+      final library = await _libraryOf(story.projectId);
       final head = await _tryLoad(id, story.headRevision);
       if (head != null) {
         return StoryLoad(
-          document: head.document,
+          document: _with(library, head.document),
           diagnostics: head.diagnostics,
           headRevision: story.headRevision,
         );
@@ -156,7 +159,7 @@ class DbStoryRepository implements StoryRepository {
         final r = await _tryLoad(id, info.rev);
         if (r != null) {
           return StoryLoad(
-            document: r.document,
+            document: _with(library, r.document),
             diagnostics: r.diagnostics,
             headRevision: story.headRevision,
             recoveredFromRevision: info.rev,
@@ -186,6 +189,26 @@ class DbStoryRepository implements StoryRepository {
     }
   }
 
+  /// Project [projectId]'s library, or null (no project, none saved yet,
+  /// or unreadable: the issue then opens with its own).
+  Future<ProjectLibrary?> _libraryOf(String? projectId) async {
+    if (projectId == null) return null;
+    final json = (await db.getProject(projectId))?.libraryJson;
+    if (json == null) return null;
+    try {
+      return ProjectLibrary.fromJson(
+        (jsonDecode(json) as Map).cast<String, Object?>(),
+      );
+    } on Object {
+      return null;
+    }
+  }
+
+  static ir.StageDocument? _with(
+    ProjectLibrary? library,
+    ir.StageDocument? doc,
+  ) => doc == null || library == null ? doc : library.applyTo(doc);
+
   Future<ir.LoadResult?> _tryLoad(String id, int rev) async {
     final r = await db.getRevision(id, rev);
     if (r == null) return null;
@@ -212,7 +235,10 @@ class DbStoryRepository implements StoryRepository {
     return _insert(document.copyWith(id: ids.next()));
   }
 
-  Future<StorySummary> _insert(ir.StageDocument doc) async {
+  Future<StorySummary> _insert(
+    ir.StageDocument doc, {
+    String? projectId,
+  }) async {
     final json = jsonEncode(doc.toJson());
     final now = _nowMs;
     final title = doc.meta.title.isEmpty ? 'Untitled story' : doc.meta.title;
@@ -228,15 +254,27 @@ class DbStoryRepository implements StoryRepository {
       headRevision: 1,
       coverAssetId: doc.meta.coverAssetId,
       sceneCount: doc.scenes.length,
+      projectId: projectId,
     );
     await db.putStory(record);
     _lastSaved[doc.id] = json;
+    if (projectId != null) await _saveLibrary(projectId, doc);
     return StorySummary(
       id: doc.id,
       title: title,
       updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
       sceneCount: doc.scenes.length,
+      projectId: projectId,
     );
+  }
+
+  /// Writes [doc]'s library to project [projectId] when it changed.
+  Future<void> _saveLibrary(String projectId, ir.StageDocument doc) async {
+    final project = await db.getProject(projectId);
+    if (project == null) return;
+    final json = jsonEncode(ProjectLibrary.of(doc).toJson());
+    if (json == project.libraryJson) return;
+    await db.putProject(project.copyWith(libraryJson: json, updatedAt: _nowMs));
   }
 
   @override
@@ -275,6 +313,7 @@ class DbStoryRepository implements StoryRepository {
       ),
     );
     _lastSaved[id] = json;
+    if (story.projectId case final pid?) await _saveLibrary(pid, document);
     // Pruning is housekeeping: a failure must not fail the save.
     try {
       final doomed = revisionsToDelete(
@@ -373,6 +412,107 @@ class DbStoryRepository implements StoryRepository {
         ),
       ),
     );
+  }
+
+  // ---- projects -----------------------------------------------------------
+
+  @override
+  Future<List<ProjectSummary>> projects() async {
+    final stories = await db.listStories();
+    final list = await db.listProjects()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return [
+      for (final p in list)
+        ProjectSummary(
+          id: p.id,
+          title: p.title,
+          updatedAt: DateTime.fromMillisecondsSinceEpoch(p.updatedAt),
+          issueCount: stories.where((s) => s.projectId == p.id).length,
+        ),
+    ];
+  }
+
+  @override
+  Future<ProjectSummary> createProject({
+    String title = 'Untitled project',
+  }) async {
+    final now = _nowMs;
+    final p = ProjectRecord(
+      id: ir.IdGenerator().next(),
+      title: title,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.putProject(p);
+    return ProjectSummary(
+      id: p.id,
+      title: title,
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+    );
+  }
+
+  @override
+  Future<void> renameProject(String id, String title) async {
+    final p = await db.getProject(id);
+    if (p == null) throw StoryNotFoundException(id);
+    await db.putProject(p.copyWith(title: title, updatedAt: _nowMs));
+  }
+
+  @override
+  Future<void> deleteProject(String id) async {
+    for (final s in await db.listStories()) {
+      if (s.projectId == id) await delete(s.id);
+    }
+    await db.deleteProject(id);
+  }
+
+  @override
+  Future<StorySummary> createIssue(
+    String projectId, {
+    String? fromStoryId,
+    String? title,
+  }) async {
+    final project = await db.getProject(projectId);
+    if (project == null) throw StoryNotFoundException(projectId);
+    final count = (await db.listStories())
+        .where((s) => s.projectId == projectId)
+        .length;
+    final name = title ?? issueTitle(count);
+    final library = await _libraryOf(projectId) ?? const ProjectLibrary();
+    final from = fromStoryId == null ? null : await load(fromStoryId);
+    final doc = from != null
+        ? issueCopy(from, title: name)
+        : library.blankIssue(title: name);
+    final summary = await _insert(doc, projectId: projectId);
+    await db.putProject(project.copyWith(updatedAt: _nowMs));
+    return summary;
+  }
+
+  @override
+  Future<void> moveToProject(String storyId, String projectId) async {
+    if (isReadOnly(storyId)) throw ReadOnlyStoryException(storyId);
+    final story = await db.getStory(storyId);
+    final project = await db.getProject(projectId);
+    if (story == null || project == null) {
+      throw StoryNotFoundException(storyId);
+    }
+    final doc = (await open(storyId))?.document;
+    await db.putStory(
+      StoryRecord(
+        id: story.id,
+        title: story.title,
+        createdAt: story.createdAt,
+        updatedAt: _nowMs,
+        headRevision: story.headRevision,
+        coverAssetId: story.coverAssetId,
+        sceneCount: story.sceneCount,
+        projectId: projectId,
+      ),
+    );
+    // A project without a library takes this draft's.
+    if (doc != null && project.libraryJson == null) {
+      await _saveLibrary(projectId, doc);
+    }
   }
 
   static String? _assetPath(String uri) =>

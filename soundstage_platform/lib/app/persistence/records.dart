@@ -14,10 +14,15 @@ class StoryRecord {
     required this.headRevision,
     this.coverAssetId,
     this.sceneCount,
+    this.projectId,
   });
 
   final String id;
   final String title;
+
+  /// The project this draft is an issue of (null: a standalone draft;
+  /// DECISIONS 26/10/26 #11).
+  final String? projectId;
 
   /// Milliseconds since the epoch.
   final int createdAt;
@@ -34,12 +39,49 @@ class StoryRecord {
     int? sceneCount,
   }) => StoryRecord(
     id: id,
+    projectId: projectId,
     title: title ?? this.title,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     headRevision: headRevision ?? this.headRevision,
     coverAssetId: coverAssetId ?? this.coverAssetId,
     sceneCount: sceneCount ?? this.sceneCount,
+  );
+}
+
+/// A project: many drafts (issues) sharing one library of tokens,
+/// components, fonts and their assets (DECISIONS 26/10/26 #11). One row of
+/// the `projects` store.
+class ProjectRecord {
+  const ProjectRecord({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    this.libraryJson,
+  });
+
+  final String id;
+  final String title;
+
+  /// Milliseconds since the epoch.
+  final int createdAt;
+  final int updatedAt;
+
+  /// The shared library (`ProjectLibrary.toJson`) as JSON text; null until
+  /// the first issue is saved.
+  final String? libraryJson;
+
+  ProjectRecord copyWith({
+    String? title,
+    int? updatedAt,
+    String? libraryJson,
+  }) => ProjectRecord(
+    id: id,
+    title: title ?? this.title,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    libraryJson: libraryJson ?? this.libraryJson,
   );
 }
 
