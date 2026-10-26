@@ -10,10 +10,10 @@ import '../fields/rows.dart';
 import '../property_writer.dart';
 import '../section_registry.dart';
 
-/// Lottie and Rive embeds (m3.md T3.6): scale, autoplay and loop; for Rive
-/// the artboard and state machine; and clocks driving inputs (a Lottie's
-/// progress, a Rive file's data-binding properties or inputs), e.g. the
-/// scene's scroll.
+/// Lottie, Rive and image-sequence embeds (m3.md T3.6): scale, autoplay and
+/// loop; for Rive the artboard and state machine; and clocks driving inputs
+/// (a Lottie's or sequence's progress, a Rive file's data-binding properties
+/// or inputs), e.g. the scene's scroll.
 final InspectorSectionSpec embedSection = InspectorSectionSpec(
   id: 'embed',
   title: 'Animation file',
@@ -42,7 +42,14 @@ class _EmbedBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          '${isRive ? 'Rive' : 'Lottie'} · ${asset?.name ?? 'missing file'}',
+          switch (asset?.kind) {
+            ir.AssetKind.rive => 'Rive · ${asset!.name}',
+            ir.AssetKind.imageSequence =>
+              'Image sequence · ${asset!.frameCount ?? 0} frames · '
+                  '${asset.name}',
+            ir.AssetKind.lottie => 'Lottie · ${asset!.name}',
+            _ => 'Missing file',
+          },
           style: t.text.caption,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

@@ -1346,6 +1346,8 @@ Future<Map<String, String>> uploadImages(Rig r) async {
     for (final f in files.values) diskFile('$_images/$f', 'image/png'),
   ];
   await r.tester.tap(find.byKey(const ValueKey<String>('assets-upload')));
+  await r.settleAnimations();
+  await r.tester.tap(find.text('Files…'));
   await r.settleAsync();
   final byName = {for (final a in r.doc.assets.values) a.name: a.id};
   return {for (final e in files.entries) e.key: byName[e.value]!};

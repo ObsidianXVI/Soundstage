@@ -50,6 +50,29 @@ class _AssetsPanelState extends ConsumerState<AssetsPanel> {
 
   AssetActions get _actions => ref.read(assetActionsProvider);
 
+  /// Media uploads: files (images, audio, video, animations) or the
+  /// frames of one image sequence.
+  void _uploadMenu(BuildContext anchor) {
+    final box = anchor.findRenderObject()! as RenderBox;
+    showSsMenu(
+      context,
+      anchor: box.localToGlobal(Offset.zero) & box.size,
+      placement: SsPlacement.belowEnd,
+      entries: [
+        SsMenuItem(
+          label: 'Files…',
+          icon: SsIcons.imageUp,
+          onSelected: () => unawaited(_actions.uploadMedia()),
+        ),
+        SsMenuItem(
+          label: 'Image sequence…',
+          icon: SsIcons.clapperboard,
+          onSelected: () => unawaited(_actions.uploadSequence()),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.ss;
@@ -90,19 +113,19 @@ class _AssetsPanelState extends ConsumerState<AssetsPanel> {
                 ),
                 if (_section != _Section.components) ...[
                   const SizedBox(width: SsSpace.s2),
-                  SsIconButton(
-                    key: const ValueKey<String>('assets-upload'),
-                    icon: SsIcons.plus,
-                    semanticLabel: _section == _Section.media
-                        ? 'Upload files'
-                        : 'Upload fonts',
-                    tooltip: _section == _Section.media
-                        ? 'Upload images, audio or video'
-                        : 'Upload fonts (TTF, OTF, WOFF)',
-                    onPressed: () => unawaited(
-                      _section == _Section.media
-                          ? _actions.uploadMedia()
-                          : _actions.uploadFonts(),
+                  Builder(
+                    builder: (anchor) => SsIconButton(
+                      key: const ValueKey<String>('assets-upload'),
+                      icon: SsIcons.plus,
+                      semanticLabel: _section == _Section.media
+                          ? 'Upload files'
+                          : 'Upload fonts',
+                      tooltip: _section == _Section.media
+                          ? 'Upload media or an image sequence'
+                          : 'Upload fonts (TTF, OTF, WOFF)',
+                      onPressed: () => _section == _Section.media
+                          ? _uploadMenu(anchor)
+                          : unawaited(_actions.uploadFonts()),
                     ),
                   ),
                 ],
@@ -234,7 +257,8 @@ String formatBytes(int n) {
 String assetFacts(ir.Asset a) {
   final parts = <String>[
     if (a.width != null && a.height != null) '${a.width} × ${a.height}',
-    if (a.duration != null) _duration(a.duration!),
+    if (a.frameCount case final n?) '$n frames',
+    if (a.duration != null && a.frameCount == null) _duration(a.duration!),
     if (a.byteSize > 0) formatBytes(a.byteSize),
   ];
   return parts.join(' · ');
@@ -250,6 +274,7 @@ IconData assetIcon(ir.AssetKind k) => switch (k) {
   ir.AssetKind.image => SsIcons.image,
   ir.AssetKind.audio => SsIcons.music,
   ir.AssetKind.video => SsIcons.film,
+  ir.AssetKind.imageSequence => SsIcons.clapperboard,
   _ => SsIcons.file,
 };
 
@@ -366,10 +391,19 @@ class _AssetThumbState extends ConsumerState<AssetThumb> {
   }
 
   void _load() {
-    _bytes = widget.asset.kind == ir.AssetKind.image
-        ? ref.read(editorAssetServiceProvider).bytes(widget.asset.id)
-        : null;
+    final id = _thumbId(widget.asset);
+    _bytes = id == null ? null : ref.read(editorAssetServiceProvider).bytes(id);
   }
+
+  /// The stored file to show: the image, or a sequence's first frame.
+  static String? _thumbId(ir.Asset a) => switch (a.kind) {
+    ir.AssetKind.image => a.id,
+    ir.AssetKind.imageSequence => switch (ir.sequenceFrameUri(a, 0)) {
+      final u when u.startsWith('local://') => u.substring('local://'.length),
+      _ => null,
+    },
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -377,7 +411,7 @@ class _AssetThumbState extends ConsumerState<AssetThumb> {
     final a = widget.asset;
     final dominant = a.placeholder?.dominantColor;
     final base = dominant == null ? t.colors.surface3 : stageColor(dominant);
-    if (a.kind != ir.AssetKind.image) {
+    if (_thumbId(a) == null) {
       return ColoredBox(
         color: t.colors.surface3,
         child: Center(

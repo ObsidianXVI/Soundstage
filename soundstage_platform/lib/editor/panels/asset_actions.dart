@@ -45,6 +45,29 @@ class AssetActions {
     return files.isEmpty ? const [] : _insert.addToLibrary(files);
   }
 
+  /// Opens the picker for the frames of an image sequence (several images,
+  /// ordered by name) and adds the sequence to the library, one undo step.
+  /// Null when cancelled or refused (with a notice).
+  Future<ir.Asset?> uploadSequence() async {
+    final files = await _ref.read(editorFilePickerProvider)(
+      accept: 'image/*',
+      multiple: true,
+    );
+    return files.isEmpty ? null : addSequence(files);
+  }
+
+  /// Stores [files] as one image sequence and adds it to the library.
+  Future<ir.Asset?> addSequence(Iterable<EditorFile> files) async {
+    try {
+      final asset = await ingestSequence(_service, files);
+      _ctl.execute(AddAssets([asset]));
+      return asset;
+    } on AssetServiceException catch (e) {
+      _say(e.message);
+      return null;
+    }
+  }
+
   /// Opens the picker for audio files, stores them (computing their
   /// waveform peaks) and adds them to the library. The audio assets among
   /// the files, or nothing when cancelled or refused.

@@ -106,3 +106,30 @@ abstract class FontFamily with _$FontFamily {
   factory FontFamily.fromJson(Map<String, dynamic> json) =>
       _$FontFamilyFromJson(json);
 }
+
+// Image sequences (architecture §12): the asset's `uri` is a numbered
+// pattern, e.g. `https://…/frame_{0001}.webp` or `local://<id>_{0001}`. The
+// digits in braces give the first frame's number and the zero padding;
+// `frameCount` frames follow it.
+
+final RegExp _framePattern = RegExp(r'\{(\d+)\}');
+
+/// The default playback rate of an image sequence without a duration.
+const double kSequenceFrameRate = 24;
+
+/// The URI of frame [index] (0-based) of the image sequence [asset]; [asset]'s
+/// `uri` when it has no `{0001}` placeholder.
+String sequenceFrameUri(Asset asset, int index) =>
+    frameUriFromPattern(asset.uri, index);
+
+/// The URI of frame [index] (0-based) of numbered [pattern].
+String frameUriFromPattern(String pattern, int index) {
+  final m = _framePattern.firstMatch(pattern);
+  if (m == null) return pattern;
+  final digits = m.group(1)!;
+  final n = (int.parse(digits) + index).toString().padLeft(digits.length, '0');
+  return pattern.replaceRange(m.start, m.end, n);
+}
+
+/// Whether [uri] is a numbered frame pattern.
+bool isFramePattern(String uri) => _framePattern.hasMatch(uri);

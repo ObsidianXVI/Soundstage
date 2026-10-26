@@ -24,6 +24,13 @@ abstract interface class EditorAssetService {
   /// Stores [bytes] as a new asset and returns its table entry.
   Future<ir.Asset> add(Uint8List bytes, String mime, {String name = ''});
 
+  /// Stores [frames] (bytes and MIME type, in playback order) as one image
+  /// sequence and returns its table entry (`local://<id>_{0001}`).
+  Future<ir.Asset> addSequence(
+    List<(Uint8List, String)> frames, {
+    String name = '',
+  });
+
   /// Replaces the file of [assetId]; the id stays.
   Future<ir.Asset> replace(
     String assetId,
@@ -235,3 +242,65 @@ String? mimeForFileExtension(String extension) =>
       'json' => 'application/json',
       _ => null,
     };
+
+/// [files] in frame order: by name, with runs of digits compared as numbers
+/// (`f2` before `f10`).
+List<EditorFile> sortFrames(Iterable<EditorFile> files) {
+  final digits = RegExp(r'\d+|\D+');
+  int compare(String a, String b) {
+    final pa = digits.allMatches(a.toLowerCase()).map((m) => m[0]!).toList();
+    final pb = digits.allMatches(b.toLowerCase()).map((m) => m[0]!).toList();
+    for (var i = 0; i < pa.length && i < pb.length; i++) {
+      final na = int.tryParse(pa[i]), nb = int.tryParse(pb[i]);
+      final c = na != null && nb != null
+          ? na.compareTo(nb)
+          : pa[i].compareTo(pb[i]);
+      if (c != 0) return c;
+    }
+    return pa.length.compareTo(pb.length);
+  }
+
+  return [...files]..sort((a, b) => compare(a.name, b.name));
+}
+
+/// A name for a sequence of [files]: their shared name prefix without the
+/// frame number and separators (`walk_0001.webp` … → `walk`), else
+/// "Image sequence".
+String sequenceName(List<EditorFile> files) {
+  if (files.isEmpty) return 'Image sequence';
+  var prefix = files.first.name;
+  for (final f in files.skip(1)) {
+    var i = 0;
+    while (i < prefix.length && i < f.name.length && prefix[i] == f.name[i]) {
+      i++;
+    }
+    prefix = prefix.substring(0, i);
+  }
+  if (files.length == 1) {
+    final dot = prefix.lastIndexOf('.');
+    if (dot > 0) prefix = prefix.substring(0, dot);
+  }
+  final cleaned = prefix.replaceAll(RegExp(r'[\d\s._-]+$'), '');
+  return cleaned.isEmpty ? 'Image sequence' : cleaned;
+}
+
+/// Stores [files] as one image sequence (in [sortFrames] order). Throws
+/// [AssetServiceException] when a file is not an image.
+Future<ir.Asset> ingestSequence(
+  EditorAssetService service,
+  Iterable<EditorFile> files,
+) async {
+  final frames = sortFrames(files);
+  if (frames.isEmpty) {
+    throw const AssetServiceException('Choose the frames of the sequence.');
+  }
+  final out = <(Uint8List, String)>[];
+  for (final f in frames) {
+    final mime = mimeOfFile(f);
+    if (mime == null || mediaKindForMime(mime) != ir.AssetKind.image) {
+      throw AssetServiceException('${f.name}: frames must be images.');
+    }
+    out.add((f.bytes, mime));
+  }
+  return service.addSequence(out, name: sequenceName(frames));
+}

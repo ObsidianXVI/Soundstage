@@ -165,6 +165,80 @@ class LocalAssetStore implements LocalAssetLoader {
     return toAsset(meta);
   }
 
+  /// Stores [frames] (bytes and MIME type, in playback order) as one image
+  /// sequence (architecture §12, DECISIONS 26/10/26): each frame is its own
+  /// record `<id>_0001`, `<id>_0002`, … and the entry's `uri` is the
+  /// pattern `local://<id>_{0001}`. Size and placeholder come from the first
+  /// frame; `duration` plays the frames at [frameRate].
+  ///
+  /// Throws [UnsupportedAssetException] when there are no frames, a frame is
+  /// not an image or the first frame cannot be decoded, and
+  /// [StorageFullException] when the browser runs out of space (frames
+  /// stored before that are garbage for [collectGarbage]).
+  Future<ir.Asset> putSequence(
+    List<(Uint8List, String)> frames, {
+    String name = '',
+    double frameRate = ir.kSequenceFrameRate,
+  }) async {
+    if (frames.isEmpty) {
+      throw const UnsupportedAssetException(
+        'An image sequence needs at least one frame.',
+      );
+    }
+    for (final (_, mime) in frames) {
+      if (assetKindForMime(mime) != ir.AssetKind.image) {
+        throw UnsupportedAssetException(
+          '"$mime" is not an image, so it cannot be a sequence frame.',
+        );
+      }
+    }
+    final (firstBytes, firstMime) = frames.first;
+    final analysis = await _analyzer.analyze(firstBytes, firstMime);
+    final id = await _freshId();
+    final pad = frames.length.toString().length.clamp(4, 9);
+    final createdAt = _now().millisecondsSinceEpoch;
+    var total = 0;
+    for (final (i, (bytes, mime)) in frames.indexed) {
+      total += bytes.length;
+      await _db.putAsset(
+        AssetRecord(
+          AssetMeta(
+            id: '${id}_${(i + 1).toString().padLeft(pad, '0')}',
+            mime: mime,
+            byteSize: bytes.length,
+            createdAt: createdAt,
+            name: name,
+            width: analysis.width,
+            height: analysis.height,
+          ),
+          bytes,
+        ),
+      );
+    }
+    final c = analysis.dominantColor;
+    return ir.Asset(
+      id: id,
+      kind: ir.AssetKind.imageSequence,
+      uri: 'local://${id}_{${'1'.padLeft(pad, '0')}}',
+      name: name,
+      mime: firstMime,
+      byteSize: total,
+      width: analysis.width,
+      height: analysis.height,
+      frameCount: frames.length,
+      duration: frames.length / frameRate,
+      placeholder: c == null
+          ? null
+          : ir.AssetPlaceholder(
+              dominantColor: ir.StageColor(
+                r: ((c >> 16) & 0xFF) / 255,
+                g: ((c >> 8) & 0xFF) / 255,
+                b: (c & 0xFF) / 255,
+              ),
+            ),
+    );
+  }
+
   /// Replaces the file of asset [assetId] with [bytes] (re-analysed), keeping
   /// its id, creation time and, unless [name] is given, its name: every use
   /// in a document follows. Throws like [put]; nothing changes on failure.
@@ -337,9 +411,18 @@ class LocalAssetStore implements LocalAssetLoader {
       }
     }
     final cutoff = _now().subtract(minAge).millisecondsSinceEpoch;
+    // A sequence pattern `local://<id>_{0001}` is captured as `<id>_` and
+    // keeps every frame record `<id>_<n>`.
+    final frame = RegExp(r'^(.+_)\d+$');
+    bool kept(String id) {
+      if (referenced.contains(id)) return true;
+      final prefix = frame.firstMatch(id)?.group(1);
+      return prefix != null && referenced.contains(prefix);
+    }
+
     final doomed = [
       for (final m in await _db.listAssets())
-        if (!referenced.contains(m.id) && m.createdAt <= cutoff) m.id,
+        if (!kept(m.id) && m.createdAt <= cutoff) m.id,
     ];
     if (doomed.isNotEmpty) await _db.deleteAssets(doomed);
     return doomed.length;

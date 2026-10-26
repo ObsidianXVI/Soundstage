@@ -36,6 +36,12 @@ class LocalEditorAssetService implements EditorAssetService {
       _guard(() => _store.put(bytes, mime, name: name));
 
   @override
+  Future<ir.Asset> addSequence(
+    List<(Uint8List, String)> frames, {
+    String name = '',
+  }) => _guard(() => _store.putSequence(frames, name: name));
+
+  @override
   Future<ir.Asset> replace(
     String assetId,
     Uint8List bytes,
@@ -94,6 +100,12 @@ class UnavailableAssetService implements EditorAssetService {
   @override
   Future<ir.Asset> add(Uint8List bytes, String mime, {String name = ''}) =>
       _no();
+
+  @override
+  Future<ir.Asset> addSequence(
+    List<(Uint8List, String)> frames, {
+    String name = '',
+  }) => _no();
 
   @override
   Future<ir.Asset> replace(

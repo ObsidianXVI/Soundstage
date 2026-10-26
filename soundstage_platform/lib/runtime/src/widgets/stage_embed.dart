@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../media/image_sequence_surface.dart';
 import '../media/lottie_surface.dart' deferred as lottie;
 import '../media/rive_surface.dart' deferred as rive;
 import '../render/stage_environment.dart';
@@ -13,7 +14,7 @@ Future<void>? _riveLoaded;
 
 /// An embed node's content (m3.md T3.6): its asset's bytes shown by the
 /// Lottie or Rive runtime, each a deferred library fetched only when a story
-/// uses it.
+/// uses it, or an image sequence's frames.
 class StageEmbedView extends StatefulWidget {
   const StageEmbedView({
     required this.node,
@@ -51,6 +52,10 @@ class _StageEmbedViewState extends State<StageEmbedView> {
     if (media == null || asset == null) return;
     final uri = asset.uri;
     _uri = uri;
+    if (asset.kind == ir.AssetKind.imageSequence) {
+      setState(() => _kind = asset.kind);
+      return;
+    }
     try {
       final library = switch (asset.kind) {
         ir.AssetKind.rive => _riveLoaded ??= rive.loadLibrary(),
@@ -72,6 +77,16 @@ class _StageEmbedViewState extends State<StageEmbedView> {
 
   @override
   Widget build(BuildContext context) {
+    final media = widget.environment.media;
+    final asset = media?.resolver.asset(widget.node.assetId);
+    if (_kind == ir.AssetKind.imageSequence && media != null && asset != null) {
+      return StageImageSequence(
+        node: widget.node,
+        asset: asset,
+        resolver: media.resolver,
+        interactive: widget.environment.mode == StageRenderMode.play,
+      );
+    }
     final bytes = _bytes;
     if (bytes == null) return const SizedBox.expand();
     final interactive = widget.environment.mode == StageRenderMode.play;

@@ -268,5 +268,44 @@ void repositoryContract(
       expect(await h.assets.get(a.id), isNull);
       expect(await h.assets.get(used.id), isNotNull);
     });
+    test(
+      'image sequences store numbered frames and survive collection',
+      () async {
+        final seq = await h.assets.putSequence([
+          for (var i = 0; i < 3; i++) (Uint8List.fromList([i]), 'image/webp'),
+        ], name: 'walk');
+        expect(seq.kind, ir.AssetKind.imageSequence);
+        expect(seq.uri, 'local://${seq.id}_{0001}');
+        expect(seq.frameCount, 3);
+        expect(seq.byteSize, 3);
+        expect(seq.duration, closeTo(3 / ir.kSequenceFrameRate, 1e-9));
+        expect(seq.width, 4);
+        expect(ir.sequenceFrameUri(seq, 2), 'local://${seq.id}_0003');
+        expect(
+          await h.assets.loadBytes('${seq.id}_0003'),
+          Uint8List.fromList([2]),
+        );
+        await expectLater(
+          h.assets.putSequence([(Uint8List(1), 'audio/wav')]),
+          throwsA(isA<UnsupportedAssetException>()),
+        );
+        await expectLater(
+          h.assets.putSequence(const []),
+          throwsA(isA<UnsupportedAssetException>()),
+        );
+
+        final orphan = await h.assets.putSequence([
+          (Uint8List.fromList([7]), 'image/png'),
+        ]);
+        final s = await h.repo.create();
+        final d = (await h.repo.load(s.id))!;
+        await h.repo.save(s.id, d.copyWith(assets: {seq.id: seq}));
+        t = t.add(const Duration(hours: 3));
+        expect(await h.assets.collectGarbage(), 1);
+        expect(await h.assets.get('${seq.id}_0001'), isNotNull);
+        expect(await h.assets.get('${seq.id}_0003'), isNotNull);
+        expect(await h.assets.get('${orphan.id}_0001'), isNull);
+      },
+    );
   });
 }

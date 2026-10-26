@@ -66,4 +66,32 @@ void main() {
     await tester.pumpAndSettle();
     expect((nodeOf(c, 'e') as ir.EmbedNode).inputBindings, {'tilt': 'clk1'});
   });
+
+  testWidgets('an image sequence shows its frames and binds progress', (
+    tester,
+  ) async {
+    final doc = _doc(ir.AssetKind.imageSequence);
+    final c = await pumpInspector(
+      tester,
+      doc.copyWith(
+        assets: {
+          'a': doc.assets['a']!.copyWith(
+            uri: 'local://a_{0001}',
+            frameCount: 48,
+          ),
+        },
+      ),
+      select: {'e'},
+      height: 1600,
+    );
+    expect(find.text('Image sequence · 48 frames · anim'), findsOneWidget);
+    expect(find.text('State machine'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('embed:bind:progress')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scene scroll').last);
+    await tester.pumpAndSettle();
+    expect((nodeOf(c, 'e') as ir.EmbedNode).inputBindings, {
+      'progress': 'clk1',
+    });
+  });
 }

@@ -348,8 +348,9 @@ class DbStoryRepository implements StoryRepository {
     for (final entry in doc.assets.entries) {
       final a = entry.value;
       final path = _assetPath(a.uri);
-      if (path == null) {
-        assetsOut[entry.key] = a; // already local:// or remote
+      if (path == null || a.kind == ir.AssetKind.imageSequence) {
+        // Already local:// or remote; bundled sequences stay asset://.
+        assetsOut[entry.key] = a;
         continue;
       }
       try {

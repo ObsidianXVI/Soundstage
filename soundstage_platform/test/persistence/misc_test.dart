@@ -176,6 +176,60 @@ void main() {
     expect(await h3.assets.get(newId), Uint8List.fromList([5, 6, 7]));
   });
 
+  test(
+    'zip round trip of an image sequence, collision remaps all frames',
+    () async {
+      final db = MemoryStoryDatabase();
+      final h = Harness(db, DateTime.now);
+      final seq = await h.assets.putSequence([
+        for (var i = 0; i < 3; i++) (Uint8List.fromList([i, i]), 'image/webp'),
+      ], name: 'walk');
+      final d = doc('Seq').copyWith(assets: {seq.id: seq});
+      Future<Uint8List?> bytesOf(ir.Asset x) =>
+          h.assets.get(x.uri.substring('local://'.length));
+      final zip = await exportStageZip(d, bytesOf);
+
+      final h2 = Harness(MemoryStoryDatabase(), DateTime.now);
+      final fresh = await importStoryFile(zip, h2.assets);
+      expect(fresh.warnings, isEmpty);
+      expect(fresh.document!.assets[seq.id]!.uri, seq.uri);
+      expect(await h2.assets.get('${seq.id}_0002'), Uint8List.fromList([1, 1]));
+
+      // A different frame under the same id: the whole sequence moves.
+      await db.putAsset(
+        AssetRecord(
+          AssetMeta(
+            id: '${seq.id}_0003',
+            mime: 'image/webp',
+            byteSize: 1,
+            createdAt: 0,
+          ),
+          Uint8List.fromList([9]),
+        ),
+      );
+      final clash = await importStoryFile(
+        zip,
+        Harness(db, DateTime.now).assets,
+      );
+      final newId = clash.document!.assets.keys.single;
+      expect(newId, isNot(seq.id));
+      expect(clash.document!.assets[newId]!.uri, 'local://${newId}_{0001}');
+      for (var i = 1; i <= 3; i++) {
+        expect(
+          await db.getAsset('${newId}_000$i'),
+          isNotNull,
+          reason: 'frame $i',
+        );
+      }
+      expect(
+        ir
+            .validateDocument(clash.document!)
+            .where((x) => x.severity == ir.IrSeverity.error),
+        isEmpty,
+      );
+    },
+  );
+
   test('json import and bad input', () async {
     final h = Harness(MemoryStoryDatabase(), DateTime.now);
     final json = Uint8List.fromList(exportStageJson(doc('J')).codeUnits);

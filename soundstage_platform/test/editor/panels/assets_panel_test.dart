@@ -69,9 +69,34 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('assets-upload')));
     await _settle(tester);
+    await tester.tap(find.text('Files…'));
+    await _settle(tester);
     expect(s.c.doc.assets.values.single.name, 'a.png');
     expect(find.text('a.png'), findsWidgets);
     expect(find.text('30 × 30 · 5 B'), findsOneWidget);
+  });
+
+  testWidgets('Image sequence… stores the picked frames in name order as '
+      'one asset', (tester) async {
+    final s = await _pump(
+      tester,
+      picks: [
+        for (final n in ['walk_10.png', 'walk_2.png', 'walk_1.png'])
+          (
+            name: n,
+            bytes: FakeAssetService.png(8, 8, n.length),
+            mime: 'image/png',
+          ),
+      ],
+    );
+    await tester.tap(find.byKey(const ValueKey('assets-upload')));
+    await _settle(tester);
+    await tester.tap(find.text('Image sequence…'));
+    await _settle(tester);
+    final a = s.c.doc.assets.values.single;
+    expect(a.kind, ir.AssetKind.imageSequence);
+    expect(a.name, 'walk');
+    expect(a.frameCount, 3);
   });
 
   testWidgets('tiles show name, dimensions and size', (tester) async {

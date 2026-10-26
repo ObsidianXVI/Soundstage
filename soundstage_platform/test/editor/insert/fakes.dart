@@ -62,6 +62,32 @@ class FakeAssetService implements EditorAssetService {
   }
 
   @override
+  Future<ir.Asset> addSequence(
+    List<(Uint8List, String)> frames, {
+    String name = '',
+  }) async {
+    if (!available) {
+      throw const AssetServiceException('Browser storage is blocked.');
+    }
+    addCount++;
+    final id = 'asset${++_next}';
+    for (final (i, (bytes, _)) in frames.indexed) {
+      files['${id}_${(i + 1).toString().padLeft(4, '0')}'] = bytes;
+    }
+    return entries[id] = ir.Asset(
+      id: id,
+      kind: ir.AssetKind.imageSequence,
+      uri: 'local://${id}_{0001}',
+      name: name,
+      mime: frames.first.$2,
+      frameCount: frames.length,
+      duration: frames.length / ir.kSequenceFrameRate,
+      width: 64,
+      height: 36,
+    );
+  }
+
+  @override
   Future<ir.Asset> replace(
     String assetId,
     Uint8List bytes,

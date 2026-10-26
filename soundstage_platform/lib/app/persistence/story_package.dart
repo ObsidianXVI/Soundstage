@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
+import 'package:soundstage_platform/runtime/runtime.dart' show localAssetId;
 
 import 'local_asset_store.dart';
 import 'records.dart';
@@ -54,6 +55,12 @@ Future<Uint8List> exportStageZip(
   final missing = <String>[];
   final rewritten = <String, ir.Asset>{};
   for (final MapEntry(:key, value: asset) in document.assets.entries) {
+    if (asset.kind == ir.AssetKind.imageSequence) {
+      final packed = await _exportSequence(asset, bytesOf, archive, entries);
+      if (packed == null) missing.add(asset.id);
+      rewritten[key] = packed ?? asset;
+      continue;
+    }
     final bytes = await bytesOf(asset);
     if (bytes == null) {
       missing.add(asset.id);
@@ -96,6 +103,44 @@ Future<Uint8List> exportStageZip(
     ),
   );
   return Uint8List.fromList(ZipEncoder().encode(archive));
+}
+
+/// Writes the frames of image sequence [asset] as
+/// `assets/<id>_0001.<ext>`, … and returns the entry pointing at them
+/// (`local://<id>_{0001}`), or null when any frame is unavailable.
+Future<ir.Asset?> _exportSequence(
+  ir.Asset asset,
+  AssetBytesSource bytesOf,
+  Archive archive,
+  List<Map<String, Object?>> entries,
+) async {
+  final count = asset.frameCount ?? 0;
+  if (count < 1 || !ir.isFramePattern(asset.uri)) return null;
+  final pad = count.toString().length.clamp(4, 9);
+  final ext = extensionForMime(asset.mime);
+  final files = <ArchiveFile>[];
+  var total = 0;
+  for (var i = 0; i < count; i++) {
+    final bytes = await bytesOf(
+      asset.copyWith(
+        kind: ir.AssetKind.image,
+        uri: ir.sequenceFrameUri(asset, i),
+      ),
+    );
+    if (bytes == null) return null;
+    total += bytes.length;
+    final id = '${asset.id}_${(i + 1).toString().padLeft(pad, '0')}';
+    files.add(ArchiveFile.noCompress('assets/$id.$ext', bytes.length, bytes));
+  }
+  files.forEach(archive.add);
+  entries.add({
+    'id': asset.id,
+    'path': 'assets/${asset.id}_{${'1'.padLeft(pad, '0')}}.$ext',
+    'mime': asset.mime,
+    'byteSize': total,
+    'frameCount': count,
+  });
+  return asset.copyWith(uri: 'local://${asset.id}_{${'1'.padLeft(pad, '0')}}');
 }
 
 /// What an import produced.
@@ -244,6 +289,50 @@ Future<ImportedStory> importStoryFile(
     ..reserve(taken)
     ..reserve(assetFiles.keys);
   var stored = 0;
+  // Image sequences first: their frames move together, so a collision on
+  // any frame gives the whole sequence a fresh id.
+  for (final seq in assetMeta.values) {
+    if (seq.kind != ir.AssetKind.imageSequence) continue;
+    final count = seq.frameCount ?? 0;
+    final frames = <(String, Uint8List)>[];
+    for (var i = 0; i < count; i++) {
+      final key = localAssetId(ir.sequenceFrameUri(seq, i));
+      final data = key == null ? null : assetFiles.remove(key)?.readBytes();
+      if (key != null && data != null) frames.add((key, data));
+    }
+    if (frames.length != count || count == 0) {
+      if (count > 0) {
+        warnings.add('Image sequence "${seq.name}" is missing frames.');
+      }
+      continue;
+    }
+    var conflict = false;
+    for (final (key, data) in frames) {
+      final existing = await store.record(key);
+      if (existing != null && !_sameBytes(existing.bytes, data)) {
+        conflict = true;
+        break;
+      }
+    }
+    final id = conflict ? ids.next() : seq.id;
+    if (conflict) remap[seq.id] = id;
+    for (final (key, data) in frames) {
+      final frameId = '$id${key.substring(seq.id.length)}';
+      await store.putExisting(
+        ir.Asset(
+          id: frameId,
+          kind: ir.AssetKind.image,
+          uri: 'local://$frameId',
+          name: seq.name,
+          mime: seq.mime,
+          width: seq.width,
+          height: seq.height,
+        ),
+        data,
+      );
+    }
+    stored++;
+  }
   for (final MapEntry(:key, value: file) in assetFiles.entries) {
     final data = file.readBytes();
     if (data == null) continue;
@@ -292,6 +381,8 @@ Future<ImportedStory> importStoryFile(
   );
 }
 
+final RegExp _sequencePattern = RegExp(r'^(.+?)(_\{\d+\})$');
+
 bool _sameBytes(Uint8List a, Uint8List b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
@@ -310,6 +401,11 @@ Object? _remapIds(Object? node, Map<String, String> remap) {
       if (s.startsWith('local://')) {
         final id = s.substring('local://'.length);
         if (remap.containsKey(id)) return 'local://${remap[id]}';
+        // An image sequence pattern: `local://<id>_{0001}`.
+        final m = _sequencePattern.firstMatch(id);
+        if (m != null && remap.containsKey(m.group(1))) {
+          return 'local://${remap[m.group(1)]}${m.group(2)}';
+        }
       }
       return s;
     case final Map<Object?, Object?> m:

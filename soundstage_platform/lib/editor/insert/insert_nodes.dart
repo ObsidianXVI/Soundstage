@@ -171,6 +171,11 @@ ir.Node buildMediaNode(ir.Asset asset, String id, String paintId, Rect box) {
       common: common.copyWith(role: ir.NodeRole.decorative),
       assetId: asset.id,
     ),
+    // Frames of footage: content, like a video.
+    ir.AssetKind.imageSequence => ir.EmbedNode(
+      common: common,
+      assetId: asset.id,
+    ),
     _ => buildImageFrame(asset, id, paintId, box),
   };
 }

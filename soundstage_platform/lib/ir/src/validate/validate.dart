@@ -256,7 +256,7 @@ class _Validator {
       _d(
         IrDiagnosticKind.noPrimaryBreakpoint,
         'No breakpoint is primary; the editor shows primary breakpoints as '
-        'artboards.',
+            'artboards.',
         'breakpoints',
         severity: IrSeverity.warning,
       );
@@ -302,6 +302,16 @@ class _Validator {
           IrDiagnosticKind.idMismatch,
           'Asset key "$key" differs from its id "${a.id}".',
           'assets.$key',
+        );
+      }
+      if (a.kind == AssetKind.imageSequence &&
+          ((a.frameCount ?? 0) < 1 || !isFramePattern(a.uri))) {
+        _d(
+          IrDiagnosticKind.invalidValue,
+          'Image sequence "$key" needs a numbered uri ({0001}) and a '
+              'frameCount of at least 1.',
+          'assets.$key',
+          severity: IrSeverity.warning,
         );
       }
     });
