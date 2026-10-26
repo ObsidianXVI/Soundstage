@@ -154,6 +154,18 @@ ir.FrameNode buildImageFrame(
 
 /// The node that places [asset] in [box]: an image frame, a video, or a
 /// Lottie/Rive embed.
+/// Whether an asset of [kind] can be placed on the canvas as a node (an
+/// image frame, a video, an animation file or an image sequence); audio and
+/// fonts cannot.
+bool isPlaceableKind(ir.AssetKind kind) => switch (kind) {
+  ir.AssetKind.image ||
+  ir.AssetKind.video ||
+  ir.AssetKind.lottie ||
+  ir.AssetKind.rive ||
+  ir.AssetKind.imageSequence => true,
+  ir.AssetKind.audio || ir.AssetKind.font => false,
+};
+
 ir.Node buildMediaNode(ir.Asset asset, String id, String paintId, Rect box) {
   final common = ir.NodeCommon(
     id: id,

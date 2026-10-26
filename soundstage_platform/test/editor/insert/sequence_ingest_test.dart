@@ -50,4 +50,20 @@ void main() {
     expect(n, isA<ir.EmbedNode>());
     expect(n.common.role, ir.NodeRole.figure);
   });
+
+  test('placeable kinds: everything but audio and fonts', () {
+    expect(
+      {
+        for (final k in ir.AssetKind.values)
+          if (isPlaceableKind(k)) k,
+      },
+      {
+        ir.AssetKind.image,
+        ir.AssetKind.video,
+        ir.AssetKind.lottie,
+        ir.AssetKind.rive,
+        ir.AssetKind.imageSequence,
+      },
+    );
+  });
 }

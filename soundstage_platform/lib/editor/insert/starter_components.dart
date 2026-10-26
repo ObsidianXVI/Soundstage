@@ -159,7 +159,9 @@ ir.FrameNode starterRoot(StarterComponent s, ir.IdGenerator ids) {
 }
 
 /// Adds starter [starter] as a new component and puts an instance of it in
-/// frame [parentId] at ([x], [y]), selected. One undo step.
+/// frame [parentId] at ([x], [y]), selected. On a scene root, breakpoints
+/// too narrow for it get a narrower width (same side margins). One undo
+/// step.
 class AddStarterComponent extends EditCommand {
   const AddStarterComponent(
     this.starter, {
@@ -213,6 +215,25 @@ class AddStarterComponent extends EditCommand {
         ),
       ],
     );
-    return resultOf(state, r, label: label, selectionAfter: {instId});
+    // Narrower breakpoints (m3.md T3.3 follow-up): on a scene root that is
+    // too narrow, the instance keeps the same margins and fills the rest,
+    // instead of overflowing the artboard.
+    var out = r;
+    final isRoot = r.document.scenes.any((s) => s.root.common.id == parentId);
+    if (r.ok && isRoot) {
+      for (final bp in r.document.breakpoints) {
+        final fits = bp.designSize.width - 2 * x;
+        if (fits >= root.common.width || fits <= 0) continue;
+        final next = ir.setBreakpointPatchValue(
+          out.document,
+          instId,
+          bp.id,
+          'width',
+          ir.IrValue.number(fits),
+        );
+        if (next.ok) out = next;
+      }
+    }
+    return resultOf(state, out, label: label, selectionAfter: {instId});
   }
 }

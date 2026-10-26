@@ -33,4 +33,25 @@ void main() {
       expect(c.doc.components.length, before);
     });
   }
+
+  test('narrow breakpoints get a narrower instance, keeping the margins', () {
+    final c = editorContainer();
+    c.ctl.execute(
+      const AddStarterComponent(StarterComponent.gallery, parentId: 'root'),
+    );
+    final inst = c.node(c.st.selection.single) as InstanceNode;
+    expect(inst.common.width, 800);
+    final widths = {
+      for (final bp in c.doc.breakpoints)
+        bp.designSize.width: (resolveDocument(
+          c.doc,
+          ResolveContext(breakpointId: bp.id),
+        ).nodeIndex[inst.id]!.node.common.width),
+    };
+    expect(widths, {1000.0: 800.0, 400.0: 320.0, 700.0: 620.0});
+    expect(
+      validateDocument(c.doc).where((d) => d.severity == IrSeverity.error),
+      isEmpty,
+    );
+  });
 }

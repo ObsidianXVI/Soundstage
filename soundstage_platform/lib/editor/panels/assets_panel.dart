@@ -11,6 +11,7 @@ import '../core/core.dart';
 import '../insert/asset_service.dart';
 import '../insert/canvas_drop.dart';
 import '../insert/file_drop.dart';
+import '../insert/insert_nodes.dart' show isPlaceableKind;
 import 'asset_actions.dart';
 import 'components_list.dart';
 import 'fonts_panel.dart';
@@ -270,6 +271,17 @@ String _duration(double s) {
   return '$m:$r';
 }
 
+/// A kind's name for the author ("Image sequence", not `imageSequence`).
+String assetKindLabel(ir.AssetKind k) => switch (k) {
+  ir.AssetKind.image => 'Image',
+  ir.AssetKind.video => 'Video',
+  ir.AssetKind.audio => 'Audio',
+  ir.AssetKind.font => 'Font',
+  ir.AssetKind.imageSequence => 'Image sequence',
+  ir.AssetKind.lottie => 'Lottie',
+  ir.AssetKind.rive => 'Rive',
+};
+
 IconData assetIcon(ir.AssetKind k) => switch (k) {
   ir.AssetKind.image => SsIcons.image,
   ir.AssetKind.audio => SsIcons.music,
@@ -299,7 +311,7 @@ class _AssetTile extends ConsumerWidget {
       onTap: onTap,
       selected: selected,
       semanticLabel: asset.name.isEmpty ? asset.id : asset.name,
-      semanticValue: '${asset.kind.name}, ${assetFacts(asset)}',
+      semanticValue: '${assetKindLabel(asset.kind)}, ${assetFacts(asset)}',
       excludeSemantics: true,
       builder: (context, s) => Container(
         decoration: BoxDecoration(
@@ -338,7 +350,7 @@ class _AssetTile extends ConsumerWidget {
         ),
       ),
     );
-    if (asset.kind == ir.AssetKind.image) {
+    if (isPlaceableKind(asset.kind)) {
       tile = Draggable<AssetDrag>(
         data: AssetDrag(asset.id),
         dragAnchorStrategy: pointerDragAnchorStrategy,
@@ -491,7 +503,7 @@ class _AssetDetails extends ConsumerWidget {
             ],
             const SizedBox(height: SsSpace.s2),
             Text(
-              '${asset.kind.name} · ${assetFacts(asset)}',
+              '${assetKindLabel(asset.kind)} · ${assetFacts(asset)}',
               style: t.text.caption,
             ),
             const SizedBox(height: SsSpace.s2),
@@ -499,18 +511,21 @@ class _AssetDetails extends ConsumerWidget {
               spacing: SsSpace.s2,
               runSpacing: SsSpace.s2,
               children: [
-                if (isImage)
+                if (isPlaceableKind(asset.kind))
                   SsButton(
                     key: const ValueKey<String>('asset-insert'),
                     label: 'Insert',
                     icon: SsIcons.imagePlus,
                     onPressed: () => actions.insertOnCanvas(asset.id),
                   ),
-                SsButton(
-                  key: const ValueKey<String>('asset-replace'),
-                  label: 'Replace file…',
-                  onPressed: () => unawaited(actions.pickAndReplace(asset.id)),
-                ),
+                // A sequence's frames are replaced by uploading a new one.
+                if (asset.kind != ir.AssetKind.imageSequence)
+                  SsButton(
+                    key: const ValueKey<String>('asset-replace'),
+                    label: 'Replace file…',
+                    onPressed: () =>
+                        unawaited(actions.pickAndReplace(asset.id)),
+                  ),
                 SsButton(
                   key: const ValueKey<String>('asset-used'),
                   label: 'Where used',
@@ -642,7 +657,7 @@ class _InUseDialogState extends ConsumerState<_InUseDialog> {
           SsDropdown<String>(
             semanticLabel: 'Replacement asset',
             hint: others.isEmpty
-                ? 'No other ${widget.asset.kind.name}'
+                ? 'No other ${assetKindLabel(widget.asset.kind).toLowerCase()}'
                 : 'Choose…',
             value: _with,
             enabled: others.isNotEmpty,

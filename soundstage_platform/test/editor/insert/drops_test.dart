@@ -96,7 +96,7 @@ void main() {
       ir.AssetKind.audio,
     ]);
     expect(
-      c.read(editorNoticesProvider).log.any((m) => m.contains('audio/video')),
+      c.read(editorNoticesProvider).log.any((m) => m.contains('1 audio file')),
       isTrue,
     );
   });

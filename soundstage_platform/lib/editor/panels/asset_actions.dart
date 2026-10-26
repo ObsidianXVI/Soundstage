@@ -10,6 +10,7 @@ import '../core/core.dart';
 import '../insert/asset_service.dart';
 import '../insert/editor_notices.dart';
 import '../insert/insert_actions.dart';
+import '../insert/insert_nodes.dart' show isPlaceableKind;
 import 'font_info.dart';
 
 /// What the Assets and Fonts panels do (T1.9): upload, rename, replace,
@@ -340,7 +341,7 @@ class AssetActions {
   /// Places image [assetId] as a new frame (see `InsertActions.insertImages`).
   void insertOnCanvas(String assetId) {
     final a = _asset(assetId);
-    if (a != null && a.kind == ir.AssetKind.image) _insert.insertImages([a]);
+    if (a != null && isPlaceableKind(a.kind)) _insert.insertImages([a]);
   }
 
   /// The bytes of [assetId] for a thumbnail.

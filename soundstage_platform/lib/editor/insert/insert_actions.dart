@@ -59,9 +59,9 @@ class InsertActions {
     await insertFiles(files);
   }
 
-  /// Stores [files] and inserts the images among them as frames (at the
-  /// drop point [screen] when given, else centred in the insert parent).
-  /// Audio and video go to the library only.
+  /// Stores [files] and places the images, videos and animation files among
+  /// them (at the drop point [screen] when given, else centred in the insert
+  /// parent). Audio goes to the library only.
   Future<void> insertFiles(
     Iterable<EditorFile> files, {
     Offset? screen,
@@ -70,7 +70,7 @@ class InsertActions {
     final assets = await addToLibrary(files);
     final images = [
       for (final a in assets)
-        if (a.kind == ir.AssetKind.image) a,
+        if (isPlaceableKind(a.kind)) a,
     ];
     final others = assets.length - images.length;
     if (images.isNotEmpty) {
@@ -80,8 +80,8 @@ class InsertActions {
     }
     if (others > 0) {
       _say(
-        '$others audio/video ${others == 1 ? 'file was' : 'files were'} '
-        'added to Assets. Placing them comes with the audio and video nodes.',
+        '$others audio ${others == 1 ? 'file was' : 'files were'} added to '
+        'Assets. Add audio to a scene in Scene settings ▸ Audio.',
       );
     }
   }
@@ -213,12 +213,16 @@ class InsertActions {
     return r.changed;
   }
 
-  /// A drop of asset [assetId] at [screen] on the canvas: onto a frame or
-  /// shape (not the artboard background) it becomes that node's fill;
-  /// anywhere else it becomes a new image frame at the drop point.
+  /// A drop of asset [assetId] at [screen] on the canvas: an image onto a
+  /// frame or shape (not the artboard background) becomes that node's fill;
+  /// anything placeable elsewhere becomes a new node at the drop point.
   void dropAsset(String assetId, Offset screen, CanvasController canvas) {
     final asset = _state.document.assets[assetId];
-    if (asset == null || asset.kind != ir.AssetKind.image) return;
+    if (asset == null || !isPlaceableKind(asset.kind)) return;
+    if (asset.kind != ir.AssetKind.image) {
+      insertImages([asset], screen: screen, canvas: canvas);
+      return;
+    }
     final doc = _state.document;
     final index = ir.DocumentIndex.of(doc);
     final hits = canvas.overlay.hitTest(screen);
