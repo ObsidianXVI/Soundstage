@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 import 'package:soundstage_platform/runtime/runtime.dart';
@@ -33,6 +34,7 @@ Future<void> _pump(
   WidgetTester tester,
   ir.StageDocument doc, {
   StageRenderMode mode = StageRenderMode.play,
+  Widget Function(Widget stage)? wrap,
 }) async {
   setViewport(tester, _viewport);
   final resolved = ir.resolveDocument(
@@ -43,12 +45,14 @@ Future<void> _pump(
     MaterialApp(
       home: StageScope(
         environment: StageEnvironment.forDocument(doc, mode: mode),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: StageSceneView(
-            scene: resolved.scenes.first,
-            viewportSize: _viewport,
-            breakpoint: resolved.breakpoint,
+        child: (wrap ?? (w) => w)(
+          Align(
+            alignment: Alignment.topLeft,
+            child: StageSceneView(
+              scene: resolved.scenes.first,
+              viewportSize: _viewport,
+              breakpoint: resolved.breakpoint,
+            ),
           ),
         ),
       ),
@@ -139,5 +143,29 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('lightbox')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('lightbox')), findsNothing);
+  });
+
+  testWidgets('inside a StageLightboxHost the lightbox covers only the host '
+      '(an editor preview pane), not the page', (tester) async {
+    await _pump(
+      tester,
+      _doc(const ir.Behavior.lightbox()),
+      wrap: (stage) => Padding(
+        padding: const EdgeInsets.only(left: 100, top: 50),
+        child: StageLightboxHost(child: stage),
+      ),
+    );
+    await tester.tapAt(const Offset(650, 250));
+    await tester.pumpAndSettle();
+    final box = find.byKey(const ValueKey('lightbox'));
+    expect(box, findsOneWidget);
+    expect(
+      find.ancestor(of: box, matching: find.byType(StageLightboxHost)),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(box), const Offset(100, 50));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(box, findsNothing);
   });
 }

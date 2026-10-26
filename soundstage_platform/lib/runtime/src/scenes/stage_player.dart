@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -17,7 +18,8 @@ import '../media/image_cache.dart';
 import '../render/render_stage_box.dart';
 import '../render/render_stage_frame.dart' show stageDevicePixelRatio;
 import '../render/stage_environment.dart';
-import '../widgets/stage_behaviors.dart' show showStageLightbox;
+import '../widgets/stage_behaviors.dart'
+    show StageLightboxHost, StageLightboxHostState;
 import '../widgets/stage_node_widget.dart';
 import '../widgets/stage_overlay.dart';
 import '../widgets/stage_scene_view.dart';
@@ -258,14 +260,19 @@ class _StagePlayerState extends State<StagePlayer>
     final n = _resolved?.nodeIndex[nodeId];
     if (n == null || !mounted) return;
     final c = n.node.common;
-    showStageLightbox(
-      context,
-      index: 0,
-      count: 1,
-      sizes: [Size(c.width, c.height)],
-      buildMember: (_) => stageNodeAlone(_env, n),
+    unawaited(
+      _lightbox.currentState?.showMember(
+        index: 0,
+        count: 1,
+        sizes: [Size(c.width, c.height)],
+        buildMember: (_) => stageNodeAlone(_env, n),
+      ),
     );
   }
+
+  /// Lightboxes cover the player, not the page around it (an editor
+  /// preview pane keeps them to itself).
+  final _lightbox = GlobalKey<StageLightboxHostState>();
 
   /// The stage nodes under [global], innermost first.
   List<String> _nodesAt(Offset global) {
@@ -660,39 +667,42 @@ class _StagePlayerState extends State<StagePlayer>
                   _animator.pointerMoved(e.position);
                 }
               },
-              child: SizedBox.fromSize(
-                size: viewport,
-                child: PrimaryScrollController(
-                  controller: _scroll,
-                  child: Focus(
-                    focusNode: _focus,
-                    autofocus: true,
-                    onKeyEvent: _onKey,
-                    // A text direction up the semantics tree makes the
-                    // scenes (siblings in the scroll view) read in order.
-                    child: Semantics(
-                      container: true,
-                      textDirection: TextDirection.ltr,
-                      child: _withPointerTriggers(
-                        Stack(
-                          children: [
-                            CustomScrollView(
-                              controller: _scroll,
-                              physics: widget.physics,
-                              scrollCacheExtent: ScrollCacheExtent.viewport(
-                                widget.lazyWindow,
-                              ),
-                              slivers: _slivers,
-                            ),
-                            if (_resolved?.overlay case final overlay?)
-                              Positioned.fill(
-                                child: StageOverlayView(
-                                  root: overlay,
-                                  viewportSize: viewport,
-                                  breakpoint: _resolved!.breakpoint,
+              child: StageLightboxHost(
+                key: _lightbox,
+                child: SizedBox.fromSize(
+                  size: viewport,
+                  child: PrimaryScrollController(
+                    controller: _scroll,
+                    child: Focus(
+                      focusNode: _focus,
+                      autofocus: true,
+                      onKeyEvent: _onKey,
+                      // A text direction up the semantics tree makes the
+                      // scenes (siblings in the scroll view) read in order.
+                      child: Semantics(
+                        container: true,
+                        textDirection: TextDirection.ltr,
+                        child: _withPointerTriggers(
+                          Stack(
+                            children: [
+                              CustomScrollView(
+                                controller: _scroll,
+                                physics: widget.physics,
+                                scrollCacheExtent: ScrollCacheExtent.viewport(
+                                  widget.lazyWindow,
                                 ),
+                                slivers: _slivers,
                               ),
-                          ],
+                              if (_resolved?.overlay case final overlay?)
+                                Positioned.fill(
+                                  child: StageOverlayView(
+                                    root: overlay,
+                                    viewportSize: viewport,
+                                    breakpoint: _resolved!.breakpoint,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

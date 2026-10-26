@@ -506,65 +506,142 @@ class _StageLightboxState extends State<StageLightbox> {
   }
 }
 
-/// Shows member [index] of a lightbox over the page (see [StageLightbox]).
+/// Shows member [index] of a lightbox over the player: inside the nearest
+/// [StageLightboxHost] (so a preview pane keeps it to itself), else over
+/// the whole page through the root navigator.
 Future<void> showStageLightbox(
   BuildContext context, {
   required int index,
   required int count,
   required List<Size> sizes,
   required Widget Function(int index) buildMember,
-}) => Navigator.of(context, rootNavigator: true).push(
-  PageRouteBuilder<void>(
-    opaque: false,
-    barrierDismissible: true,
-    barrierLabel: 'Close',
-    transitionDuration: _reduced(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 200),
-    pageBuilder: (_, _, _) => _LightboxView(
-      index: index,
-      count: count,
-      sizes: sizes,
-      buildMember: buildMember,
+}) {
+  final request = _LightboxRequest(index, count, sizes, buildMember);
+  final host = context.findAncestorStateOfType<StageLightboxHostState>();
+  if (host != null) return host._show(request);
+  return Navigator.of(context, rootNavigator: true).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      transitionDuration: _reduced(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
+      pageBuilder: (context, _, _) => _LightboxView(
+        request: request,
+        onClose: () => Navigator.of(context).pop(),
+      ),
+      transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: c),
     ),
-    transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: c),
-  ),
-);
+  );
+}
 
-class _LightboxView extends StatefulWidget {
-  const _LightboxView({
-    required this.index,
-    required this.count,
-    required this.sizes,
-    required this.buildMember,
-  });
+class _LightboxRequest {
+  const _LightboxRequest(this.index, this.count, this.sizes, this.buildMember);
 
   final int index;
   final int count;
   final List<Size> sizes;
   final Widget Function(int index) buildMember;
+}
+
+/// The area a lightbox covers: [child] (the player), with the open
+/// lightbox, if any, faded in over it.
+class StageLightboxHost extends StatefulWidget {
+  const StageLightboxHost({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<StageLightboxHost> createState() => StageLightboxHostState();
+}
+
+class StageLightboxHostState extends State<StageLightboxHost> {
+  _LightboxRequest? _open;
+  Completer<void>? _closed;
+
+  /// Whether a lightbox is showing.
+  bool get isOpen => _open != null;
+
+  Future<void> _show(_LightboxRequest request) {
+    _closed?.complete();
+    final done = _closed = Completer<void>();
+    setState(() => _open = request);
+    return done.future;
+  }
+
+  /// Shows member [index] of [count] (sizes in stage pixels).
+  Future<void> showMember({
+    required int index,
+    required int count,
+    required List<Size> sizes,
+    required Widget Function(int index) buildMember,
+  }) => _show(_LightboxRequest(index, count, sizes, buildMember));
+
+  void close() {
+    if (_open == null) return;
+    setState(() => _open = null);
+    _closed?.complete();
+    _closed = null;
+  }
+
+  @override
+  void dispose() {
+    _closed?.complete();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final open = _open;
+    return Stack(
+      children: [
+        widget.child,
+        if (open != null)
+          Positioned.fill(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: _reduced(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 200),
+              builder: (_, t, child) => Opacity(opacity: t, child: child),
+              child: _LightboxView(request: open, onClose: close),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _LightboxView extends StatefulWidget {
+  const _LightboxView({required this.request, required this.onClose});
+
+  final _LightboxRequest request;
+  final VoidCallback onClose;
 
   @override
   State<_LightboxView> createState() => _LightboxViewState();
 }
 
 class _LightboxViewState extends State<_LightboxView> {
-  late int _i = widget.index;
+  late int _i = widget.request.index;
 
   void _step(int d) {
-    if (widget.count < 2) return;
-    setState(() => _i = (_i + d + widget.count) % widget.count);
+    final count = widget.request.count;
+    if (count < 2) return;
+    setState(() => _i = (_i + d + count) % count);
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = _i < widget.sizes.length ? widget.sizes[_i] : Size.zero;
+    final sizes = widget.request.sizes;
+    final size = _i < sizes.length ? sizes[_i] : Size.zero;
     return Focus(
       autofocus: true,
       onKeyEvent: (_, e) {
         if (e is! KeyDownEvent) return KeyEventResult.ignored;
         if (e.logicalKey == LogicalKeyboardKey.escape) {
-          Navigator.of(context).pop();
+          widget.onClose();
         } else if (e.logicalKey == LogicalKeyboardKey.arrowRight) {
           _step(1);
         } else if (e.logicalKey == LogicalKeyboardKey.arrowLeft) {
@@ -580,7 +657,7 @@ class _LightboxViewState extends State<_LightboxView> {
         label: 'Full screen view',
         child: GestureDetector(
           key: const ValueKey<String>('lightbox'),
-          onTap: () => Navigator.of(context).pop(),
+          onTap: widget.onClose,
           child: ColoredBox(
             color: const Color(0xEB000000),
             child: SafeArea(
@@ -592,7 +669,7 @@ class _LightboxViewState extends State<_LightboxView> {
                       : FittedBox(
                           child: SizedBox.fromSize(
                             size: size,
-                            child: widget.buildMember(_i),
+                            child: widget.request.buildMember(_i),
                           ),
                         ),
                 ),
