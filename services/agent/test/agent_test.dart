@@ -54,4 +54,39 @@ void main() {
     });
     expect(providerHeaders(Provider.quiver, 'k')['authorization'], 'Bearer k');
   });
+
+  test('invite list from the Firestore document', () {
+    final doc = {
+      'fields': {
+        'emails': {
+          'arrayValue': {
+            'values': [
+              {'stringValue': ' Author@Example.com '},
+              {'integerValue': '3'},
+            ],
+          },
+        },
+      },
+    };
+    expect(inviteEmails(doc), {'author@example.com'});
+    expect(inviteEmails({'fields': {}}), isEmpty);
+    expect(inviteEmails(null), isEmpty);
+  });
+
+  test('only a verified, listed email is invited', () {
+    const list = {'author@example.com'};
+    expect(
+      isInvited(email: 'AUTHOR@example.com', verified: true, invites: list),
+      isTrue,
+    );
+    expect(
+      isInvited(email: 'author@example.com', verified: false, invites: list),
+      isFalse,
+    );
+    expect(
+      isInvited(email: 'other@example.com', verified: true, invites: list),
+      isFalse,
+    );
+    expect(isInvited(email: null, verified: true, invites: list), isFalse);
+  });
 }

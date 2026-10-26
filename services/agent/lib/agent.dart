@@ -124,3 +124,28 @@ Map<String, String> providerHeaders(Provider provider, String key) =>
         'content-type': 'application/json',
       },
     };
+
+/// The approved emails in the Firestore REST form of `config/invites`
+/// (`fields.emails.arrayValue.values[].stringValue`), lowercased. Anything
+/// malformed reads as no invites.
+Set<String> inviteEmails(Object? document) {
+  if (document is! Map) return const {};
+  final fields = document['fields'];
+  final emails = fields is Map ? fields['emails'] : null;
+  final array = emails is Map ? emails['arrayValue'] : null;
+  final values = array is Map ? array['values'] : null;
+  if (values is! List) return const {};
+  return {
+    for (final v in values)
+      if (v is Map && v['stringValue'] is String)
+        (v['stringValue'] as String).trim().toLowerCase(),
+  };
+}
+
+/// Whether an account may use the service (DECISIONS 26/10/26 "Invites"): a
+/// verified email on the invite list.
+bool isInvited({
+  required String? email,
+  required bool verified,
+  required Set<String> invites,
+}) => email != null && verified && invites.contains(email.trim().toLowerCase());

@@ -91,10 +91,11 @@ class _SignInDialogState extends State<_SignInDialog> {
     });
     try {
       if (_create) {
-        await widget.auth.createUserWithEmailAndPassword(
+        final created = await widget.auth.createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
+        await created.user?.sendEmailVerification();
       } else {
         await widget.auth.signInWithEmailAndPassword(
           email: email,
@@ -182,6 +183,108 @@ class _SignInDialogState extends State<_SignInDialog> {
       ],
     );
   }
+}
+
+/// Makes sure the author may use the cloud (publish, agent): signs in if
+/// needed, then explains an unverified email (with resend) or a missing
+/// invite. True when invited.
+Future<bool> ensureCloudAccess(BuildContext context, Cloud cloud) async {
+  if (cloud.auth.currentUser == null) {
+    await showSignInDialog(context, cloud.auth);
+    if (cloud.auth.currentUser == null) return false;
+  }
+  while (context.mounted) {
+    final CloudAccess access;
+    try {
+      access = await accessOf(cloud);
+    } on Object {
+      if (context.mounted) {
+        SsToast.show(
+          context,
+          'Could not reach Soundstage. Check the network.',
+          kind: SsToastKind.danger,
+        );
+      }
+      return false;
+    }
+    if (!context.mounted) return false;
+    switch (access) {
+      case CloudAccess.invited:
+        return true;
+      case CloudAccess.signedOut:
+        return false;
+      case CloudAccess.notInvited:
+        await _showNotInvited(context, cloud.auth.currentUser?.email ?? '');
+        return false;
+      case CloudAccess.unverified:
+        final again = await _showVerify(context, cloud.auth);
+        if (!again) return false;
+    }
+  }
+  return false;
+}
+
+Future<void> _showNotInvited(BuildContext context, String email) =>
+    showSsDialog<void>(
+      context,
+      builder: (ctx) => SsDialog(
+        title: 'Soundstage is invite-only',
+        width: 400,
+        content: Text(
+          '$email is not on the invite list yet. Your stories stay in this '
+          'browser in the meantime; publishing and the agent open once you '
+          'are invited.',
+        ),
+        actions: [
+          SsButton(
+            label: 'OK',
+            variant: SsButtonVariant.primary,
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+        ],
+      ),
+    );
+
+/// Asks the author to verify their email. True to check again.
+Future<bool> _showVerify(BuildContext context, FirebaseAuth auth) async {
+  final email = auth.currentUser?.email ?? 'your email';
+  final again = await showSsDialog<bool>(
+    context,
+    builder: (ctx) => SsDialog(
+      title: 'Verify your email',
+      width: 400,
+      content: Text(
+        'We sent a link to $email. Open it, then come back and choose '
+        '"I have verified".',
+      ),
+      actions: [
+        SsButton(
+          label: 'Send again',
+          onPressed: () async {
+            try {
+              await auth.currentUser?.sendEmailVerification();
+              if (ctx.mounted) SsToast.show(ctx, 'Sent.');
+            } on FirebaseAuthException catch (e) {
+              if (ctx.mounted) {
+                SsToast.show(
+                  ctx,
+                  authErrorText(e.code),
+                  kind: SsToastKind.danger,
+                );
+              }
+            }
+          },
+        ),
+        SsButton(
+          key: const ValueKey<String>('verify:check'),
+          label: 'I have verified',
+          variant: SsButtonVariant.primary,
+          onPressed: () => Navigator.of(ctx).pop(true),
+        ),
+      ],
+    ),
+  );
+  return again ?? false;
 }
 
 /// Firebase Auth error codes in the author's words.

@@ -47,10 +47,22 @@ Future<void> _handle(HttpRequest req) async {
     }
     final route = Route.parse(req.method, req.uri.path);
     if (route == null) return _error(res, HttpStatus.notFound, 'Not found.');
-    final uid = await _uidOf(req.headers.value('authorization'));
-    if (uid == null) {
+    final account = await _accountOf(req.headers.value('authorization'));
+    if (account == null) {
       return _error(res, HttpStatus.unauthorized, 'Sign in again.');
     }
+    if (!isInvited(
+      email: account.email,
+      verified: account.verified,
+      invites: await _invites(),
+    )) {
+      return _error(
+        res,
+        HttpStatus.forbidden,
+        'Soundstage is invite-only for now.',
+      );
+    }
+    final uid = account.uid;
     switch (route) {
       case KeyStatus(:final provider):
         final key = await _readKey(uid, provider);
@@ -123,16 +135,18 @@ Future<Object?> _body(HttpRequest req) async {
 
 // ---- Auth ---------------------------------------------------------------
 
-final Map<String, (String, DateTime)> _uids = {};
+typedef _Account = ({String uid, String? email, bool verified});
 
-/// The uid of a `Bearer <Firebase ID token>`, checked with Identity
+final Map<String, (_Account, DateTime)> _accounts = {};
+
+/// The account of a `Bearer <Firebase ID token>`, checked with Identity
 /// Toolkit (`accounts:lookup`), cached for five minutes.
-Future<String?> _uidOf(String? authorization) async {
+Future<_Account?> _accountOf(String? authorization) async {
   if (authorization == null || !authorization.startsWith('Bearer ')) {
     return null;
   }
   final token = authorization.substring(7);
-  final cached = _uids[token];
+  final cached = _accounts[token];
   if (cached != null && DateTime.now().isBefore(cached.$2)) return cached.$1;
   final (status, body) = await _send(
     'POST',
@@ -145,11 +159,43 @@ Future<String?> _uidOf(String? authorization) async {
   if (status != HttpStatus.ok) return null;
   final users = (jsonDecode(body) as Map<String, Object?>)['users'];
   if (users is! List || users.isEmpty) return null;
-  final uid = (users.first as Map)['localId'];
+  final user = users.first as Map;
+  final uid = user['localId'];
   if (uid is! String) return null;
-  if (_uids.length > 1000) _uids.clear();
-  _uids[token] = (uid, DateTime.now().add(const Duration(minutes: 5)));
-  return uid;
+  final account = (
+    uid: uid,
+    email: user['email'] as String?,
+    verified: user['emailVerified'] == true,
+  );
+  if (_accounts.length > 1000) _accounts.clear();
+  _accounts[token] = (account, DateTime.now().add(const Duration(minutes: 5)));
+  return account;
+}
+
+Set<String> _inviteList = const {};
+DateTime _invitesExpiry = DateTime(0);
+
+/// The admin's invite list (Firestore `config/invites`), read at most once
+/// a minute.
+Future<Set<String>> _invites() async {
+  if (DateTime.now().isBefore(_invitesExpiry)) return _inviteList;
+  final (status, body) = await _send(
+    'GET',
+    Uri.parse(
+      'https://firestore.googleapis.com/v1/projects/$_project/databases/'
+      '(default)/documents/config/invites',
+    ),
+    bearer: await _token(),
+  );
+  if (status == HttpStatus.notFound) {
+    _inviteList = const {};
+  } else if (status != HttpStatus.ok) {
+    throw HttpException('invites read: $status');
+  } else {
+    _inviteList = inviteEmails(jsonDecode(body));
+  }
+  _invitesExpiry = DateTime.now().add(const Duration(minutes: 1));
+  return _inviteList;
 }
 
 // ---- Secret Manager -----------------------------------------------------

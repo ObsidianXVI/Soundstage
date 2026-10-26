@@ -7,7 +7,7 @@ import 'package:soundstage_platform/app/cloud/cloud.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/editor/agent/agent_transport.dart';
 
-import '../pages/cloud_ui.dart' show showSignInDialog;
+import '../pages/cloud_ui.dart' show ensureCloudAccess;
 import 'agent_client.dart';
 import 'agent_platform.dart';
 
@@ -71,10 +71,7 @@ const List<String> kClaudeModels = [
 Future<void> showAgentSettings(BuildContext context, WidgetRef ref) async {
   final cloud = ref.read(cloudProvider);
   if (cloud == null) return;
-  if (cloud.auth.currentUser == null) {
-    await showSignInDialog(context, cloud.auth);
-    if (cloud.auth.currentUser == null || !context.mounted) return;
-  }
+  if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
   await showSsDialog<void>(context, builder: (_) => const _AgentSettings());
 }
 

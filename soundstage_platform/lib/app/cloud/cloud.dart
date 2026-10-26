@@ -82,6 +82,42 @@ final authUserProvider = StreamProvider<User?>((ref) {
   return cloud.auth.authStateChanges();
 });
 
+/// What the signed-in account may do (DECISIONS 26/10/26 "Invites").
+enum CloudAccess {
+  signedOut,
+
+  /// Signed in, but the email is not verified yet.
+  unverified,
+
+  /// Verified, but not on the admin's invite list.
+  notInvited,
+  invited,
+}
+
+/// The current account's access, checked with the server: the user is
+/// reloaded (a verification may have happened in another tab) and the
+/// Firestore probe `members/{uid}` is readable only when invited.
+Future<CloudAccess> accessOf(Cloud cloud) async {
+  var user = cloud.auth.currentUser;
+  if (user == null) return CloudAccess.signedOut;
+  await user.reload();
+  user = cloud.auth.currentUser;
+  if (user == null) return CloudAccess.signedOut;
+  if (!user.emailVerified) return CloudAccess.unverified;
+  // The rules read email_verified from the token: refresh it once it flips.
+  final claims = (await user.getIdTokenResult()).claims;
+  if (claims?['email_verified'] != true) await user.getIdToken(true);
+  try {
+    await cloud.firestore
+        .doc('members/${user.uid}')
+        .get(const GetOptions(source: Source.server));
+    return CloudAccess.invited;
+  } on FirebaseException catch (e) {
+    if (e.code == 'permission-denied') return CloudAccess.notInvited;
+    rethrow;
+  }
+}
+
 /// [CloudBackend] over Firebase.
 class FirebaseCloudBackend implements CloudBackend {
   FirebaseCloudBackend(this._cloud);

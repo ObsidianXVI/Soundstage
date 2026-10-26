@@ -6,6 +6,10 @@ rules_version = '2';
 //   published/{slug}    the public pointer for /s/<slug>: owner, story,
 //                       version, title, description, poster path.
 //   series/{slug}       a project's published issues (/series/<slug>).
+//   config/invites      {emails: [...]}, kept by the admin in the console
+//                       (DECISIONS 26/10/26 "Invites"); never readable.
+//   members/{uid}       a probe: reading your own works only when invited.
+// Every author write needs a verified email on the invite list.
 // Everything else is closed.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -17,6 +21,14 @@ service cloud.firestore {
       return signedIn() && data.ownerId == request.auth.uid;
     }
 
+    // A verified email on the admin's invite list (m7.md T7.1).
+    function invited() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in
+          get(/databases/$(database)/documents/config/invites).data.emails;
+    }
+
     // ownerId never changes after creation.
     function keepsOwner() {
       return request.resource.data.ownerId == resource.data.ownerId;
@@ -24,21 +36,21 @@ service cloud.firestore {
 
     match /stories/{storyId} {
       allow read, delete: if isOwner(resource.data);
-      allow create: if isOwner(request.resource.data)
+      allow create: if invited() && isOwner(request.resource.data)
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 200;
-      allow update: if isOwner(resource.data) && keepsOwner()
+      allow update: if invited() && isOwner(resource.data) && keepsOwner()
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 200;
     }
 
     match /published/{slug} {
       allow read: if true;
-      allow create: if isOwner(request.resource.data)
+      allow create: if invited() && isOwner(request.resource.data)
         && slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$')
         && request.resource.data.storyId is string
         && request.resource.data.version is int;
-      allow update: if isOwner(resource.data) && keepsOwner()
+      allow update: if invited() && isOwner(resource.data) && keepsOwner()
         && request.resource.data.version is int
         && request.resource.data.version >= resource.data.version;
       allow delete: if isOwner(resource.data);
@@ -47,15 +59,21 @@ service cloud.firestore {
     // A project's public index of its published issues (series page).
     match /series/{slug} {
       allow read: if true;
-      allow create: if isOwner(request.resource.data)
+      allow create: if invited() && isOwner(request.resource.data)
         && slug.matches('^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$')
         && request.resource.data.projectId is string
         && request.resource.data.issues is list
         && request.resource.data.issues.size() <= 500;
-      allow update: if isOwner(resource.data) && keepsOwner()
+      allow update: if invited() && isOwner(resource.data) && keepsOwner()
         && request.resource.data.issues is list
         && request.resource.data.issues.size() <= 500;
       allow delete: if isOwner(resource.data);
+    }
+
+    // The app's access check: the get succeeds (as not-found) only for an
+    // invited author.
+    match /members/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid && invited();
     }
 
     match /{document=**} {

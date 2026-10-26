@@ -3,11 +3,19 @@ rules_version = '2';
 // Soundstage Storage (m4.md T4.1), bucket <project>-media.
 //   users/{uid}/...                 an author's documents and media (private)
 //   published/{uid}/{slug}/...      frozen published versions (public read)
-// Everything else is closed.
+// Writes need a verified email on the invite list (Firestore
+// config/invites, m7.md T7.1). Everything else is closed.
 service firebase.storage {
   match /b/{bucket}/o {
     function owns(uid) {
       return request.auth != null && request.auth.uid == uid;
+    }
+
+    function invited() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in
+          firestore.get(/databases/(default)/documents/config/invites).data.emails;
     }
 
     // Deletes have no request.resource; uploads stay under 500 MB.
@@ -17,12 +25,12 @@ service firebase.storage {
 
     match /users/{uid}/{allPaths=**} {
       allow read: if owns(uid);
-      allow write: if owns(uid) && sizeOk();
+      allow write: if owns(uid) && invited() && sizeOk();
     }
 
     match /published/{uid}/{slug}/{allPaths=**} {
       allow read: if true;
-      allow write: if owns(uid) && sizeOk();
+      allow write: if owns(uid) && invited() && sizeOk();
     }
 
     match /{allPaths=**} {

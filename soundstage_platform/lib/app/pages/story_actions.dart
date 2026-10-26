@@ -325,10 +325,7 @@ class StoryActions {
     final cloud = ref.read(cloudProvider);
     final db = _db;
     if (cloud == null) return;
-    if (cloud.auth.currentUser == null) {
-      await showSignInDialog(context, cloud.auth);
-      if (cloud.auth.currentUser == null || !context.mounted) return;
-    }
+    if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
     try {
       final doc = current ?? await _repo.load(s.id);
       if (doc == null || !context.mounted) return;

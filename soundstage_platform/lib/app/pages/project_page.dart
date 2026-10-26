@@ -7,7 +7,7 @@ import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
 import 'cloud_ui.dart'
-    show showPublishDialog, showPublishedDialog, showSignInDialog;
+    show ensureCloudAccess, showPublishDialog, showPublishedDialog;
 import 'not_found_page.dart';
 import 'story_list_page.dart' show StoryRow;
 
@@ -142,10 +142,7 @@ class ProjectActions {
   Future<void> publishSeries(ProjectSummary p) async {
     final cloud = ref.read(cloudProvider);
     if (cloud == null) return;
-    if (cloud.auth.currentUser == null) {
-      await showSignInDialog(context, cloud.auth);
-      if (cloud.auth.currentUser == null || !context.mounted) return;
-    }
+    if (!await ensureCloudAccess(context, cloud) || !context.mounted) return;
     final existing = await cloud.backend.seriesSlugOf(p.id);
     if (!context.mounted) return;
     final origin = Uri.base.origin;
