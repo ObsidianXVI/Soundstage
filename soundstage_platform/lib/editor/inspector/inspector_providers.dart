@@ -369,6 +369,7 @@ class SelectionInfo {
     this.flowAutoLayoutRoots = 0,
     this.hasModes = false,
     this.inGrid = 0,
+    this.isolated = false,
   });
 
   final List<String> ids;
@@ -405,6 +406,9 @@ class SelectionInfo {
   /// Selected nodes whose parent is a grid frame (§4.5).
   final int inGrid;
 
+  /// Whether the editor is in component isolation mode.
+  final bool isolated;
+
   int get count => ids.length;
   bool get isEmpty => ids.isEmpty;
   bool get isSingle => ids.length == 1;
@@ -439,7 +443,8 @@ class SelectionInfo {
       setEquals(other.geometries, geometries) &&
       other.flowAutoLayoutRoots == flowAutoLayoutRoots &&
       other.hasModes == hasModes &&
-      other.inGrid == inGrid;
+      other.inGrid == inGrid &&
+      other.isolated == isolated;
 
   @override
   int get hashCode => Object.hash(
@@ -456,6 +461,7 @@ class SelectionInfo {
     flowAutoLayoutRoots,
     hasModes,
     inGrid,
+    isolated,
   );
 }
 
@@ -537,6 +543,8 @@ SelectionInfo classifySelection(
     flowAutoLayoutRoots: flowRoots,
     hasModes: doc.tokens.collections.any((c) => c.modes.length > 1),
     inGrid: inGrid,
+    isolated:
+        doc.scenes.length == 1 && doc.scenes.first.id == kIsolationSceneId,
   );
 }
 

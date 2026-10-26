@@ -4,6 +4,8 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 // Unprefixed for freezed's generated nested copyWith.
 import 'package:soundstage_platform/ir/ir.dart' show $StageDocumentCopyWith;
 
+import 'component_isolation.dart';
+
 part 'editor_state.freezed.dart';
 
 /// Where a `SetProperty` writes (architecture §15, DECISIONS 23/10/26).
@@ -80,6 +82,10 @@ abstract class HistoryStatus with _$HistoryStatus {
 abstract class EditorState with _$EditorState {
   const factory EditorState({
     required ir.StageDocument document,
+
+    /// Isolation mode (component_isolation.dart): [document] is then the
+    /// view, and [storyDocument] the story.
+    ComponentIsolation? isolation,
     @Default(<String>{}) Set<String> selection,
     String? selectionContext,
     String? textEditId,
@@ -109,6 +115,13 @@ abstract class EditorState with _$EditorState {
     activeSceneId: document.scenes.isEmpty ? null : document.scenes.first.id,
     editingBreakpointId: defaultBreakpointId(document),
   );
+
+  /// The story: [document], or while isolated the view folded back. What is
+  /// saved, previewed and exported.
+  ir.StageDocument get storyDocument {
+    final iso = isolation;
+    return iso == null ? document : foldIsolation(document, iso);
+  }
 
   /// The scope the next edit uses: [editScope], flipped while Alt is held.
   EditScope get effectiveScope => scopeFlipped ? editScope.flipped : editScope;

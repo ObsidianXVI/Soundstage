@@ -25,6 +25,7 @@ export 'src/diagnostics.dart';
 export 'src/document.dart';
 export 'src/edit/audio_edits.dart';
 export 'src/edit/breakpoint_edits.dart';
+export 'src/edit/component_edits.dart';
 export 'src/edit/constraint_math.dart';
 export 'src/edit/document_index.dart' hide carryRootIndex;
 export 'src/edit/edit_result.dart';

@@ -12,6 +12,7 @@ import '../insert/asset_service.dart';
 import '../insert/canvas_drop.dart';
 import '../insert/file_drop.dart';
 import 'asset_actions.dart';
+import 'components_list.dart';
 import 'fonts_panel.dart';
 
 /// The Assets tab of the left panel (T1.9): the story's media and fonts.
@@ -41,7 +42,7 @@ class AssetsPanel extends ConsumerStatefulWidget {
   ConsumerState<AssetsPanel> createState() => _AssetsPanelState();
 }
 
-enum _Section { media, fonts }
+enum _Section { media, fonts, components }
 
 class _AssetsPanelState extends ConsumerState<AssetsPanel> {
   _Section _section = _Section.media;
@@ -79,25 +80,32 @@ class _AssetsPanelState extends ConsumerState<AssetsPanel> {
                     segments: const [
                       SsSegment(value: _Section.media, label: 'Media'),
                       SsSegment(value: _Section.fonts, label: 'Fonts'),
+                      SsSegment(
+                        value: _Section.components,
+                        label: 'Comps',
+                        semanticLabel: 'Components',
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: SsSpace.s2),
-                SsIconButton(
-                  key: const ValueKey<String>('assets-upload'),
-                  icon: SsIcons.plus,
-                  semanticLabel: _section == _Section.media
-                      ? 'Upload files'
-                      : 'Upload fonts',
-                  tooltip: _section == _Section.media
-                      ? 'Upload images, audio or video'
-                      : 'Upload fonts (TTF, OTF, WOFF)',
-                  onPressed: () => unawaited(
-                    _section == _Section.media
-                        ? _actions.uploadMedia()
-                        : _actions.uploadFonts(),
+                if (_section != _Section.components) ...[
+                  const SizedBox(width: SsSpace.s2),
+                  SsIconButton(
+                    key: const ValueKey<String>('assets-upload'),
+                    icon: SsIcons.plus,
+                    semanticLabel: _section == _Section.media
+                        ? 'Upload files'
+                        : 'Upload fonts',
+                    tooltip: _section == _Section.media
+                        ? 'Upload images, audio or video'
+                        : 'Upload fonts (TTF, OTF, WOFF)',
+                    onPressed: () => unawaited(
+                      _section == _Section.media
+                          ? _actions.uploadMedia()
+                          : _actions.uploadFonts(),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -115,12 +123,14 @@ class _AssetsPanelState extends ConsumerState<AssetsPanel> {
               ),
             ),
           Expanded(
-            child: _section == _Section.media
-                ? _MediaSection(
-                    selected: _selected,
-                    onSelect: (id) => setState(() => _selected = id),
-                  )
-                : const FontsPanel(),
+            child: switch (_section) {
+              _Section.media => _MediaSection(
+                selected: _selected,
+                onSelect: (id) => setState(() => _selected = id),
+              ),
+              _Section.fonts => const FontsPanel(),
+              _Section.components => const ComponentsList(),
+            },
           ),
         ],
       ),

@@ -26,6 +26,7 @@ import '../shortcuts/shortcut_help.dart';
 import '../timeline/timeline_panel.dart';
 import 'content_mode_screen.dart';
 import 'editor_layout.dart';
+import 'isolation_bar.dart';
 import 'resize_handle.dart';
 import 'toolbar.dart';
 
@@ -124,7 +125,7 @@ class _EditorScope extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(
-      editorControllerProvider.select((s) => Identity(s.document)),
+      editorControllerProvider.select((s) => Identity(s.storyDocument)),
       (_, next) => onDocumentChanged?.call(next.value),
     );
     // The title only: an edit must not rebuild the shell (T2.1-6).
@@ -345,7 +346,7 @@ class _DockedEditor extends ConsumerWidget {
                       ],
                       Expanded(
                         child: PreviewSplit(
-                          canvas: const EditorCanvas(),
+                          canvas: const IsolationFrame(child: EditorCanvas()),
                           onOpenInNewTab: onOpenPreviewInNewTab,
                         ),
                       ),

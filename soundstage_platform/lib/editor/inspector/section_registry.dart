@@ -4,6 +4,7 @@ import 'inspector_providers.dart';
 import 'sections/appearance_section.dart';
 import 'sections/auto_layout_section.dart';
 import 'sections/behavior_section.dart';
+import 'sections/component_section.dart';
 import 'sections/effects_section.dart';
 import 'sections/fill_section.dart';
 import 'sections/frame_section.dart';
@@ -54,6 +55,7 @@ class InspectorSectionSpec {
 /// The sections of the inspector for a selection, top to bottom.
 final List<InspectorSectionSpec> kInspectorSections = [
   headerSection,
+  componentSection,
   frameSection,
   shapeSection,
   autoLayoutSection,

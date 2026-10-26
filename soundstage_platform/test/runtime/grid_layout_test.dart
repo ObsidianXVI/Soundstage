@@ -127,12 +127,7 @@ void main() {
       ),
       children: [
         _item(20, 10, inFlow: false),
-        _item(
-          20,
-          10,
-          alignX: ir.GridAlign.center,
-          alignY: ir.GridAlign.end,
-        ),
+        _item(20, 10, alignX: ir.GridAlign.center, alignY: ir.GridAlign.end),
       ],
     );
     expect(r.boxes[0], isNull);

@@ -30,7 +30,7 @@ class _PreviewPaneState extends ConsumerState<PreviewPane> {
     final preview = ref.watch(previewProvider);
     final notifier = ref.read(previewProvider.notifier);
     final boards = ref.watch(
-      editorControllerProvider.select((s) => Identity(s.document)),
+      editorControllerProvider.select((s) => Identity(s.storyDocument)),
     );
     final doc = boards.value;
     final primaries = artboardBreakpoints(doc);

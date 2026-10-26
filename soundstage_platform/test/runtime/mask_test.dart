@@ -17,12 +17,19 @@ ir.ShapeNode _rect(
   ir.MaskMode mask = ir.MaskMode.none,
 }) => ir.ShapeNode(
   common: ir.NodeCommon(id: id, x: x, y: y, width: w, height: w, mask: mask),
-  appearance: ir.Appearance(fills: [ir.Paint.solid(id: 'f', color: color)]),
+  appearance: ir.Appearance(
+    fills: [ir.Paint.solid(id: 'f', color: color)],
+  ),
 );
 
 const _red = ir.StageColor(r: 1, g: 0, b: 0);
 
-Future<List<int>> _pixel(WidgetTester tester, GlobalKey key, int x, int y) async {
+Future<List<int>> _pixel(
+  WidgetTester tester,
+  GlobalKey key,
+  int x,
+  int y,
+) async {
   final boundary =
       key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
   final data = await tester.runAsync(() async {

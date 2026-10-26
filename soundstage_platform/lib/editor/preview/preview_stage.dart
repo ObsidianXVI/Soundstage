@@ -87,9 +87,9 @@ class _PreviewStageState extends ConsumerState<PreviewStage> {
   void initState() {
     super.initState();
     widget.controller?._state = this;
-    _shown = ref.read(editorControllerProvider).document;
+    _shown = ref.read(editorControllerProvider).storyDocument;
     ref.listenManual(
-      editorControllerProvider.select((s) => Identity(s.document)),
+      editorControllerProvider.select((s) => Identity(s.storyDocument)),
       (_, _) => _schedule(),
     );
     ref.listenManual(editorControllerProvider.select((s) => s.activeSceneId), (
@@ -143,7 +143,7 @@ class _PreviewStageState extends ConsumerState<PreviewStage> {
       _schedule();
       return;
     }
-    final doc = ref.read(editorControllerProvider).document;
+    final doc = ref.read(editorControllerProvider).storyDocument;
     if (identical(doc, _shown)) return;
     setState(() {
       _shown = doc;

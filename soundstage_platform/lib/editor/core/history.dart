@@ -1,5 +1,7 @@
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import 'component_isolation.dart';
+
 /// What undo/redo restore: the document and the selection around it
 /// (architecture §15). Documents share every untouched subtree with their
 /// neighbours (path-copy edits), so a snapshot costs the edited path only.
@@ -10,9 +12,13 @@ class HistorySnapshot {
     this.selection = const {},
     this.selectionContext,
     this.activeSceneId,
+    this.isolation,
   });
 
   final ir.StageDocument document;
+
+  /// Isolation mode at that point (undo can leave or re-enter it).
+  final ComponentIsolation? isolation;
   final int revision;
   final Set<String> selection;
   final String? selectionContext;

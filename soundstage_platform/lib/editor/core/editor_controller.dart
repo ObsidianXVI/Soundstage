@@ -4,6 +4,7 @@ import 'package:soundstage_platform/ir/ir.dart' as ir;
 
 import 'command.dart';
 import 'commands/property_commands.dart';
+import 'component_isolation.dart';
 import 'editor_events.dart';
 import 'editor_state.dart';
 import 'history.dart';
@@ -179,6 +180,7 @@ class EditorController extends Notifier<EditorState> {
       before: _snapshot(s),
       after: HistorySnapshot(
         document: doc,
+        isolation: s.isolation,
         revision: rev,
         selection: selection,
         selectionContext: context,
@@ -376,6 +378,50 @@ class EditorController extends Notifier<EditorState> {
     );
   }
 
+  /// Opens component [componentId] in isolation mode (component_isolation
+  /// .dart): the canvas shows only its main, every tool edits it. Not an
+  /// undo step. Leaves any other isolation first.
+  void enterComponent(String componentId) {
+    if (state.isolation?.componentId == componentId) return;
+    if (state.isolation != null) exitComponent();
+    final doc = state.document;
+    if (!doc.components.containsKey(componentId)) return;
+    final (view, iso) = isolate(
+      doc,
+      componentId,
+      returnSceneId: state.activeSceneId,
+    );
+    state = state.copyWith(
+      document: view,
+      isolation: iso,
+      activeSceneId: kIsolationSceneId,
+      selection: {iso.rootId},
+      selectionContext: null,
+      selectedAudioTrackId: null,
+      textEditId: null,
+      hoverId: null,
+    );
+  }
+
+  /// Leaves isolation mode, back to the story (and the scene it was on).
+  void exitComponent() {
+    final iso = state.isolation;
+    if (iso == null) return;
+    final story = state.storyDocument;
+    final back = iso.returnSceneId;
+    state = state.copyWith(
+      document: story,
+      isolation: null,
+      activeSceneId: back != null && story.scenes.any((s) => s.id == back)
+          ? back
+          : (story.scenes.isEmpty ? null : story.scenes.first.id),
+      selection: const {},
+      selectionContext: null,
+      textEditId: null,
+      hoverId: null,
+    );
+  }
+
   /// The artboard being edited (its breakpoint receives *This breakpoint*
   /// writes).
   void setEditingBreakpoint(String breakpointId) {
@@ -522,6 +568,7 @@ class EditorController extends Notifier<EditorState> {
 
   HistorySnapshot _snapshot(EditorState s) => HistorySnapshot(
     document: s.document,
+    isolation: s.isolation,
     revision: s.revision,
     selection: s.selection,
     selectionContext: s.selectionContext,
@@ -532,6 +579,7 @@ class EditorController extends Notifier<EditorState> {
     if (snap == null) return false;
     state = state.copyWith(
       document: snap.document,
+      isolation: snap.isolation,
       revision: snap.revision,
       selection: snap.selection,
       selectionContext: snap.selectionContext,

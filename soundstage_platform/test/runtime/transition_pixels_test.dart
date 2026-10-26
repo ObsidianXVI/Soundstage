@@ -16,7 +16,9 @@ ir.Scene _scene(String id, ir.StageColor color, {ir.SceneTransition? t}) =>
       transitionIn: t ?? const ir.SceneTransition(),
       root: ir.FrameNode(
         common: ir.NodeCommon(id: '$id-root', width: 100, height: 100),
-        appearance: ir.Appearance(fills: [ir.Paint.solid(id: 'f', color: color)]),
+        appearance: ir.Appearance(
+          fills: [ir.Paint.solid(id: 'f', color: color)],
+        ),
       ),
     );
 
