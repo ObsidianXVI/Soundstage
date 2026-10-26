@@ -12,6 +12,7 @@ import 'package:soundstage_agent/agent.dart';
 final Map<String, String> _env = Platform.environment;
 final String _project = _env['PROJECT_ID'] ?? 'project-soundstage';
 final String _webApiKey = _env['FIREBASE_API_KEY'] ?? '';
+final String _pagesSite = _env['PAGES_SITE'] ?? '';
 final List<String> _origins =
     (_env['ALLOWED_ORIGINS'] ?? 'https://project-soundstage.web.app').split(
       ',',
@@ -64,6 +65,17 @@ Future<void> _handle(HttpRequest req) async {
     }
     final uid = account.uid;
     switch (route) {
+      case ListDomains():
+        return _json(res, await _listDomains(account));
+      case AddDomain():
+        final body = await _body(req);
+        final host = body is Map ? body['host'] : null;
+        if (host is! String || !isValidDomain(host.trim().toLowerCase())) {
+          return _error(res, HttpStatus.badRequest, 'Enter a domain name.');
+        }
+        return await _addDomain(res, account, host.trim().toLowerCase());
+      case RemoveDomain(:final host):
+        return await _removeDomain(res, account, host);
       case KeyStatus(:final provider):
         final key = await _readKey(uid, provider);
         return _json(res, {'set': key != null});
@@ -196,6 +208,158 @@ Future<Set<String>> _invites() async {
   }
   _invitesExpiry = DateTime.now().add(const Duration(minutes: 1));
   return _inviteList;
+}
+
+// ---- Custom domains (m7.md T7.5) ----------------------------------------
+
+String get _documents =>
+    'https://firestore.googleapis.com/v1/projects/$_project/databases/'
+    '(default)/documents';
+
+String get _customDomains =>
+    'https://firebasehosting.googleapis.com/v1beta1/projects/$_project/'
+    'sites/$_pagesSite/customDomains';
+
+/// The Firestore document at [path] (REST JSON), or null.
+Future<Map<String, Object?>?> _doc(String path) async {
+  final (status, body) = await _send(
+    'GET',
+    Uri.parse('$_documents/$path'),
+    bearer: await _token(),
+  );
+  if (status == HttpStatus.notFound) return null;
+  if (status != HttpStatus.ok) throw HttpException('firestore: $status');
+  return jsonDecode(body) as Map<String, Object?>;
+}
+
+String? _stringField(Map<String, Object?>? doc, String name) {
+  final value = (doc?['fields'] as Map?)?[name];
+  return value is Map && value['stringValue'] is String
+      ? value['stringValue'] as String
+      : null;
+}
+
+/// Whether the admin enabled custom domains for [account]
+/// (`config/premium`, request-only).
+Future<bool> _premium(_Account account) async {
+  final list = inviteEmails(await _doc('config/premium'));
+  return account.email != null &&
+      list.contains(account.email!.trim().toLowerCase());
+}
+
+/// The Hosting custom domain [host] (REST JSON), or null.
+Future<Map<String, Object?>?> _customDomain(String host) async {
+  final (status, body) = await _send(
+    'GET',
+    Uri.parse('$_customDomains/$host'),
+    bearer: await _token(),
+  );
+  if (status == HttpStatus.notFound) return null;
+  if (status != HttpStatus.ok) throw HttpException('hosting: $status');
+  return jsonDecode(body) as Map<String, Object?>;
+}
+
+Future<Map<String, Object?>> _listDomains(_Account account) async {
+  final premium = await _premium(account);
+  final (status, body) = await _send(
+    'POST',
+    Uri.parse('$_documents:runQuery'),
+    bearer: await _token(),
+    body: jsonEncode({
+      'structuredQuery': {
+        'from': [
+          {'collectionId': 'domains'},
+        ],
+        'where': {
+          'fieldFilter': {
+            'field': {'fieldPath': 'ownerId'},
+            'op': 'EQUAL',
+            'value': {'stringValue': account.uid},
+          },
+        },
+      },
+    }),
+  );
+  if (status != HttpStatus.ok) throw HttpException('firestore: $status');
+  final domains = <Map<String, Object?>>[];
+  for (final row in (jsonDecode(body) as List).whereType<Map>()) {
+    final name = (row['document'] as Map?)?['name'];
+    if (name is! String) continue;
+    final host = name.split('/').last;
+    domains.add(domainSummary(host, await _customDomain(host)));
+  }
+  return {'premium': premium, 'domains': domains};
+}
+
+Future<void> _addDomain(HttpResponse res, _Account account, String host) async {
+  if (!await _premium(account)) {
+    return _error(
+      res,
+      HttpStatus.forbidden,
+      'Custom domains are by request. Ask to have them enabled.',
+    );
+  }
+  final handle = _stringField(await _doc('profiles/${account.uid}'), 'handle');
+  if (handle == null) {
+    return _error(res, HttpStatus.preconditionFailed, 'Choose a handle first.');
+  }
+  final existing = await _doc('domains/$host');
+  if (existing != null && _stringField(existing, 'ownerId') != account.uid) {
+    return _error(res, HttpStatus.conflict, '$host is connected elsewhere.');
+  }
+  if (await _customDomain(host) == null) {
+    final (status, body) = await _send(
+      'POST',
+      Uri.parse('$_customDomains?customDomainId=$host'),
+      bearer: await _token(),
+      body: '{}',
+    );
+    if (status != HttpStatus.ok) {
+      stderr.writeln('soundstage-agent: create $host: $status $body');
+      return _error(
+        res,
+        HttpStatus.badGateway,
+        'Hosting refused $host. Check the name and try again.',
+      );
+    }
+  }
+  final (status, _) = await _send(
+    'PATCH',
+    Uri.parse('$_documents/domains/$host'),
+    bearer: await _token(),
+    body: jsonEncode({
+      'fields': {
+        'handle': {'stringValue': handle},
+        'ownerId': {'stringValue': account.uid},
+      },
+    }),
+  );
+  if (status != HttpStatus.ok) throw HttpException('domain record: $status');
+  return _json(res, domainSummary(host, await _customDomain(host)));
+}
+
+Future<void> _removeDomain(
+  HttpResponse res,
+  _Account account,
+  String host,
+) async {
+  final existing = await _doc('domains/$host');
+  if (existing == null || _stringField(existing, 'ownerId') != account.uid) {
+    return _error(res, HttpStatus.notFound, 'Not one of your domains.');
+  }
+  final (status, _) = await _send(
+    'DELETE',
+    Uri.parse('$_customDomains/$host?allowMissing=true'),
+    bearer: await _token(),
+  );
+  if (status != HttpStatus.ok) throw HttpException('hosting delete: $status');
+  final (s2, _) = await _send(
+    'DELETE',
+    Uri.parse('$_documents/domains/$host'),
+    bearer: await _token(),
+  );
+  if (s2 != HttpStatus.ok) throw HttpException('domain record delete: $s2');
+  return _json(res, {'removed': host});
 }
 
 // ---- Secret Manager -----------------------------------------------------

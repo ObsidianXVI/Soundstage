@@ -141,3 +141,55 @@ String? _handle(GoRouterState state) {
   final h = who.substring(1).toLowerCase();
   return isValidHandle(h) ? h : null;
 }
+
+/// The router on an author's custom domain (m7.md T7.5): their published
+/// work at clean paths, nothing else.
+///
+/// - `/` the handle's page
+/// - `/s/:slug` a one-off story
+/// - `/:pub` a publication, `/:pub/:issue` one of its issues
+GoRouter buildDomainRouter(String handle, {String initialLocation = '/'}) {
+  StageTier tier(GoRouterState state) =>
+      StageTier.parse(state.uri.queryParameters['tier']);
+  return GoRouter(
+    initialLocation: initialLocation,
+    errorBuilder: (context, state) => const NotFoundPage(),
+    routes: <RouteBase>[
+      GoRoute(
+        path: '/',
+        builder: (context, state) => SitePage(handle: handle),
+      ),
+      GoRoute(
+        path: '/s/:slug',
+        builder: (context, state) => PublishedPage(
+          target: DraftTarget(handle, state.pathParameters['slug']!),
+          tier: tier(state),
+        ),
+      ),
+      GoRoute(
+        path: '/:pub',
+        builder: (context, state) => switch (state.pathParameters['pub']!) {
+          final p when isValidPublication(p) => SeriesPage(
+            publication: PublicationRef(handle, p),
+          ),
+          _ => const NotFoundPage(),
+        },
+        routes: [
+          GoRoute(
+            path: ':issue',
+            builder: (context, state) => switch (state.pathParameters['pub']!) {
+              final p when isValidPublication(p) => PublishedPage(
+                target: IssueTarget(
+                  PublicationRef(handle, p),
+                  state.pathParameters['issue']!,
+                ),
+                tier: tier(state),
+              ),
+              _ => const NotFoundPage(),
+            },
+          ),
+        ],
+      ),
+    ],
+  );
+}

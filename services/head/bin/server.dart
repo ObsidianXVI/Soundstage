@@ -53,8 +53,13 @@ Future<void> _handle(HttpRequest request) async {
       res.statusCode = HttpStatus.methodNotAllowed;
       return;
     }
+    // On an author's custom domain (the pages site, m7.md T7.5) paths are
+    // the handle's: `/s/x` shows `/@<handle>/s/x`.
+    final host = _hostOf(request);
+    final handle = isAppHost(host) ? null : await _domainHandle(host);
+    final site = handle == null ? _site : 'https://$host';
     if (request.uri.path == '/sitemap.xml') {
-      final body = sitemapXml(_site, [
+      final body = sitemapXml(site, handle: handle, [
         for (final c in ['drafts', 'publications', 'issues'])
           ...await _published(c),
       ]);
@@ -64,28 +69,41 @@ Future<void> _handle(HttpRequest request) async {
           'xml',
           charset: 'utf-8',
         )
-        ..headers.set('cache-control', 'public, max-age=3600, s-maxage=3600');
+        ..headers.set('cache-control', 'public, max-age=3600, s-maxage=3600')
+        ..headers.set('vary', 'x-forwarded-host');
       if (request.method == 'GET') res.write(body);
       return;
     }
     final shell = await _shell();
-    final route = HeadRoute.parse(request.uri.path);
+    final route = HeadRoute.parse(
+      handle == null ? request.uri.path : domainPath(handle, request.uri.path),
+    );
     final doc = route == null ? null : await _document(route.docPath);
+    // An app route on the pages site (or an unknown domain) is the shell.
+    final page = route != null || isAppHost(host);
     res
-      ..statusCode = doc == null ? HttpStatus.notFound : HttpStatus.ok
+      ..statusCode = doc == null && page ? HttpStatus.notFound : HttpStatus.ok
       ..headers.contentType = ContentType.html
       // A missing page may be published soon: cache it briefly.
       ..headers.set(
         'cache-control',
         'public, max-age=60, s-maxage=${doc == null ? 60 : 600}',
       )
+      ..headers.set('vary', 'x-forwarded-host')
       ..headers.set('cross-origin-opener-policy', 'same-origin')
       ..headers.set('cross-origin-embedder-policy', 'credentialless');
     if (request.method == 'GET') {
       res.write(
         route == null || doc == null
             ? shell
-            : injectHead(shell, headFor(route, doc, '$_site${route.path}')),
+            : injectHead(
+                shell,
+                headFor(
+                  route,
+                  doc,
+                  '$site${handle == null ? route.path : localPath(handle, route.path)}',
+                ),
+              ),
       );
     }
   } on Object catch (e) {
@@ -100,6 +118,40 @@ Future<void> _handle(HttpRequest request) async {
   } finally {
     await res.close();
   }
+}
+
+var _hostLogs = 0;
+
+/// The host the reader asked for: Hosting forwards it in
+/// `x-forwarded-host` (the first few are logged to confirm what arrives).
+String _hostOf(HttpRequest request) {
+  final forwarded = request.headers.value('x-forwarded-host');
+  final host = request.headers.value('host');
+  if (_hostLogs < 5) {
+    _hostLogs++;
+    stdout.writeln('soundstage-head host: forwarded=$forwarded host=$host');
+  }
+  return (forwarded ?? host ?? '')
+      .split(',')
+      .first
+      .trim()
+      .split(':')
+      .first
+      .toLowerCase();
+}
+
+final Map<String, (String?, DateTime)> _domains = {};
+
+/// The handle custom domain [host] shows (`domains/{host}`), cached for a
+/// minute.
+Future<String?> _domainHandle(String host) async {
+  final cached = _domains[host];
+  if (cached != null && DateTime.now().isBefore(cached.$2)) return cached.$1;
+  final doc = await _document('domains/$host');
+  final handle = doc == null ? null : plainFields(doc)['handle'] as String?;
+  if (_domains.length > 1000) _domains.clear();
+  _domains[host] = (handle, DateTime.now().add(const Duration(minutes: 1)));
+  return handle;
 }
 
 String? _shellCache;
@@ -214,7 +266,7 @@ Future<void> _gate(HttpRequest req) async {
   if (isFile) {
     // The pass in the URL is the credential; any page may embed the file.
     res.headers.set('access-control-allow-origin', '*');
-  } else if (_originAllowed(origin)) {
+  } else if (await _originAllowed(origin)) {
     res.headers
       ..set('access-control-allow-origin', origin!)
       ..set('vary', 'Origin')
@@ -248,13 +300,20 @@ Future<void> _gate(HttpRequest req) async {
   }
 }
 
-bool _originAllowed(String? origin) {
+/// The app's origins, local development, and authors' connected custom
+/// domains (their readers open private pages there).
+Future<bool> _originAllowed(String? origin) async {
   if (origin == null) return false;
   if (_origins.contains(origin)) return true;
   final uri = Uri.tryParse(origin);
-  return uri != null &&
-      (uri.host == 'localhost' || uri.host == '127.0.0.1') &&
-      (uri.scheme == 'http' || uri.scheme == 'https');
+  if (uri == null) return false;
+  if ((uri.host == 'localhost' || uri.host == '127.0.0.1') &&
+      (uri.scheme == 'http' || uri.scheme == 'https')) {
+    return true;
+  }
+  return uri.scheme == 'https' &&
+      !isAppHost(uri.host) &&
+      await _domainHandle(uri.host) != null;
 }
 
 void _gateJson(HttpResponse res, int status, Object body) {

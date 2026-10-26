@@ -284,4 +284,28 @@ void main() {
     };
     expect(plainFields(typed), record);
   });
+
+  test('custom domains show their handle at clean paths', () {
+    expect(isAppHost('project-soundstage.web.app'), isTrue);
+    expect(isAppHost('x.firebaseapp.com'), isTrue);
+    expect(isAppHost('news.example.com'), isFalse);
+    expect(domainPath('ada', '/'), '/@ada');
+    expect(domainPath('ada', '/s/walk'), '/@ada/s/walk');
+    expect(domainPath('ada', '/weekly/one'), '/@ada/weekly/one');
+    expect(domainPath('ada', '/@ada/s/walk'), '/@ada/s/walk');
+    expect(
+      HeadRoute.parse(domainPath('ada', '/weekly')),
+      isA<PublicationRoute>(),
+    );
+    expect(localPath('ada', '/@ada'), '/');
+    expect(localPath('ada', '/@ada/s/walk'), '/s/walk');
+    expect(localPath('ada', '/@bob/s/walk'), '/@bob/s/walk');
+    final xml = sitemapXml('https://news.example.com', handle: 'ada', const [
+      (path: '/@ada/s/walk', lastModified: null),
+      (path: '/@bob/s/run', lastModified: null),
+    ]);
+    expect(xml, contains('<loc>https://news.example.com/s/walk</loc>'));
+    expect(xml, isNot(contains('bob')));
+    expect(xml, isNot(contains('/@ada<')));
+  });
 }

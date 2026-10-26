@@ -12,6 +12,9 @@ rules_version = '2';
 //                       ones readable by anyone, listed only when public,
 //                       password/readers ones only by the owner — readers
 //                       go through the gate service, m7.md T7.4).
+//   domains/{host}      a custom domain's handle (public read; written by the
+//                       agent service for premium authors, m7.md T7.5).
+//   config/premium      {emails: [...]}: who may connect domains (admin).
 //   gates/{id}          a gated record's password hash or readers list;
 //                       only the gate service reads or writes it.
 //   config/invites      {emails: [...]}, kept by the admin in the console
@@ -156,6 +159,10 @@ service cloud.firestore {
         allow update: if updatesStory(handle);
         allow delete: if isOwner(resource.data);
       }
+    }
+
+    match /domains/{host} {
+      allow get: if true;
     }
 
     // The app's access check: the get succeeds (as not-found) only for an

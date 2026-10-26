@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "project-soundstage"
+  },
+  "targets": {
+    "project-soundstage": {
+      "hosting": {
+        "main": [
+          "project-soundstage"
+        ],
+        "pages": [
+          "project-soundstage-pages"
+        ]
+      }
+    }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/domains.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
@@ -61,6 +62,7 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
 
   Widget _page(BuildContext context, SeriesRecord value) {
     final t = context.ss;
+    final site = ref.watch(siteHandleProvider);
     return Scaffold(
       backgroundColor: t.colors.surface0,
       body: SafeArea(
@@ -75,7 +77,8 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
               children: [
                 SsInteractive(
                   semanticLabel: '@${publication.handle}',
-                  onTap: () => context.go('/@${publication.handle}'),
+                  onTap: () =>
+                      context.go(localRoute(site, '/@${publication.handle}')),
                   builder: (context, _) =>
                       Text('@${publication.handle}', style: t.text.overline),
                 ),
@@ -96,7 +99,7 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
                     description: i.description,
                     image: i.image,
                     locked: i.gated,
-                    route: '${publication.route}/${i.slug}',
+                    route: localRoute(site, '${publication.route}/${i.slug}'),
                   ),
               ],
             ),

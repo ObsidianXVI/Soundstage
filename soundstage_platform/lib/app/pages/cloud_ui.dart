@@ -7,6 +7,9 @@ import 'package:soundstage_platform/app/cloud/gate.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
+import '../agent/agent_settings.dart' show kAgentUrl;
+import 'domains_dialog.dart';
+
 /// The story list's account control (m4.md T4.1): "Sign in" when signed
 /// out, the author's email with a Sign out menu when signed in. Hidden in
 /// a local-only build.
@@ -38,6 +41,12 @@ class AccountButton extends ConsumerWidget {
             anchor: box.localToGlobal(Offset.zero) & box.size,
             placement: SsPlacement.belowEnd,
             entries: [
+              if (kAgentUrl.isNotEmpty)
+                SsMenuItem(
+                  label: 'Custom domains…',
+                  icon: SsIcons.globe,
+                  onSelected: () => showDomainsDialog(context, ref),
+                ),
               SsMenuItem(
                 label: 'Sign out',
                 icon: SsIcons.logOut,

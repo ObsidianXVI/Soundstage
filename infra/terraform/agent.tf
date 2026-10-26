@@ -63,6 +63,10 @@ resource "google_cloud_run_v2_service" "agent" {
         value = data.google_firebase_web_app_config.soundstage.api_key
       }
       env {
+        name  = "PAGES_SITE"
+        value = google_firebase_hosting_site.pages.site_id
+      }
+      env {
         name  = "ALLOWED_ORIGINS"
         value = "https://${var.project_id}.web.app,https://${var.project_id}.firebaseapp.com"
       }

@@ -52,6 +52,14 @@ sealed class Route {
 
   static Route? parse(String method, String path) {
     final parts = path.split('/').where((p) => p.isNotEmpty).toList();
+    if (parts.isNotEmpty && parts[0] == 'domains') {
+      return switch ((method, parts.length)) {
+        ('GET', 1) => const ListDomains(),
+        ('POST', 1) => const AddDomain(),
+        ('DELETE', 2) when isValidDomain(parts[1]) => RemoveDomain(parts[1]),
+        _ => null,
+      };
+    }
     if (parts.length == 2 && parts[0] == 'keys') {
       final p = Provider.named(parts[1]);
       if (p == null) return null;
@@ -91,6 +99,20 @@ class DeleteKey extends Route {
   final Provider provider;
 }
 
+/// The author's custom domains (m7.md T7.5).
+class ListDomains extends Route {
+  const ListDomains();
+}
+
+class AddDomain extends Route {
+  const AddDomain();
+}
+
+class RemoveDomain extends Route {
+  const RemoveDomain(this.host);
+  final String host;
+}
+
 class Forward extends Route {
   const Forward(this.provider);
   final Provider provider;
@@ -125,9 +147,10 @@ Map<String, String> providerHeaders(Provider provider, String key) =>
       },
     };
 
-/// The approved emails in the Firestore REST form of `config/invites`
-/// (`fields.emails.arrayValue.values[].stringValue`), lowercased. Anything
-/// malformed reads as no invites.
+/// The approved emails in the Firestore REST form of an email-list
+/// document (`config/invites`, `config/premium`:
+/// `fields.emails.arrayValue.values[].stringValue`), lowercased. Anything
+/// malformed reads as an empty list.
 Set<String> inviteEmails(Object? document) {
   if (document is! Map) return const {};
   final fields = document['fields'];
@@ -149,3 +172,70 @@ bool isInvited({
   required bool verified,
   required Set<String> invites,
 }) => email != null && verified && invites.contains(email.trim().toLowerCase());
+
+// ---- Custom domains (m7.md T7.5) ---------------------------------------
+
+final RegExp _domainPattern = RegExp(
+  r'^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$',
+);
+
+/// Whether [host] is a domain an author may connect: a lowercase DNS name,
+/// not one of Firebase's own.
+bool isValidDomain(String host) =>
+    _domainPattern.hasMatch(host) &&
+    !host.endsWith('.web.app') &&
+    !host.endsWith('.firebaseapp.com') &&
+    !host.endsWith('.run.app');
+
+/// What the app shows of a Hosting `CustomDomain` (REST v1beta1): its
+/// states, the DNS records the author must add or remove, and issues.
+Map<String, Object?> domainSummary(String host, Map<String, Object?>? custom) {
+  if (custom == null) {
+    return {
+      'host': host,
+      'state': 'pending',
+      'records': const <Object?>[],
+      'issues': const <Object?>[],
+    };
+  }
+  final records = <Map<String, Object?>>[];
+  final desired = switch (custom['requiredDnsUpdates']) {
+    {'desired': final List d} => d,
+    _ => const [],
+  };
+  for (final set in desired.whereType<Map>()) {
+    for (final r in ((set['records'] as List?) ?? const []).whereType<Map>()) {
+      final action = r['requiredAction'];
+      if (action != 'ADD' && action != 'REMOVE') continue;
+      records.add({
+        'action': action,
+        'name': r['domainName'] ?? set['domainName'] ?? host,
+        'type': r['type'],
+        'value': r['rdata'],
+      });
+    }
+  }
+  final hostState = custom['hostState'];
+  final owner = custom['ownershipState'];
+  final cert = switch (custom['cert']) {
+    {'state': final String s} => s,
+    _ => null,
+  };
+  final live =
+      hostState == 'HOST_ACTIVE' &&
+      owner == 'OWNERSHIP_ACTIVE' &&
+      cert == 'CERT_ACTIVE';
+  return {
+    'host': host,
+    'state': live ? 'live' : (records.isEmpty ? 'checking' : 'dns'),
+    'hostState': hostState,
+    'ownershipState': owner,
+    'certState': cert,
+    'records': records,
+    'issues': [
+      for (final i
+          in ((custom['issues'] as List?) ?? const []).whereType<Map>())
+        if (i['message'] is String) i['message'],
+    ],
+  };
+}

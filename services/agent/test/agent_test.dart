@@ -89,4 +89,77 @@ void main() {
     );
     expect(isInvited(email: null, verified: true, invites: list), isFalse);
   });
+
+  test('domain routes and names', () {
+    expect(Route.parse('GET', '/domains'), isA<ListDomains>());
+    expect(Route.parse('POST', '/domains'), isA<AddDomain>());
+    expect(
+      (Route.parse('DELETE', '/domains/news.example.com')! as RemoveDomain)
+          .host,
+      'news.example.com',
+    );
+    expect(Route.parse('DELETE', '/domains/Bad_Host'), isNull);
+    expect(Route.parse('PUT', '/domains'), isNull);
+    expect(isValidDomain('example.com'), isTrue);
+    expect(isValidDomain('www.client.co.uk'), isTrue);
+    expect(isValidDomain('Example.com'), isFalse);
+    expect(isValidDomain('localhost'), isFalse);
+    expect(isValidDomain('x.web.app'), isFalse);
+    expect(isValidDomain('a.firebaseapp.com'), isFalse);
+    expect(isValidDomain('-a.com'), isFalse);
+  });
+
+  test('a Hosting custom domain as the app shows it', () {
+    expect(domainSummary('a.com', null)['state'], 'pending');
+    final dns = domainSummary('a.com', {
+      'hostState': 'HOST_UNHOSTED',
+      'ownershipState': 'OWNERSHIP_MISSING',
+      'cert': {'state': 'CERT_PREPARING'},
+      'requiredDnsUpdates': {
+        'desired': [
+          {
+            'domainName': 'a.com',
+            'records': [
+              {
+                'domainName': 'a.com',
+                'type': 'A',
+                'rdata': '199.36.158.100',
+                'requiredAction': 'ADD',
+              },
+              {
+                'domainName': 'a.com',
+                'type': 'TXT',
+                'rdata': 'hosting-site=x',
+                'requiredAction': 'ADD',
+              },
+              {
+                'domainName': 'a.com',
+                'type': 'A',
+                'rdata': '1.2.3.4',
+                'requiredAction': 'NONE',
+              },
+            ],
+          },
+        ],
+      },
+      'issues': [
+        {'message': 'DNS not found'},
+      ],
+    });
+    expect(dns['state'], 'dns');
+    expect((dns['records']! as List).length, 2);
+    expect((dns['records']! as List).first, {
+      'action': 'ADD',
+      'name': 'a.com',
+      'type': 'A',
+      'value': '199.36.158.100',
+    });
+    expect(dns['issues'], ['DNS not found']);
+    final live = domainSummary('a.com', {
+      'hostState': 'HOST_ACTIVE',
+      'ownershipState': 'OWNERSHIP_ACTIVE',
+      'cert': {'state': 'CERT_ACTIVE'},
+    });
+    expect(live['state'], 'live');
+  });
 }

@@ -9,17 +9,25 @@ import 'router.dart';
 /// Routes are in [buildRouter]. The old `?demo=` URLs redirect to
 /// `/demo/:name`.
 class SoundstageApp extends StatefulWidget {
-  const SoundstageApp({this.router, super.key});
+  const SoundstageApp({this.router, this.siteHandle, super.key});
 
   /// Overrides the router (tests start at a given location).
   final GoRouter? router;
+
+  /// On an author's custom domain: their handle (only their published
+  /// work is routed).
+  final String? siteHandle;
 
   @override
   State<SoundstageApp> createState() => _SoundstageAppState();
 }
 
 class _SoundstageAppState extends State<SoundstageApp> {
-  late final GoRouter _router = widget.router ?? buildRouter();
+  late final GoRouter _router =
+      widget.router ??
+      (widget.siteHandle == null
+          ? buildRouter()
+          : buildDomainRouter(widget.siteHandle!));
 
   @override
   void dispose() {

@@ -28,9 +28,10 @@ resource "google_project_iam_member" "rules_firestore" {
   member  = "serviceAccount:service-${data.google_project.this.number}@firebase-rules.iam.gserviceaccount.com"
 }
 
-# The agent service checks the invite list too.
+# The agent service checks the invite list too, and keeps the custom
+# domains' records (domains/{host}, m7.md T7.5).
 resource "google_project_iam_member" "agent_firestore" {
   project = var.project_id
-  role    = "roles/datastore.viewer"
+  role    = "roles/datastore.user"
   member  = google_service_account.agent.member
 }

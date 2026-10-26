@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/domains.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
@@ -28,6 +29,7 @@ class SitePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.ss;
+    final site = ref.watch(siteHandleProvider);
     return switch (ref.watch(siteProvider(handle))) {
       AsyncData(:final value?) => Scaffold(
         backgroundColor: t.colors.surface0,
@@ -67,7 +69,7 @@ class SitePage extends ConsumerWidget {
                             ? '1 issue'
                             : '${p.issueCount} issues',
                         image: p.image,
-                        route: p.route,
+                        route: localRoute(site, p.route),
                       ),
                     const SizedBox(height: SsSpace.s4),
                   ],
@@ -79,7 +81,7 @@ class SitePage extends ConsumerWidget {
                         title: d.title,
                         description: d.description,
                         image: d.image,
-                        route: d.route,
+                        route: localRoute(site, d.route),
                       ),
                   ],
                 ],

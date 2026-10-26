@@ -290,6 +290,30 @@ String injectHead(String html, StoryHead head) {
 /// A published page in the sitemap: its path and when it last changed.
 typedef SitemapEntry = ({String path, String? lastModified});
 
+/// Whether [host] is one of the app's own hosts (not an author's custom
+/// domain).
+bool isAppHost(String host) =>
+    host.isEmpty ||
+    host == 'localhost' ||
+    host == '127.0.0.1' ||
+    host.endsWith('.web.app') ||
+    host.endsWith('.firebaseapp.com') ||
+    host.endsWith('.run.app');
+
+/// [path] on [handle]'s custom domain as the site path it shows
+/// (`/s/x` → `/@<handle>/s/x`; `/` → `/@<handle>`); `/@…` paths stay.
+String domainPath(String handle, String path) {
+  if (path.startsWith('/@')) return path;
+  return path == '/' || path.isEmpty ? '/@$handle' : '/@$handle$path';
+}
+
+/// [path] (`/@<handle>/…`) as a link on [handle]'s custom domain.
+String localPath(String handle, String path) {
+  final prefix = '/@$handle';
+  if (path == prefix) return '/';
+  return path.startsWith('$prefix/') ? path.substring(prefix.length) : path;
+}
+
 /// The public entries of a Firestore REST `runQuery` reply (a list of
 /// `{"document": {...}}`; `updatedAt` is a timestamp value; unlisted and
 /// private pages are left out).
@@ -311,9 +335,20 @@ List<SitemapEntry> sitemapEntries(Object? reply) {
 }
 
 /// `sitemap.xml` for [site] (no trailing slash): the home page, every
-/// handle with published work, and every published page.
-String sitemapXml(String site, Iterable<SitemapEntry> entries) {
-  final list = entries.toList();
+/// handle with published work, and every published page. On a custom
+/// domain ([handle] given) only that handle's pages, at the domain's paths.
+String sitemapXml(
+  String site,
+  Iterable<SitemapEntry> entries, {
+  String? handle,
+}) {
+  final list = [
+    for (final e in entries)
+      if (handle == null)
+        e
+      else if (HeadRoute.parse(e.path)?.handle == handle)
+        (path: localPath(handle, e.path), lastModified: e.lastModified),
+  ];
   final handles = {
     for (final e in list)
       if (HeadRoute.parse(e.path) case final r?) r.handle,
@@ -322,8 +357,10 @@ String sitemapXml(String site, Iterable<SitemapEntry> entries) {
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     ..writeln('  <url><loc>${escapeHtml('$site/')}</loc></url>');
-  for (final h in handles) {
-    out.writeln('  <url><loc>${escapeHtml('$site/@$h')}</loc></url>');
+  if (handle == null) {
+    for (final h in handles) {
+      out.writeln('  <url><loc>${escapeHtml('$site/@$h')}</loc></url>');
+    }
   }
   for (final e in list) {
     out.write('  <url><loc>${escapeHtml('$site${e.path}')}</loc>');
