@@ -81,6 +81,7 @@ class PublishedRecord {
     this.manifest = '',
     this.latest = 0,
     this.versions = const [],
+    this.audience = Audience.public,
   });
 
   factory PublishedRecord.fromMap(Map<String, Object?> m) {
@@ -99,6 +100,7 @@ class PublishedRecord {
         for (final v in (m['versions'] as List?) ?? const [])
           if (v is Map) PublishedVersion.fromMap(v.cast<String, Object?>()),
       ],
+      audience: Audience.parse(m['audience']),
     );
   }
 
@@ -123,6 +125,9 @@ class PublishedRecord {
   /// Every listed version, oldest first.
   final List<PublishedVersion> versions;
 
+  /// Who can read it (m7.md T7.4).
+  final Audience audience;
+
   /// This record with [v] live.
   PublishedRecord withLive(PublishedVersion v) => PublishedRecord(
     ownerId: ownerId,
@@ -135,6 +140,7 @@ class PublishedRecord {
     manifest: v.manifest,
     latest: latest,
     versions: versions,
+    audience: audience,
   );
 
   Map<String, Object?> toMap() => {
@@ -148,6 +154,7 @@ class PublishedRecord {
     'manifest': manifest,
     'latest': latest,
     'versions': [for (final v in versions) v.toMap()],
+    'audience': audience.name,
   };
 }
 
@@ -205,6 +212,10 @@ abstract interface class CloudBackend {
   /// A URL anyone can GET [path] at (published files are public-read).
   String publicUrl(String path);
 
+  /// Deletes every file under the Storage folder [prefix] (the author's
+  /// own).
+  Future<void> deleteFolder(String prefix);
+
   Future<PublishedRecord?> published(PublishTarget target);
 
   Future<void> setPublished(PublishTarget target, PublishedRecord record);
@@ -234,6 +245,7 @@ class SeriesIssue {
     required this.title,
     this.description = '',
     this.image = '',
+    this.gated = false,
   });
 
   factory SeriesIssue.fromMap(Map<String, Object?> m) => SeriesIssue(
@@ -241,6 +253,7 @@ class SeriesIssue {
     title: (m['title'] as String?) ?? '',
     description: (m['description'] as String?) ?? '',
     image: (m['image'] as String?) ?? '',
+    gated: m['gated'] == true,
   );
 
   /// The issue's slug within its publication.
@@ -249,11 +262,15 @@ class SeriesIssue {
   final String description;
   final String image;
 
+  /// Whether readers need a password or to be on the list.
+  final bool gated;
+
   Map<String, Object?> toMap() => {
     'slug': slug,
     'title': title,
     'description': description,
     'image': image,
+    'gated': gated,
   };
 }
 
@@ -266,6 +283,7 @@ class SeriesRecord {
     required this.projectId,
     required this.title,
     this.issues = const [],
+    this.audience = Audience.public,
   });
 
   factory SeriesRecord.fromMap(Map<String, Object?> m) => SeriesRecord(
@@ -276,6 +294,7 @@ class SeriesRecord {
       for (final i in (m['issues'] as List?) ?? const [])
         if (i is Map) SeriesIssue.fromMap(i.cast<String, Object?>()),
     ],
+    audience: Audience.parse(m['audience']),
   );
 
   final String ownerId;
@@ -283,11 +302,15 @@ class SeriesRecord {
   final String title;
   final List<SeriesIssue> issues;
 
+  /// Who can open the publication's page (its issues have their own).
+  final Audience audience;
+
   Map<String, Object?> toMap() => {
     'ownerId': ownerId,
     'projectId': projectId,
     'title': title,
     'issues': [for (final i in issues) i.toMap()],
+    'audience': audience.name,
   };
 }
 
@@ -314,6 +337,7 @@ Future<SeriesRecord> publishSeries({
   required PublicationRef ref,
   required List<String> issueIds,
   required CloudBackend backend,
+  Audience? audience,
 }) async {
   final uid = await _requireHandle(backend, ref.handle);
   if (!isValidPublication(ref.slug)) {
@@ -333,13 +357,17 @@ Future<SeriesRecord> publishSeries({
     final target = await backend.publishedTargetOf(id);
     if (target is! IssueTarget || target.publication != ref) continue;
     final r = await backend.published(target);
-    if (r == null || r.ownerId != uid) continue;
+    // Unlisted issues are reached by their link only.
+    if (r == null || r.ownerId != uid || r.audience == Audience.unlisted) {
+      continue;
+    }
     issues.add(
       SeriesIssue(
         slug: target.slug,
         title: r.title,
         description: r.description,
         image: r.image,
+        gated: r.audience.gated,
       ),
     );
   }
@@ -348,6 +376,7 @@ Future<SeriesRecord> publishSeries({
     projectId: projectId,
     title: title,
     issues: issues,
+    audience: audience ?? existing?.audience ?? Audience.public,
   );
   await backend.setSeries(ref, record);
   return record;
@@ -408,6 +437,7 @@ Future<PublishResult> publishStory(
   required AssetBytesSource bytesOf,
   Future<Uint8List?> Function()? cover,
   DateTime? now,
+  Audience audience = Audience.public,
 }) async {
   final uid = await _requireHandle(backend, target.handle);
   final slug = target.slug;
@@ -425,8 +455,16 @@ Future<PublishResult> publishStory(
     );
   }
   final version = (existing?.latest ?? 0) + 1;
-  final base = target.storagePrefix(uid);
+  final gated = audience.gated;
+  // Crossing between public and private files starts the history again:
+  // the other folder's files are removed once this version is live.
+  final moved = existing != null && existing.audience.gated != gated;
+  final base = target.storagePrefix(uid, gated: gated);
   final warnings = <String>[];
+  // Gated files are never public: their URIs name the Storage object and
+  // a reader's pass resolves them (m7.md T7.4).
+  String urlOf(String path) =>
+      gated ? '$kGatedScheme$path' : backend.publicUrl(path);
 
   Future<String> put(String path, Uint8List bytes, String mime) async {
     if (!await backend.exists(path)) await backend.upload(path, bytes, mime);
@@ -468,9 +506,9 @@ Future<PublishResult> publishStory(
       }
       // The braces must survive URL encoding: the runtime fills them in.
       const token = 'FRAMENUMBER';
-      final pattern = backend
-          .publicUrl('${stem}_$token.$ext')
-          .replaceFirst(token, '{${'1'.padLeft(pad, '0')}}');
+      final pattern = urlOf(
+        '${stem}_$token.$ext',
+      ).replaceFirst(token, '{${'1'.padLeft(pad, '0')}}');
       assets[key] = a.copyWith(uri: pattern);
       continue;
     }
@@ -485,7 +523,7 @@ Future<PublishResult> publishStory(
       bytes,
       a.mime,
     );
-    assets[key] = a.copyWith(uri: backend.publicUrl(path));
+    assets[key] = a.copyWith(uri: urlOf(path));
   }
 
   // The author's meta-notes and inspiration board are private.
@@ -497,19 +535,22 @@ Future<PublishResult> publishStory(
     annotations: const [],
   );
   var image = '';
-  try {
-    final png = await cover?.call();
-    if (png != null) {
-      image = backend.publicUrl(
-        await put(
-          '$base/cover-${_short(contentHash(png))}.png',
-          png,
-          'image/png',
-        ),
-      );
+  // A gated story's cover is not shown in link previews.
+  if (!gated) {
+    try {
+      final png = await cover?.call();
+      if (png != null) {
+        image = backend.publicUrl(
+          await put(
+            '$base/cover-${_short(contentHash(png))}.png',
+            png,
+            'image/png',
+          ),
+        );
+      }
+    } on Object {
+      image = ''; // the preview image is optional
     }
-  } on Object {
-    image = ''; // the preview image is optional
   }
 
   final docPath = '$base/v$version.stage.json';
@@ -527,7 +568,7 @@ Future<PublishResult> publishStory(
       bytes,
       'application/json',
     );
-    return backend.publicUrl(path);
+    return urlOf(path);
   }
 
   final manifestPath = '$base/v$version.manifest.json';
@@ -553,7 +594,7 @@ Future<PublishResult> publishStory(
     image: image,
     publishedAt: (now ?? DateTime.now()).toUtc().millisecondsSinceEpoch,
   );
-  final versions = [...?existing?.versions, published];
+  final versions = [if (!moved) ...?existing?.versions, published];
   await backend.setPublished(
     target,
     PublishedRecord(
@@ -565,8 +606,22 @@ Future<PublishResult> publishStory(
       versions: versions.length > kMaxListedVersions
           ? versions.sublist(versions.length - kMaxListedVersions)
           : versions,
+      audience: audience,
     ).withLive(published),
   );
+  if (moved) {
+    try {
+      await backend.deleteFolder(target.storagePrefix(uid, gated: !gated));
+      warnings.add(
+        gated
+            ? 'Earlier public versions were removed, so only your readers '
+                  'can open this story.'
+            : 'Earlier private versions were removed.',
+      );
+    } on Object {
+      warnings.add('Some files of earlier versions could not be removed.');
+    }
+  }
   await backend.setStoryMeta(storyId, {
     'ownerId': uid,
     'title': doc.meta.title,
@@ -637,43 +692,129 @@ class ChunkedPublishedStory extends PublishedStory {
   }
 }
 
+/// A gated story or publication needs a pass (m7.md T7.4): the reader
+/// asks the gate with a password, or as a signed-in reader.
+class GateRequired implements Exception {
+  const GateRequired(this.docPath);
+
+  /// The Firestore record the gate opens.
+  final String docPath;
+
+  @override
+  String toString() => 'This page is private.';
+}
+
+/// A reader's pass to one gated record, from the gate service: the record
+/// and a short-lived token for its files.
+class GatePass {
+  const GatePass({
+    required this.record,
+    required this.token,
+    required this.baseUrl,
+  });
+
+  /// The record's fields (a story's or a publication's).
+  final Map<String, Object?> record;
+  final String token;
+
+  /// The gate service's URL (no trailing slash).
+  final String baseUrl;
+
+  /// The gate's URL for Storage object [path]. Braces stay literal: frame
+  /// patterns are filled in by the runtime.
+  String fileUrl(String path) {
+    final encoded = path
+        .split('/')
+        .map(Uri.encodeComponent)
+        .join('/')
+        .replaceAll('%7B', '{')
+        .replaceAll('%7D', '}');
+    return '$baseUrl/gate/file/$encoded?t=${Uri.encodeQueryComponent(token)}';
+  }
+
+  /// [uri] with a `gated:` Storage path made into a file URL.
+  String resolve(String uri) => uri.startsWith(kGatedScheme)
+      ? fileUrl(uri.substring(kGatedScheme.length))
+      : uri;
+}
+
+/// [library]'s asset table with every URI resolved by [resolve].
+Map<String, Object?> _resolveAssets(
+  Map<String, Object?> library,
+  String Function(String) resolve,
+) {
+  final assets = library['assets'];
+  if (assets is! Map) return library;
+  return {
+    ...library,
+    'assets': <String, Object?>{
+      for (final MapEntry(:key, :value) in assets.entries)
+        key as String: value is Map && value['uri'] is String
+            ? <String, Object?>{
+                ...value.cast<String, Object?>(),
+                'uri': resolve(value['uri'] as String),
+              }
+            : value,
+    },
+  };
+}
+
 /// Opens the live version at [target] (null when nothing is published
 /// there): its manifest and library chunk when the version is chunked,
-/// else its whole document. [fetch] gets bytes from a URL.
+/// else its whole document. [fetch] gets bytes from a URL. A gated story
+/// opens with a reader's [pass]; without one it throws [GateRequired].
 Future<PublishedStory?> openPublished(
   PublishTarget target, {
   required CloudBackend backend,
   required Future<Uint8List> Function(String url) fetch,
+  GatePass? pass,
 }) async {
-  final record = await backend.published(target);
+  final PublishedRecord? record;
+  if (pass != null) {
+    record = PublishedRecord.fromMap(pass.record);
+  } else {
+    record = await backend.published(target);
+    if (record != null && record.audience.gated) {
+      throw GateRequired(target.docPath);
+    }
+  }
   if (record == null) return null;
+  String resolve(String uri) => pass?.resolve(uri) ?? uri;
+  String urlOf(String path) =>
+      pass != null ? pass.fileUrl(path) : backend.publicUrl(path);
+  Future<Uint8List> get(String url) => fetch(resolve(url));
   Future<Map<String, Object?>> json(String url) async =>
-      (jsonDecode(utf8.decode(await fetch(url))) as Map)
-          .cast<String, Object?>();
+      (jsonDecode(utf8.decode(await get(url))) as Map).cast<String, Object?>();
   if (record.manifest.isNotEmpty) {
-    final manifest = await json(backend.publicUrl(record.manifest));
+    final manifest = await json(urlOf(record.manifest));
     final library = await json(manifest['library']! as String);
     return ChunkedPublishedStory(
-      ChunkedDocument.open(manifest, library),
-      fetch,
+      ChunkedDocument.open(manifest, _resolveAssets(library, resolve)),
+      get,
     );
   }
-  final loaded = ir.loadDocument(
-    utf8.decode(await fetch(backend.publicUrl(record.path))),
-  );
+  final loaded = ir.loadDocument(utf8.decode(await get(urlOf(record.path))));
   final doc = loaded.document;
-  return doc == null ? null : WholePublishedStory(doc);
+  if (doc == null) return null;
+  return WholePublishedStory(
+    doc.copyWith(
+      assets: {
+        for (final MapEntry(:key, value: a) in doc.assets.entries)
+          key: a.copyWith(uri: resolve(a.uri)),
+      },
+    ),
+  );
 }
 
 /// Loads the whole live document at [target], or null when nothing is
-/// published there. [fetch] gets bytes from a URL.
+/// published there or it is gated. [fetch] gets bytes from a URL.
 Future<ir.LoadResult?> loadPublished(
   PublishTarget target, {
   required CloudBackend backend,
   required Future<Uint8List> Function(String url) fetch,
 }) async {
   final record = await backend.published(target);
-  if (record == null) return null;
+  if (record == null || record.audience.gated) return null;
   final bytes = await fetch(backend.publicUrl(record.path));
   return ir.loadDocument(utf8.decode(bytes));
 }

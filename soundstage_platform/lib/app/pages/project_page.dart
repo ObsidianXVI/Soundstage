@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/gate.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart' as pub;
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
@@ -10,6 +11,7 @@ import 'cloud_ui.dart'
     show
         ensureCloudAccess,
         ensureHandle,
+        setGateFor,
         showPublishDialog,
         showPublishedDialog;
 import 'not_found_page.dart';
@@ -152,20 +154,34 @@ class ProjectActions {
     if (handle == null || !context.mounted) return;
     try {
       final existing = await cloud.backend.publicationOf(p.id);
+      final was = existing == null
+          ? null
+          : await cloud.backend.series(existing);
       if (!context.mounted) return;
       final origin = Uri.base.origin;
-      final slug = await showPublishDialog(
+      final choice = await showPublishDialog(
         context,
         title: p.title,
         suggested: existing?.slug ?? pub.slugFor(p.title),
         prefix: '$origin/@$handle/',
         note:
             'The publication lists the published issues of this project, '
-            'newest first. Publishing an issue updates it.',
+            'newest first. Publishing an issue updates it. Each issue has '
+            'its own readers.',
+        audience: was?.audience ?? pub.Audience.public,
         valid: pub.isValidPublication,
       );
-      if (slug == null || !context.mounted) return;
-      final at = pub.PublicationRef(handle, slug);
+      if (choice == null || !context.mounted) return;
+      final gate = ref.read(gateClientProvider);
+      if (choice.audience.gated && gate == null) {
+        SsToast.show(
+          context,
+          'Private audiences need the gate service in this build.',
+          kind: SsToastKind.danger,
+        );
+        return;
+      }
+      final at = pub.PublicationRef(handle, choice.slug);
       final stories = await _repo.list();
       final record = await pub.publishSeries(
         projectId: p.id,
@@ -176,7 +192,11 @@ class ProjectActions {
             if (s.projectId == p.id) s.id,
         ],
         backend: cloud.backend,
+        audience: choice.audience,
       );
+      final problem = choice.audience.gated
+          ? await setGateFor(gate!, cloud, at.docPath, choice)
+          : null;
       if (!context.mounted) return;
       await showPublishedDialog(
         context,
@@ -188,6 +208,7 @@ class ProjectActions {
           if (existing != null && existing != at)
             'Issues published under ${existing.route} stay there; publish '
                 'them again to move them here.',
+          ?problem,
         ],
         onOpen: () => context.go(at.route),
       );

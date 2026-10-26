@@ -2,7 +2,9 @@ rules_version = '2';
 
 // Soundstage Storage (m4.md T4.1), bucket <project>-media.
 //   users/{uid}/...                 an author's documents and media (private)
-//   published/{uid}/{slug}/...      frozen published versions (public read)
+//   published/{uid}/...             frozen published versions (public read)
+//   gated/{uid}/...                 password/readers versions: only the
+//                                   owner and the gate service read them
 // Writes need a verified email on the invite list (Firestore
 // config/invites, m7.md T7.1). Everything else is closed.
 service firebase.storage {
@@ -30,6 +32,11 @@ service firebase.storage {
 
     match /published/{uid}/{slug}/{allPaths=**} {
       allow read: if true;
+      allow write: if owns(uid) && invited() && sizeOk();
+    }
+
+    match /gated/{uid}/{allPaths=**} {
+      allow read: if owns(uid);
       allow write: if owns(uid) && invited() && sizeOk();
     }
 

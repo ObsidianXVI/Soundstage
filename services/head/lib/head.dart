@@ -123,9 +123,34 @@ String _text(Map<String, Object?> fields, String name) =>
 Map<String, Object?> _fields(Map<String, Object?> doc) =>
     (doc['fields'] as Map<String, Object?>?) ?? const {};
 
+/// The audience of a Firestore REST record (`public` when unset).
+String audienceOf(Map<String, Object?> doc) {
+  final a = _text(_fields(doc), 'audience');
+  return a.isEmpty ? 'public' : a;
+}
+
+/// Whether [audience] keeps the page private (password or readers).
+bool isGatedAudience(String audience) =>
+    audience == 'password' || audience == 'readers';
+
 /// The preview of [route] from its Firestore REST document [doc], shown at
-/// [url].
-StoryHead headFor(HeadRoute route, Map<String, Object?> doc, String url) =>
+/// [url]. Private pages show only whose they are; unlisted ones are not
+/// indexed.
+StoryHead headFor(HeadRoute route, Map<String, Object?> doc, String url) {
+  final audience = route is SiteRoute ? 'public' : audienceOf(doc);
+  if (isGatedAudience(audience)) {
+    return StoryHead(
+      title: '@${route.handle} on Soundstage',
+      description: 'A private page.',
+      url: url,
+      index: false,
+    );
+  }
+  final head = _headFor(route, doc, url);
+  return audience == 'unlisted' ? head.notIndexed() : head;
+}
+
+StoryHead _headFor(HeadRoute route, Map<String, Object?> doc, String url) =>
     switch (route) {
       SiteRoute(:final handle) => () {
         final name = _text(_fields(doc), 'name');
@@ -171,6 +196,7 @@ class StoryHead {
     required this.url,
     this.description = '',
     this.image = '',
+    this.index = true,
   });
 
   /// From a Firestore REST document (`published/{slug}`): fields are typed
@@ -196,6 +222,17 @@ class StoryHead {
   final String description;
   final String image;
   final String url;
+
+  /// Whether search engines may index the page.
+  final bool index;
+
+  StoryHead notIndexed() => StoryHead(
+    title: title,
+    description: description,
+    image: image,
+    url: url,
+    index: false,
+  );
 }
 
 const String siteName = 'Soundstage';
@@ -236,6 +273,7 @@ String injectHead(String html, StoryHead head) {
       ),
     )
     ..write('  <link rel="canonical" href="${escapeHtml(head.url)}">\n');
+  if (!head.index) tags.write(meta('name', 'robots', 'noindex'));
 
   var out = html.replaceFirst(
     RegExp(r'<title>[\s\S]*?</title>'),
@@ -252,21 +290,23 @@ String injectHead(String html, StoryHead head) {
 /// A published page in the sitemap: its path and when it last changed.
 typedef SitemapEntry = ({String path, String? lastModified});
 
-/// The entries of a Firestore REST `runQuery` reply (a list of
-/// `{"document": {...}}`; `updatedAt` is a timestamp value).
+/// The public entries of a Firestore REST `runQuery` reply (a list of
+/// `{"document": {...}}`; `updatedAt` is a timestamp value; unlisted and
+/// private pages are left out).
 List<SitemapEntry> sitemapEntries(Object? reply) {
   final rows = reply is List ? reply : const <Object?>[];
   return [
     for (final r in rows.whereType<Map<String, Object?>>())
       if (r['document'] case {'name': final String name} && final Map d)
         if (HeadRoute.fromDocumentName(name) case final route?)
-          (
-            path: route.path,
-            lastModified: switch (d['fields']) {
-              {'updatedAt': {'timestampValue': final String t}} => t,
-              _ => null,
-            },
-          ),
+          if (audienceOf(d.cast<String, Object?>()) == 'public')
+            (
+              path: route.path,
+              lastModified: switch (d['fields']) {
+                {'updatedAt': {'timestampValue': final String t}} => t,
+                _ => null,
+              },
+            ),
   ];
 }
 

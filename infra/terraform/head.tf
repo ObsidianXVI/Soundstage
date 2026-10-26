@@ -99,14 +99,50 @@ resource "google_project_iam_member" "builder_logs" {
 
 resource "google_service_account" "head" {
   account_id   = "soundstage-head"
-  display_name = "Soundstage link previews (reads published/{slug})"
+  display_name = "Soundstage link previews and reader gate"
   depends_on   = [google_project_service.apis]
 }
 
+# Reads records; writes gate secrets (gates/{id}, m7.md T7.4).
 resource "google_project_iam_member" "head_firestore" {
   project = var.project_id
-  role    = "roles/datastore.viewer"
+  role    = "roles/datastore.user"
   member  = google_service_account.head.member
+}
+
+# The gate streams gated files (Storage gated/…) to readers with a pass.
+resource "google_storage_bucket_iam_member" "head_media" {
+  bucket = google_storage_bucket.media.name
+  role   = "roles/storage.objectViewer"
+  member = google_service_account.head.member
+}
+
+# The key that signs readers' passes. Generated here, kept in Secret
+# Manager (and the private Terraform state), never in a file.
+resource "random_password" "gate_key" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret" "gate_key" {
+  secret_id = "soundstage-gate-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "gate_key" {
+  secret      = google_secret_manager_secret.gate_key.id
+  secret_data = random_password.gate_key.result
+}
+
+resource "google_secret_manager_secret_iam_member" "head_gate_key" {
+  secret_id = google_secret_manager_secret.gate_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.head.member
 }
 
 resource "google_cloud_run_v2_service" "head" {
@@ -116,8 +152,9 @@ resource "google_cloud_run_v2_service" "head" {
   deletion_protection = false
 
   template {
-    service_account                  = google_service_account.head.email
-    timeout                          = "10s"
+    service_account = google_service_account.head.email
+    # Previews answer in well under a second; gated video streams longer.
+    timeout                          = "300s"
     max_instance_request_concurrency = 80
 
     scaling {
@@ -145,10 +182,36 @@ resource "google_cloud_run_v2_service" "head" {
         name  = "PROJECT_ID"
         value = var.project_id
       }
+      env {
+        name  = "FIREBASE_API_KEY"
+        value = data.google_firebase_web_app_config.soundstage.api_key
+      }
+      env {
+        name  = "MEDIA_BUCKET"
+        value = google_storage_bucket.media.name
+      }
+      env {
+        name  = "ALLOWED_ORIGINS"
+        value = "https://${var.project_id}.web.app,https://${var.project_id}.firebaseapp.com"
+      }
+      env {
+        name = "GATE_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gate_key.secret_id
+            version = "latest"
+          }
+        }
+      }
     }
   }
 
-  depends_on = [google_project_iam_member.head_firestore]
+  depends_on = [
+    google_project_iam_member.head_firestore,
+    google_storage_bucket_iam_member.head_media,
+    google_secret_manager_secret_iam_member.head_gate_key,
+    google_secret_manager_secret_version.gate_key,
+  ]
 }
 
 # Hosting calls the service unauthenticated (required for Hosting rewrites).

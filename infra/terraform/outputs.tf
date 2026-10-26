@@ -12,6 +12,7 @@ output "firebase_web_config" {
     FIREBASE_STORAGE_BUCKET      = google_storage_bucket.media.name
     FIREBASE_MESSAGING_SENDER_ID = data.google_firebase_web_app_config.soundstage.messaging_sender_id
     AGENT_URL                    = google_cloud_run_v2_service.agent.uri
+    GATE_URL                     = google_cloud_run_v2_service.head.uri
   }
   sensitive = true
 }

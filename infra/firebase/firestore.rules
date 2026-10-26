@@ -8,7 +8,12 @@ rules_version = '2';
 //   sites/{handle}/drafts/{slug}                    a one-off story's record
 //   sites/{handle}/publications/{pub}               a project's publication
 //   sites/{handle}/publications/{pub}/issues/{slug} an issue's record
-//                       (public read; written by the handle's owner).
+//                       (written by the handle's owner; public and unlisted
+//                       ones readable by anyone, listed only when public,
+//                       password/readers ones only by the owner — readers
+//                       go through the gate service, m7.md T7.4).
+//   gates/{id}          a gated record's password hash or readers list;
+//                       only the gate service reads or writes it.
 //   config/invites      {emails: [...]}, kept by the admin in the console
 //                       (DECISIONS 26/10/26 "Invites"); never readable.
 //   members/{uid}       a probe: reading your own works only when invited.
@@ -100,15 +105,37 @@ service cloud.firestore {
         && request.resource.data.versions is list;
     }
 
+    function audience(data) {
+      return data.get('audience', 'public');
+    }
+
+    // Who may read a published record: anyone for public and unlisted
+    // work (lists only public), the owner for everything.
+    // (A missing record reads as not found.)
+    function readable() {
+      return resource == null
+        || audience(resource.data) in ['public', 'unlisted']
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // Queries must filter on audience (or ownerId) for the rules to prove
+    // this.
+    function listable() {
+      return resource.data.audience == 'public'
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
     match /sites/{handle}/drafts/{slug} {
-      allow read: if true;
+      allow get: if readable();
+      allow list: if listable();
       allow create: if createsStory(handle, slug);
       allow update: if updatesStory(handle);
       allow delete: if isOwner(resource.data);
     }
 
     match /sites/{handle}/publications/{pub} {
-      allow read: if true;
+      allow get: if readable();
+      allow list: if listable();
       allow create: if invited() && validSlug(pub) && pub != 's'
         && ownsHandle(handle)
         && isOwner(request.resource.data)
@@ -123,7 +150,8 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data);
 
       match /issues/{slug} {
-        allow read: if true;
+        allow get: if readable();
+        allow list: if listable();
         allow create: if createsStory(handle, slug);
         allow update: if updatesStory(handle);
         allow delete: if isOwner(resource.data);

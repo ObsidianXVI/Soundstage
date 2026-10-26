@@ -2,7 +2,8 @@
 #   firebase emulators:start --only auth,firestore,storage --project demo-soundstage
 #   python3 -I infra/firebase/checks/handles_rules_check.py
 import json, urllib.request, urllib.error, uuid
-P = 'demo-soundstage'
+import sys
+P = sys.argv[1] if len(sys.argv) > 1 else 'demo-soundstage'
 A = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1'
 ROOT = f'projects/{P}/databases/(default)/documents'
 F = f'http://127.0.0.1:8085/v1/{ROOT}'
@@ -45,9 +46,17 @@ def claim(uid, tok, handle):
     ]}, {'authorization': 'Bearer ' + tok})
 
 
-def record(uid, story, version=1):
+def record(uid, story, version=1, audience='public'):
     return {'fields': {'ownerId': s(uid), 'storyId': s(story), 'version': {'integerValue': str(version)},
-                       'path': s('p'), 'versions': {'arrayValue': {}}}}
+                       'path': s('p'), 'versions': {'arrayValue': {}}, 'audience': s(audience)}}
+
+
+def query(handle, tok=None, audience=None):
+    q = {'from': [{'collectionId': 'drafts'}]}
+    if audience:
+        q['where'] = {'fieldFilter': {'field': {'fieldPath': 'audience'}, 'op': 'EQUAL', 'value': s(audience)}}
+    return req('POST', f'{F}/sites/{handle}:runQuery', {'structuredQuery': q},
+               {'authorization': 'Bearer ' + tok} if tok else {})
 
 
 def put(path, tok, body):
@@ -56,7 +65,7 @@ def put(path, tok, body):
 
 tag = uuid.uuid4().hex[:6]
 emails = [f'a-{tag}@example.com', f'b-{tag}@example.com', f'c-{tag}@example.com']
-req('PATCH', f'{F}/config/invites', {'fields': {'emails': {'arrayValue': {'values': [s(e) for e in emails[:2]]}}}},
+req('PATCH', f'{F}/config/invites', {'fields': {'emails': {'arrayValue': {'values': [s(e) for e in emails[:2]] + [s('author@soundstage.test')]}}}},
     {'authorization': 'Bearer owner'})
 ua, ta = author(emails[0])
 ub, tb = author(emails[1])
@@ -80,6 +89,21 @@ checks = {
     'publish an issue': (put(f'sites/{ha}/publications/weekly/issues/one', ta, record(ua, 'i1')), 200),
     'read a draft signed out': (req('GET', f'{F}/sites/{ha}/drafts/walk'), 200),
     'read a handle signed out': (req('GET', f'{F}/handles/{ha}'), 200),
+    'publish an unlisted draft': (put(f'sites/{ha}/drafts/quiet', ta, record(ua, 's2', 1, 'unlisted')), 200),
+    'publish a password draft': (put(f'sites/{ha}/drafts/locked', ta, record(ua, 's3', 1, 'password')), 200),
+    'read an unlisted draft signed out': (req('GET', f'{F}/sites/{ha}/drafts/quiet'), 200),
+    'read a password draft signed out': (req('GET', f'{F}/sites/{ha}/drafts/locked'), 403),
+    'read a password draft as another author': (
+        req('GET', f'{F}/sites/{ha}/drafts/locked', headers={'authorization': 'Bearer ' + tb}), 403),
+    'read a password draft as its owner': (
+        req('GET', f'{F}/sites/{ha}/drafts/locked', headers={'authorization': 'Bearer ' + ta}), 200),
+    'read a missing draft signed out': (req('GET', f'{F}/sites/{ha}/drafts/nothing-here'), 404),
+    'read a missing draft as the owner': (
+        req('GET', f'{F}/sites/{ha}/drafts/nothing-here', headers={'authorization': 'Bearer ' + ta}), 404),
+    'list public drafts signed out': (query(ha, audience='public'), 200),
+    'list all drafts signed out': (query(ha), 403),
+    'read a gate secret as the owner': (
+        req('GET', f'{F}/gates/sites~{ha}~drafts~locked', headers={'authorization': 'Bearer ' + ta}), 403),
 }
 bad = 0
 for name, (got, want) in checks.items():

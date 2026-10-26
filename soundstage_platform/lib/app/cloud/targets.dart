@@ -55,6 +55,36 @@ String handleFor(String email) {
   return kReservedHandles.contains(s) ? '$s-1' : s;
 }
 
+/// Who can read a published story or publication (DECISIONS 26/10/26
+/// "Audiences", m7.md T7.4).
+enum Audience {
+  /// Anyone; listed on the handle's page and in the sitemap.
+  public('Public', 'Anyone can read it; it is listed on your page.'),
+
+  /// Anyone with the link; not listed, not indexed.
+  unlisted('Unlisted', 'Anyone with the link can read it; it is not listed.'),
+
+  /// Anyone with the password.
+  password('Password', 'Readers enter a password you choose.'),
+
+  /// Signed-in readers whose email is on your list.
+  readers('Readers', 'Readers sign in with an email on your list.');
+
+  const Audience(this.label, this.description);
+
+  final String label;
+  final String description;
+
+  /// Whether files are kept private and served through the gate.
+  bool get gated => this == password || this == readers;
+
+  static Audience parse(Object? name) =>
+      values.where((a) => a.name == name).firstOrNull ?? public;
+}
+
+/// The URI form of a gated Storage object (resolved by the reader's pass).
+const String kGatedScheme = 'gated:';
+
 /// A project's publication (`/@<handle>/<slug>`).
 class PublicationRef {
   const PublicationRef(this.handle, this.slug);
@@ -91,8 +121,9 @@ sealed class PublishTarget {
   /// The reader's route on the site.
   String get route;
 
-  /// The Storage folder of the author [uid]'s files for this story.
-  String storagePrefix(String uid);
+  /// The Storage folder of the author [uid]'s files for this story:
+  /// `published/…`, or `gated/…` for a [gated] audience.
+  String storagePrefix(String uid, {bool gated = false});
 
   /// The form kept in the story's metadata (`stories/{id}.published`).
   Map<String, Object?> toMap();
@@ -121,7 +152,8 @@ class DraftTarget extends PublishTarget {
   String get route => '/@$handle/s/$slug';
 
   @override
-  String storagePrefix(String uid) => 'published/$uid/$handle/s/$slug';
+  String storagePrefix(String uid, {bool gated = false}) =>
+      '${gated ? 'gated' : 'published'}/$uid/$handle/s/$slug';
 
   @override
   Map<String, Object?> toMap() => {'handle': handle, 'slug': slug};
@@ -147,8 +179,8 @@ class IssueTarget extends PublishTarget {
   String get route => '${publication.route}/$slug';
 
   @override
-  String storagePrefix(String uid) =>
-      'published/$uid/$handle/${publication.slug}/$slug';
+  String storagePrefix(String uid, {bool gated = false}) =>
+      '${gated ? 'gated' : 'published'}/$uid/$handle/${publication.slug}/$slug';
 
   @override
   Map<String, Object?> toMap() => {

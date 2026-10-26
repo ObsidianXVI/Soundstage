@@ -31,6 +31,14 @@ class FakeBackend implements CloudBackend {
     handles[uid!] = handle;
   }
 
+  final deleted = <String>[];
+
+  @override
+  Future<void> deleteFolder(String prefix) async {
+    deleted.add(prefix);
+    files.removeWhere((k, _) => k.startsWith('$prefix/'));
+  }
+
   @override
   Future<bool> exists(String path) async => files.containsKey(path);
 
@@ -532,5 +540,138 @@ void main() {
       jsonDecode(utf8.decode(b.files[b.records[_d('gaps').docPath]!.path]!)),
       isA<Map<String, Object?>>(),
     );
+  });
+
+  test('gated stories keep their files private and open with a pass', () async {
+    final b = FakeBackend('u1');
+    final r = await publishStory(
+      _doc(),
+      storyId: 'st',
+      target: _d('locked'),
+      backend: b,
+      bytesOf: _bytes,
+      audience: Audience.password,
+      cover: () async => Uint8List.fromList([9]),
+    );
+    final rec = b.records[_d('locked').docPath]!;
+    expect(rec.audience, Audience.password);
+    expect(rec.image, isEmpty, reason: 'no public cover');
+    expect(rec.path, 'gated/u1/ada/s/locked/v1.stage.json');
+    expect(b.files.keys.every((k) => k.startsWith('gated/')), isTrue);
+    expect(r.warnings, isEmpty);
+    final whole = utf8.decode(b.files[rec.path]!);
+    expect(whole, contains('gated:gated/u1/ada/s/locked/assets/'));
+    expect(whole, isNot(contains('cdn.test')));
+
+    // Without a pass, a reader is sent to the gate.
+    await expectLater(
+      openPublished(_d('locked'), backend: b, fetch: (u) async => b.fetch(u)),
+      throwsA(isA<GateRequired>()),
+    );
+    expect(
+      await loadPublished(
+        _d('locked'),
+        backend: b,
+        fetch: (u) async => b.fetch(u),
+      ),
+      isNull,
+    );
+
+    // With a pass, every URL goes through the gate's file route.
+    final pass = GatePass(
+      record: rec.toMap(),
+      token: 'tok',
+      baseUrl: 'https://gate.test',
+    );
+    final fetched = <String>[];
+    Future<Uint8List> fetch(String url) async {
+      fetched.add(url);
+      final path = Uri.decodeComponent(
+        url.substring('https://gate.test/gate/file/'.length, url.indexOf('?')),
+      );
+      return b.files[path]!;
+    }
+
+    final story =
+        await openPublished(_d('locked'), backend: b, fetch: fetch, pass: pass)
+            as ChunkedPublishedStory;
+    expect(
+      fetched.every((u) => u.startsWith('https://gate.test/gate/file/')),
+      isTrue,
+    );
+    expect(fetched.every((u) => u.endsWith('?t=tok')), isTrue);
+    final assets = story.chunked.document.assets;
+    expect(assets['img']!.uri, startsWith('https://gate.test/gate/file/'));
+    // Frame patterns keep their braces for the runtime.
+    expect(assets['seq']!.uri, contains('{0001}'));
+    expect(isFramePattern(assets['seq']!.uri), isTrue);
+    expect(await fetch(assets['img']!.uri), [1, 2, 3]);
+  });
+
+  test('crossing between public and private removes the other files', () async {
+    final b = FakeBackend('u1');
+    Future<PublishResult> go(Audience a) => publishStory(
+      _doc(),
+      storyId: 'st',
+      target: _d('walk'),
+      backend: b,
+      bytesOf: _bytes,
+      audience: a,
+    );
+    await go(Audience.public);
+    await go(Audience.unlisted); // same files, no move
+    expect(b.deleted, isEmpty);
+    expect(b.records[_d('walk').docPath]!.versions, hasLength(2));
+    final r = await go(Audience.readers);
+    expect(b.deleted, ['published/u1/ada/s/walk']);
+    expect(r.warnings.single, contains('public versions were removed'));
+    final rec = b.records[_d('walk').docPath]!;
+    expect(rec.version, 3, reason: 'numbering continues');
+    expect(rec.versions.map((v) => v.version), [3]);
+    expect(b.files.keys.where((k) => k.startsWith('published/')), isEmpty);
+    await go(Audience.public);
+    expect(b.deleted.last, 'gated/u1/ada/s/walk');
+  });
+
+  test('a publication lists public and private issues, not unlisted', () async {
+    final b = FakeBackend('u1');
+    const weekly = PublicationRef('ada', 'weekly');
+    for (final (id, slug, a) in [
+      ('i1', 'open', Audience.public),
+      ('i2', 'quiet', Audience.unlisted),
+      ('i3', 'paid', Audience.password),
+    ]) {
+      await publishStory(
+        _doc(),
+        storyId: id,
+        target: IssueTarget(weekly, slug),
+        backend: b,
+        bytesOf: _bytes,
+        audience: a,
+      );
+    }
+    final r = await publishSeries(
+      projectId: 'p',
+      title: 'Weekly',
+      ref: weekly,
+      issueIds: ['i3', 'i2', 'i1'],
+      backend: b,
+      audience: Audience.readers,
+    );
+    expect(r.issues.map((i) => (i.slug, i.gated)), [
+      ('paid', true),
+      ('open', false),
+    ]);
+    expect(r.audience, Audience.readers);
+    // The audience is kept when it is not given.
+    final again = await publishSeries(
+      projectId: 'p',
+      title: 'Weekly',
+      ref: weekly,
+      issueIds: const [],
+      backend: b,
+    );
+    expect(again.audience, Audience.readers);
+    expect(SeriesRecord.fromMap(r.toMap()).issues.first.gated, isTrue);
   });
 }

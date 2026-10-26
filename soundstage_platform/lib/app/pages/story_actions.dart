@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/gate.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/export/pdf_export.dart';
@@ -354,18 +355,33 @@ class StoryActions {
           slug,
         _ => '',
       };
+      final was = previous.isEmpty || before == null
+          ? null
+          : await cloud.backend.published(before);
       final suggested = previous.isNotEmpty
           ? previous
           : doc.meta.slug.isNotEmpty
           ? doc.meta.slug
           : slugFor(s.title);
-      final slug = await showPublishDialog(
+      if (!context.mounted) return;
+      final choice = await showPublishDialog(
         context,
         title: s.title,
         suggested: suggested,
         prefix: pub == null ? '$origin/@$handle/s/' : '$origin${pub.route}/',
+        audience: was?.audience ?? Audience.public,
+        published: was != null,
       );
-      if (slug == null) return;
+      if (choice == null) return;
+      final gate = ref.read(gateClientProvider);
+      if (choice.audience.gated && gate == null) {
+        _toast(
+          'Private audiences need the gate service in this build.',
+          SsToastKind.danger,
+        );
+        return;
+      }
+      final slug = choice.slug;
       final target = pub == null
           ? DraftTarget(handle, slug)
           : IssueTarget(pub, slug);
@@ -376,6 +392,7 @@ class StoryActions {
         target: target,
         backend: cloud.backend,
         bytesOf: (a) => db?.assetBytes(a) ?? Future.value(null),
+        audience: choice.audience,
         cover: doc.scenes.isEmpty
             ? null
             : () => renderStagePoster(
@@ -384,6 +401,11 @@ class StoryActions {
                 sceneId: doc.scenes.first.id,
               ),
       );
+      final warnings = [...result.warnings];
+      if (choice.audience.gated) {
+        final problem = await _setGate(cloud, target.docPath, choice);
+        if (problem != null) warnings.add(problem);
+      }
       // An issue's publication lists it.
       await refreshSeriesOf(s.id);
       // Remember the link in the story (the next publish suggests it).
@@ -398,7 +420,7 @@ class StoryActions {
         context,
         url: '$origin${result.path}',
         version: result.version,
-        warnings: result.warnings,
+        warnings: warnings,
         onOpen: () =>
             open != null ? open(result.path) : context.go(result.path),
       );
@@ -408,6 +430,9 @@ class StoryActions {
       _toast('Publishing failed: ${_describe(e)}', SsToastKind.danger);
     }
   }
+
+  Future<String?> _setGate(Cloud cloud, String docPath, PublishChoice choice) =>
+      setGateFor(ref.read(gateClientProvider)!, cloud, docPath, choice);
 
   /// Project [projectId]'s publication; asks for its link (and creates
   /// it, empty) the first time. Null when cancelled.
@@ -423,27 +448,39 @@ class StoryActions {
         .firstOrNull;
     final title = project?.title ?? 'Project';
     if (!context.mounted) return null;
-    final slug = await showPublishDialog(
+    final choice = await showPublishDialog(
       context,
       title: title,
       suggested: slugFor(title),
       prefix: '${Uri.base.origin}/@$handle/',
       note:
           'Issues of this project are published under this link, and it '
-          'lists them, newest first.',
+          'lists them, newest first. Each issue has its own readers.',
       action: 'Name the publication of',
       valid: isValidPublication,
     );
-    if (slug == null) return null;
-    final ref = PublicationRef(handle, slug);
+    if (choice == null) return null;
+    if (choice.audience.gated && ref.read(gateClientProvider) == null) {
+      _toast(
+        'Private audiences need the gate service in this build.',
+        SsToastKind.danger,
+      );
+      return null;
+    }
+    final at = PublicationRef(handle, choice.slug);
     await publishSeries(
       projectId: projectId,
       title: title,
-      ref: ref,
+      ref: at,
       issueIds: const [],
       backend: cloud.backend,
+      audience: choice.audience,
     );
-    return ref;
+    final problem = choice.audience.gated
+        ? await _setGate(cloud, at.docPath, choice)
+        : null;
+    if (problem != null) _toast(problem, SsToastKind.warning);
+    return at;
   }
 
   /// The published versions of [s] (DECISIONS 26/10/26 "Releases"),

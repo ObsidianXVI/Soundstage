@@ -211,8 +211,34 @@ class FirebaseCloudBackend implements CloudBackend {
   }
 
   @override
+  Future<void> deleteFolder(String prefix) async {
+    Future<void> clear(Reference folder) async {
+      final list = await folder.listAll();
+      for (final item in list.items) {
+        await item.delete();
+      }
+      for (final sub in list.prefixes) {
+        await clear(sub);
+      }
+    }
+
+    await clear(_cloud.storage.ref(prefix));
+  }
+
+  /// The document at [path]; a gated one (hidden by the rules from
+  /// everyone but its owner) throws [GateRequired].
+  Future<Map<String, Object?>?> _read(String path) async {
+    try {
+      return (await _db.doc(path).get()).data();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') throw GateRequired(path);
+      rethrow;
+    }
+  }
+
+  @override
   Future<PublishedRecord?> published(PublishTarget target) async {
-    final data = (await _db.doc(target.docPath).get()).data();
+    final data = await _read(target.docPath);
     return data == null ? null : PublishedRecord.fromMap(data);
   }
 
@@ -229,7 +255,7 @@ class FirebaseCloudBackend implements CloudBackend {
 
   @override
   Future<SeriesRecord?> series(PublicationRef ref) async {
-    final data = (await _db.doc(ref.docPath).get()).data();
+    final data = await _read(ref.docPath);
     return data == null ? null : SeriesRecord.fromMap(data);
   }
 
@@ -244,6 +270,7 @@ class FirebaseCloudBackend implements CloudBackend {
     if (h == null) return null;
     final q = await _db
         .collection('sites/$h/publications')
+        .where('ownerId', isEqualTo: uid)
         .where('projectId', isEqualTo: projectId)
         .limit(1)
         .get();
@@ -254,8 +281,13 @@ class FirebaseCloudBackend implements CloudBackend {
   Future<SiteListing?> site(String handle) async {
     final owner = (await _db.doc('handles/$handle').get()).data();
     if (owner == null) return null;
-    final pubs = await _db.collection('sites/$handle/publications').get();
-    final drafts = await _db.collection('sites/$handle/drafts').get();
+    // Only public work is listed (the rules allow no other list).
+    Future<QuerySnapshot<Map<String, Object?>>> listed(String c) => _db
+        .collection('sites/$handle/$c')
+        .where('audience', isEqualTo: Audience.public.name)
+        .get();
+    final pubs = await listed('publications');
+    final drafts = await listed('drafts');
     return SiteListing(
       handle: handle,
       name: (owner['name'] as String?) ?? '',

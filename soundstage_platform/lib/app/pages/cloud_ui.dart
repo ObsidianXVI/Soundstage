@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
+import 'package:soundstage_platform/app/cloud/gate.dart';
 import 'package:soundstage_platform/app/cloud/publish.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 
@@ -430,19 +431,73 @@ class _HandleDialogState extends State<_HandleDialog> {
   }
 }
 
-/// Asks for the published link of a story or publication: [suggested] is
-/// prefilled after [prefix] (the link up to the slug). [valid] checks the
-/// slug (default [isValidSlug]). Returns the chosen slug, or null when
-/// cancelled.
-Future<String?> showPublishDialog(
+/// What the author chose in the publish dialog.
+class PublishChoice {
+  const PublishChoice({
+    required this.slug,
+    this.audience = Audience.public,
+    this.password,
+    this.readers,
+  });
+
+  final String slug;
+  final Audience audience;
+
+  /// A new password (password audience), or null to keep the current one.
+  final String? password;
+
+  /// A new readers list (readers audience), or null to keep the current
+  /// one.
+  final List<String>? readers;
+}
+
+final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+$');
+
+/// The emails in [text] (separated by commas, spaces or lines), lowercase.
+List<String> parseReaders(String text) => {
+  for (final e in text.split(RegExp(r'[\s,;]+')))
+    if (e.trim().isNotEmpty) e.trim().toLowerCase(),
+}.toList();
+
+/// Stores [choice]'s password or readers for record [docPath] with the
+/// gate; a warning when it fails (null when done or nothing changed).
+Future<String?> setGateFor(
+  GateClient gate,
+  Cloud cloud,
+  String docPath,
+  PublishChoice choice,
+) async {
+  if (choice.password == null && choice.readers == null) return null;
+  try {
+    final token = await cloud.auth.currentUser?.getIdToken();
+    if (token == null) return 'Sign in again to set who can read it.';
+    await gate.setSecret(
+      docPath,
+      idToken: token,
+      password: choice.password,
+      readers: choice.readers,
+    );
+    return null;
+  } on Object catch (e) {
+    return 'Readers cannot open it yet: $e. Publish again to retry.';
+  }
+}
+
+/// Asks for the published link of a story or publication and who can read
+/// it (m7.md T7.4): [suggested] is prefilled after [prefix] (the link up
+/// to the slug); [audience] is the current audience. [valid] checks the
+/// slug (default [isValidSlug]). Null when cancelled.
+Future<PublishChoice?> showPublishDialog(
   BuildContext context, {
   required String title,
   required String suggested,
   required String prefix,
   String? note,
   String action = 'Publish',
+  Audience audience = Audience.public,
+  bool published = false,
   bool Function(String slug) valid = isValidSlug,
-}) => showSsDialog<String>(
+}) => showSsDialog<PublishChoice>(
   context,
   builder: (ctx) => _PublishDialog(
     title: title,
@@ -450,6 +505,8 @@ Future<String?> showPublishDialog(
     prefix: prefix,
     note: note,
     action: action,
+    current: audience,
+    published: published,
     valid: valid,
   ),
 );
@@ -460,6 +517,8 @@ class _PublishDialog extends StatefulWidget {
     required this.suggested,
     required this.prefix,
     required this.action,
+    required this.current,
+    required this.published,
     required this.valid,
     this.note,
   });
@@ -469,6 +528,11 @@ class _PublishDialog extends StatefulWidget {
   final String prefix;
   final String? note;
   final String action;
+  final Audience current;
+
+  /// Whether earlier versions exist (crossing public ↔ private removes
+  /// them).
+  final bool published;
   final bool Function(String slug) valid;
 
   @override
@@ -477,19 +541,55 @@ class _PublishDialog extends StatefulWidget {
 
 class _PublishDialogState extends State<_PublishDialog> {
   late final _slug = TextEditingController(text: widget.suggested);
+  final _password = TextEditingController();
+  final _readers = TextEditingController();
+  late Audience _audience = widget.current;
 
   @override
   void dispose() {
     _slug.dispose();
+    _password.dispose();
+    _readers.dispose();
     super.dispose();
   }
 
-  void _submit() {
-    if (widget.valid(_slug.text.trim())) {
-      Navigator.of(context).pop(_slug.text.trim());
-    } else {
-      setState(() {});
+  /// Why the audience settings cannot be used yet, or null.
+  String? get _audienceProblem {
+    switch (_audience) {
+      case Audience.password:
+        final p = _password.text;
+        if (p.isEmpty && widget.current == Audience.password) return null;
+        return p.length < 4 ? 'Use at least 4 characters' : null;
+      case Audience.readers:
+        final list = parseReaders(_readers.text);
+        if (list.isEmpty && widget.current == Audience.readers) return null;
+        if (list.isEmpty) return 'Add at least one email';
+        final bad = list.where((e) => !_emailPattern.hasMatch(e)).firstOrNull;
+        return bad == null ? null : '"$bad" is not an email';
+      case Audience.public || Audience.unlisted:
+        return null;
     }
+  }
+
+  void _submit() {
+    final slug = _slug.text.trim();
+    if (!widget.valid(slug) || _audienceProblem != null) {
+      setState(() {});
+      return;
+    }
+    final readers = parseReaders(_readers.text);
+    Navigator.of(context).pop(
+      PublishChoice(
+        slug: slug,
+        audience: _audience,
+        password: _audience == Audience.password && _password.text.isNotEmpty
+            ? _password.text
+            : null,
+        readers: _audience == Audience.readers && readers.isNotEmpty
+            ? readers
+            : null,
+      ),
+    );
   }
 
   @override
@@ -497,17 +597,18 @@ class _PublishDialogState extends State<_PublishDialog> {
     final t = context.ss;
     final slug = _slug.text.trim();
     final valid = widget.valid(slug);
+    final problem = _audienceProblem;
+    final crossing =
+        widget.published && widget.current.gated != _audience.gated;
     return SsDialog(
       title: '${widget.action} "${widget.title}"',
-      width: 440,
+      width: 460,
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            widget.note ??
-                'Anyone with the link can read the published version. '
-                    'Publishing again adds a version and makes it live.',
+            widget.note ?? 'Publishing again adds a version and makes it live.',
             style: t.text.small.copyWith(color: t.colors.textSecondary),
           ),
           const SizedBox(height: SsSpace.s3),
@@ -524,6 +625,64 @@ class _PublishDialogState extends State<_PublishDialog> {
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _submit(),
           ),
+          const SizedBox(height: SsSpace.s4),
+          Text('WHO CAN READ IT', style: t.text.overline),
+          const SizedBox(height: SsSpace.s2),
+          SsSegmented<Audience>(
+            key: const ValueKey<String>('publish:audience'),
+            semanticLabel: 'Who can read it',
+            expand: true,
+            segments: [
+              for (final a in Audience.values)
+                SsSegment(value: a, label: a.label),
+            ],
+            selected: _audience,
+            onChanged: (a) => setState(() => _audience = a),
+          ),
+          const SizedBox(height: SsSpace.s2),
+          Text(
+            _audience.description,
+            style: t.text.small.copyWith(color: t.colors.textSecondary),
+          ),
+          if (_audience == Audience.password) ...[
+            const SizedBox(height: SsSpace.s2),
+            SsTextField(
+              key: const ValueKey<String>('publish:password'),
+              controller: _password,
+              obscureText: true,
+              semanticLabel: 'Password',
+              placeholder: widget.current == Audience.password
+                  ? 'New password (empty keeps the current one)'
+                  : 'Password',
+              autofillHints: const [AutofillHints.newPassword],
+              errorText: _password.text.isEmpty ? null : problem,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+          if (_audience == Audience.readers) ...[
+            const SizedBox(height: SsSpace.s2),
+            SsTextField(
+              key: const ValueKey<String>('publish:readers'),
+              controller: _readers,
+              maxLines: 4,
+              semanticLabel: 'Readers',
+              placeholder: widget.current == Audience.readers
+                  ? 'Emails, one per line (empty keeps the current list)'
+                  : 'Emails, one per line',
+              errorText: _readers.text.isEmpty ? null : problem,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+          if (crossing) ...[
+            const SizedBox(height: SsSpace.s2),
+            Text(
+              _audience.gated
+                  ? 'Earlier public versions are removed, so only your '
+                        'readers can open it.'
+                  : 'Earlier private versions are removed.',
+              style: t.text.small.copyWith(color: t.colors.warning),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -532,7 +691,7 @@ class _PublishDialogState extends State<_PublishDialog> {
           key: const ValueKey<String>('publish:submit'),
           label: widget.action,
           variant: SsButtonVariant.primary,
-          onPressed: valid ? _submit : null,
+          onPressed: valid && problem == null ? _submit : null,
         ),
       ],
     );

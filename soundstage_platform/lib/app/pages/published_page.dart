@@ -8,10 +8,11 @@ import 'package:soundstage_platform/app/sound_demo.dart';
 import 'package:soundstage_platform/runtime/runtime.dart'
     show StageAssetResolver, StageTier;
 
+import 'gate_panel.dart';
 import 'not_found_page.dart';
 
 /// The published story at a target (null: nothing published there, or a
-/// local-only build).
+/// local-only build). A gated story throws [GateRequired].
 final publishedStoryProvider = FutureProvider.autoDispose
     .family<PublishedStory?, PublishTarget>((ref, target) async {
       final cloud = ref.watch(cloudProvider);
@@ -21,13 +22,14 @@ final publishedStoryProvider = FutureProvider.autoDispose
         backend: cloud.backend,
         fetch: StageAssetResolver().load,
       );
-    });
+    }, retry: retryUnlessGated);
 
 /// `/@<handle>/s/:slug` or `/@<handle>/<pub>/:issue`: a published story
-/// (m4.md T4.2, m7.md T7.2) in the player behind the enter gate. Anyone
-/// can open it; the document and assets are public. `?tier=lite|static`
-/// plays the reduced tiers (m4.md T4.6).
-class PublishedPage extends ConsumerWidget {
+/// (m4.md T4.2, m7.md T7.2) in the player behind the enter gate. Public
+/// and unlisted stories open directly; password and readers-only ones
+/// behind the [GatePanel] (m7.md T7.4). `?tier=lite|static` plays the
+/// reduced tiers (m4.md T4.6).
+class PublishedPage extends ConsumerStatefulWidget {
   const PublishedPage({
     required this.target,
     this.tier = StageTier.full,
@@ -38,20 +40,59 @@ class PublishedPage extends ConsumerWidget {
   final StageTier tier;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      switch (ref.watch(publishedStoryProvider(target))) {
-        AsyncData(value: WholePublishedStory(:final document)) => Scaffold(
-          body: GatedStagePlayer(document: document, tier: tier),
-        ),
-        AsyncData(value: final ChunkedPublishedStory story) => Scaffold(
-          body: ChunkedStoryPlayer(story: story, tier: tier),
-        ),
-        AsyncData() => const NotFoundPage(message: 'Story not found'),
-        AsyncError(:final error) => NotFoundPage(
-          message: 'Could not open the story: $error',
-        ),
-        _ => const Scaffold(body: SizedBox.shrink()),
-      };
+  ConsumerState<PublishedPage> createState() => _PublishedPageState();
+}
+
+class _PublishedPageState extends ConsumerState<PublishedPage> {
+  /// The gated story, once the reader has a pass.
+  Future<PublishedStory?>? _gated;
+
+  void _open(GatePass pass) {
+    final cloud = ref.read(cloudProvider);
+    if (cloud == null) return;
+    setState(() {
+      _gated = openPublished(
+        widget.target,
+        backend: cloud.backend,
+        fetch: StageAssetResolver().load,
+        pass: pass,
+      );
+    });
+  }
+
+  Widget _story(PublishedStory? story) => switch (story) {
+    WholePublishedStory(:final document) => Scaffold(
+      body: GatedStagePlayer(document: document, tier: widget.tier),
+    ),
+    final ChunkedPublishedStory story => Scaffold(
+      body: ChunkedStoryPlayer(story: story, tier: widget.tier),
+    ),
+    null => const NotFoundPage(message: 'Story not found'),
+  };
+
+  Widget _failed(Object error) => error is GateRequired
+      ? GatePanel(docPath: error.docPath, onPass: _open)
+      : NotFoundPage(message: 'Could not open the story: $error');
+
+  @override
+  Widget build(BuildContext context) {
+    final gated = _gated;
+    if (gated != null) {
+      return FutureBuilder<PublishedStory?>(
+        future: gated,
+        builder: (context, snap) => snap.hasError
+            ? _failed(snap.error!)
+            : snap.connectionState == ConnectionState.done
+            ? _story(snap.data)
+            : const Scaffold(body: SizedBox.shrink()),
+      );
+    }
+    return switch (ref.watch(publishedStoryProvider(widget.target))) {
+      AsyncData(:final value) => _story(value),
+      AsyncError(:final error) => _failed(unwrapProviderError(error)),
+      _ => const Scaffold(body: SizedBox.shrink()),
+    };
+  }
 }
 
 /// A chunked published story (architecture §17.3, m4.md T4.4): the first

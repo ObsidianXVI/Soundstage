@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:soundstage_head/gate.dart';
 import 'package:soundstage_head/head.dart';
 import 'package:test/test.dart';
 
@@ -168,5 +172,116 @@ void main() {
       },
     }, 'u');
     expect(story.title, 'Night');
+  });
+
+  test('private pages preview as their handle only; unlisted not indexed', () {
+    Map<String, Object?> doc(String audience) => {
+      'fields': {
+        'title': {'stringValue': 'Secret'},
+        'image': {'stringValue': 'https://cdn/c.png'},
+        'audience': {'stringValue': audience},
+      },
+    };
+    final gated = headFor(const DraftRoute('ada', 'x'), doc('password'), 'u');
+    expect(gated.title, '@ada on Soundstage');
+    expect(gated.image, isEmpty);
+    expect(injectHead(_shell, gated), contains('content="noindex"'));
+    final unlisted = headFor(
+      const DraftRoute('ada', 'x'),
+      doc('unlisted'),
+      'u',
+    );
+    expect(unlisted.title, 'Secret');
+    expect(injectHead(_shell, unlisted), contains('content="noindex"'));
+    final public = headFor(const DraftRoute('ada', 'x'), doc('public'), 'u');
+    expect(injectHead(_shell, public), isNot(contains('noindex')));
+    const root = 'projects/p/databases/(default)/documents';
+    final entries = sitemapEntries([
+      for (final (slug, a) in [
+        ('a', 'public'),
+        ('b', 'unlisted'),
+        ('c', 'readers'),
+      ])
+        {
+          'document': {
+            'name': '$root/sites/ada/drafts/$slug',
+            'fields': {
+              'audience': {'stringValue': a},
+            },
+          },
+        },
+      {
+        'document': {'name': '$root/sites/ada/drafts/old'},
+      },
+    ]);
+    expect(entries.map((e) => e.path), ['/@ada/s/a', '/@ada/s/old']);
+  });
+
+  test('PBKDF2-HMAC-SHA256 matches RFC 7914', () {
+    final out = pbkdf2('passwd', utf8.encode('salt'), 1);
+    expect(
+      out.map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      '55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc',
+    );
+    final secret = passwordSecret('open sesame', random: Random(1));
+    expect(passwordMatches('open sesame', secret), isTrue);
+    expect(passwordMatches('open sesame ', secret), isFalse);
+    expect(passwordMatches('x', const {}), isFalse);
+  });
+
+  test('passes cover their folder until they expire', () {
+    final key = utf8.encode('k' * 32);
+    final now = DateTime.utc(2026, 10, 26, 12);
+    const folder = 'gated/u1/ada/s/walk';
+    final pass = signPass(key, folder, now.add(kPassLifetime));
+    expect(passCovers(key, pass, '$folder/v1.manifest.json', now), isTrue);
+    expect(passCovers(key, pass, '$folder/assets/a_{0001}.webp', now), isTrue);
+    expect(passCovers(key, pass, 'gated/u1/ada/s/walker/x', now), isFalse);
+    expect(passCovers(key, pass, '$folder/../other/x', now), isFalse);
+    expect(
+      passCovers(key, pass, '$folder/x', now.add(const Duration(hours: 7))),
+      isFalse,
+    );
+    expect(passCovers(utf8.encode('other'), pass, '$folder/x', now), isFalse);
+    final forged = '${pass.substring(0, pass.indexOf('.'))}.AAAA';
+    expect(passCovers(key, forged, '$folder/x', now), isFalse);
+    expect(passCovers(key, 'nonsense', '$folder/x', now), isFalse);
+  });
+
+  test('records, secrets and readers', () {
+    expect(gateIdFor('sites/ada/drafts/x'), 'sites~ada~drafts~x');
+    expect(routeOfDocPath('sites/ada/drafts/x'), isA<DraftRoute>());
+    expect(
+      routeOfDocPath('sites/ada/publications/w/issues/1'),
+      isA<IssueRoute>(),
+    );
+    expect(routeOfDocPath('gates/x'), isNull);
+    expect(routeOfDocPath('sites/ada/drafts/x/y'), isNull);
+    expect(
+      gatedFolderOf({'path': 'gated/u1/ada/s/walk/v2.stage.json'}),
+      'gated/u1/ada/s/walk',
+    );
+    expect(
+      gatedFolderOf({'path': 'published/u1/ada/s/walk/v2.stage.json'}),
+      isNull,
+    );
+    expect(readersFrom([' A@x.org ', 'a@x.org', '', 'b@y.z']), [
+      'a@x.org',
+      'b@y.z',
+    ]);
+    expect(readersFrom(['nope']), isNull);
+    expect(readersFrom('a@x.org'), isNull);
+    final record = {
+      'title': 'T',
+      'version': 3,
+      'versions': [
+        {'version': 1, 'gated': true},
+      ],
+      'none': null,
+    };
+    final typed = {
+      'fields': (typedValue(record)! as Map)['mapValue']['fields'],
+    };
+    expect(plainFields(typed), record);
   });
 }
