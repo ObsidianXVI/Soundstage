@@ -234,8 +234,8 @@ class EditorToolbar extends ConsumerWidget {
             ),
             const _Divider(),
           ],
-          // Narrow windows: ? still opens the shortcut list.
-          if (!compact)
+          // Below 1600 px: ? still opens the shortcut list.
+          if (windowWidth >= 1600)
             SsIconButton(
               icon: SsIcons.keyboard,
               semanticLabel: 'Keyboard shortcuts',
@@ -276,6 +276,14 @@ class EditorToolbar extends ConsumerWidget {
                 onPressed: onPreview,
               ),
           ],
+          const SizedBox(width: SsSpace.s1),
+          SsIconButton(
+            key: const ValueKey<String>('toolbar-agent'),
+            icon: SsIcons.sparkles,
+            semanticLabel: 'Agent',
+            selected: layout.agentOpen,
+            onPressed: notifier.toggleAgent,
+          ),
           if (onPublish != null) ...[
             const SizedBox(width: SsSpace.s1),
             if (compact)

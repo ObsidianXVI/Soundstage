@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:soundstage_platform/design_system/design_system.dart';
 import 'package:soundstage_platform/ir/ir.dart' as ir;
 
+import '../agent/agent_panel.dart';
+import '../agent/agent_transport.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/editor_canvas.dart';
 import '../clipboard/clipboard_actions.dart';
@@ -55,6 +57,8 @@ class EditorShell extends StatelessWidget {
     this.onOpenPreviewInNewTab,
     this.onPublish,
     this.publishActions = const [],
+    this.agentTransport,
+    this.onAgentSettings,
     super.key,
   });
 
@@ -95,6 +99,13 @@ class EditorShell extends StatelessWidget {
   /// The Publish mode's export actions, supplied by the app.
   final List<EditorPublishAction> publishActions;
 
+  /// The agent's model access (the app's agent service); null: the Agent
+  /// panel explains what it needs.
+  final AgentTransport? agentTransport;
+
+  /// Opens the app's Agent settings (keys and models).
+  final VoidCallback? onAgentSettings;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -104,6 +115,8 @@ class EditorShell extends StatelessWidget {
           editorAssetServiceProvider.overrideWithValue(service),
         if (filePicker case final picker?)
           editorFilePickerProvider.overrideWithValue(picker),
+        agentTransportProvider.overrideWithValue(agentTransport),
+        agentSettingsProvider.overrideWithValue(onAgentSettings),
       ],
       child: _EditorScope(
         onBack: onBack,
@@ -361,23 +374,28 @@ class _DockedEditor extends ConsumerWidget {
                   onPublish: onPublish,
                 ),
                 Expanded(
-                  child: switch (layout.mode) {
-                    EditorMode.writing => PreviewSplit(
-                      canvas: const WritingView(),
-                      onOpenInNewTab: onOpenPreviewInNewTab,
-                    ),
-                    EditorMode.publish => PublishView(
-                      onPublish: onPublishDocument,
-                      actions: publishActions,
-                      onOpenInNewTab: onOpenPreviewInNewTab,
-                    ),
-                    EditorMode.design || EditorMode.animation => _canvasArea(
-                      layout: layout,
-                      notifier: notifier,
-                      leftW: leftW.toDouble(),
-                      rightW: rightW.toDouble(),
-                    ),
-                  },
+                  child: _withAgent(
+                    layout: layout,
+                    notifier: notifier,
+                    width: rightW.toDouble(),
+                    child: switch (layout.mode) {
+                      EditorMode.writing => PreviewSplit(
+                        canvas: const WritingView(),
+                        onOpenInNewTab: onOpenPreviewInNewTab,
+                      ),
+                      EditorMode.publish => PublishView(
+                        onPublish: onPublishDocument,
+                        actions: publishActions,
+                        onOpenInNewTab: onOpenPreviewInNewTab,
+                      ),
+                      EditorMode.design || EditorMode.animation => _canvasArea(
+                        layout: layout,
+                        notifier: notifier,
+                        leftW: leftW.toDouble(),
+                        rightW: rightW.toDouble(),
+                      ),
+                    },
+                  ),
                 ),
                 if (layout.mode == EditorMode.design ||
                     layout.mode == EditorMode.animation)
@@ -395,6 +413,29 @@ class _DockedEditor extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// The Agent panel beside [child] in Write and Publish; in Design and
+  /// Animate it takes the inspector's place (see [_canvasArea]).
+  Widget _withAgent({
+    required EditorLayoutState layout,
+    required EditorLayoutNotifier notifier,
+    required double width,
+    required Widget child,
+  }) {
+    final onCanvas =
+        layout.mode == EditorMode.design || layout.mode == EditorMode.animation;
+    if (!layout.agentOpen || onCanvas) return child;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: child),
+        SizedBox(
+          width: width,
+          child: AgentPanel(onClose: notifier.toggleAgent),
+        ),
+      ],
     );
   }
 
@@ -419,13 +460,18 @@ class _DockedEditor extends ConsumerWidget {
           onOpenInNewTab: onOpenPreviewInNewTab,
         ),
       ),
-      if (layout.rightOpen) ...[
+      if (layout.rightOpen || layout.agentOpen) ...[
         ResizeHandle(
           semanticLabel: 'Resize inspector',
           onDelta: (d) => notifier.setRightWidth(rightW - d, available: width),
           onReset: () => notifier.setRightWidth(288),
         ),
-        SizedBox(width: rightW, child: const Inspector()),
+        SizedBox(
+          width: rightW,
+          child: layout.agentOpen
+              ? AgentPanel(onClose: notifier.toggleAgent)
+              : const Inspector(),
+        ),
       ],
     ],
   );

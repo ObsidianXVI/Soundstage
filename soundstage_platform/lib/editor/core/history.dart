@@ -121,6 +121,28 @@ class History {
     if (_undo.length > cap) _undo.removeAt(0);
   }
 
+  /// Merges every entry recorded after the undo stack was [depth] deep into
+  /// one entry labelled [label] (an agent run is one undo step, m6.md).
+  /// Returns whether anything was merged.
+  bool squashSince(int depth, String label) {
+    if (depth < 0 || _undo.length - depth < 1) return false;
+    final first = _undo[depth];
+    final last = _undo.last;
+    _undo
+      ..removeRange(depth, _undo.length)
+      ..add(
+        HistoryEntry(
+          label: label,
+          before: first.before,
+          after: last.after,
+          coalesceKey: null,
+          gesture: null,
+        ),
+      );
+    _gesture = null;
+    return true;
+  }
+
   /// Steps back; returns the state to restore, or null.
   HistorySnapshot? undo() {
     if (_undo.isEmpty) return null;

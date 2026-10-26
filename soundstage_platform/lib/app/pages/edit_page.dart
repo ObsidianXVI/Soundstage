@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:soundstage_platform/app/agent/agent_settings.dart';
 import 'package:soundstage_platform/app/cloud/cloud.dart';
 import 'package:soundstage_platform/app/data/story_repository.dart';
 import 'package:soundstage_platform/app/export/static_export.dart'
@@ -99,6 +100,10 @@ class _EditPageState extends ConsumerState<EditPage> {
           },
           onSave: () => unawaited(autosave.flush()),
           publishActions: _exportActions(autosave),
+          agentTransport: ref.watch(agentClientProvider),
+          onAgentSettings: ref.watch(cloudProvider) == null
+              ? null
+              : () => showAgentSettings(context, ref),
           onPublish: ref.watch(cloudProvider) == null
               ? null
               : (doc) async {

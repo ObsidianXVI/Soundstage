@@ -134,6 +134,7 @@ abstract final class SsIcons {
   static const IconData indent = IconData(0xe108, fontFamily: fontFamily);
   static const IconData info = IconData(0xe0f9, fontFamily: fontFamily);
   static const IconData italic = IconData(0xe0fb, fontFamily: fontFamily);
+  static const IconData keyRound = IconData(0xe4a3, fontFamily: fontFamily);
   static const IconData keyboard = IconData(0xe284, fontFamily: fontFamily);
   static const IconData layers = IconData(0xe529, fontFamily: fontFamily);
   static const IconData layoutTemplate = IconData(
@@ -180,6 +181,7 @@ abstract final class SsIcons {
   static const IconData scaling = IconData(0xe2ec, fontFamily: fontFamily);
   static const IconData scan = IconData(0xe257, fontFamily: fontFamily);
   static const IconData search = IconData(0xe151, fontFamily: fontFamily);
+  static const IconData send = IconData(0xe152, fontFamily: fontFamily);
   static const IconData settings = IconData(0xe154, fontFamily: fontFamily);
   static const IconData shrink = IconData(0xe220, fontFamily: fontFamily);
   static const IconData slidersHorizontal = IconData(
@@ -187,6 +189,7 @@ abstract final class SsIcons {
     fontFamily: fontFamily,
   );
   static const IconData smartphone = IconData(0xe163, fontFamily: fontFamily);
+  static const IconData sparkles = IconData(0xe412, fontFamily: fontFamily);
   static const IconData square = IconData(0xe167, fontFamily: fontFamily);
   static const IconData squareDashed = IconData(0xe1cb, fontFamily: fontFamily);
   static const IconData squareRoundCorner = IconData(

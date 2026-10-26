@@ -210,6 +210,15 @@ class EditorController extends Notifier<EditorState> {
   /// Redoes the last undone entry. Returns false when there is none.
   bool redo() => _restore(history.redo());
 
+  /// Merges the undo entries recorded since the stack was [depth] deep
+  /// (`history.undoDepth` before a multi-step change) into one, labelled
+  /// [label]: an agent run undoes in one step (m6.md T6.3).
+  void squashHistorySince(int depth, String label) {
+    if (history.squashSince(depth, label)) {
+      state = state.copyWith(history: _status());
+    }
+  }
+
   /// Starts a continuous gesture (drag, scrub, typing): commands with the
   /// same coalescing key until [endGesture] become one undo entry.
   void beginGesture() => history.beginGesture();

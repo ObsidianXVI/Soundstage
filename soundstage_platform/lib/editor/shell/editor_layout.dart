@@ -61,6 +61,7 @@ class EditorLayoutState {
     this.timelineHeight = kTimelineDefaultHeight,
     this.leftTab = LeftPanelTab.scenes,
     this.mode = EditorMode.design,
+    this.agentOpen = false,
   });
 
   final double leftWidth;
@@ -74,6 +75,9 @@ class EditorLayoutState {
   final LeftPanelTab leftTab;
   final EditorMode mode;
 
+  /// The Agent panel shows (in every mode; m6.md T6.4).
+  final bool agentOpen;
+
   /// Whether the timeline shows (always in Animation mode).
   bool get showsTimeline => mode == EditorMode.animation || timelineOpen;
 
@@ -86,6 +90,7 @@ class EditorLayoutState {
     double? timelineHeight,
     LeftPanelTab? leftTab,
     EditorMode? mode,
+    bool? agentOpen,
   }) => EditorLayoutState(
     leftWidth: leftWidth ?? this.leftWidth,
     rightWidth: rightWidth ?? this.rightWidth,
@@ -95,6 +100,7 @@ class EditorLayoutState {
     timelineHeight: timelineHeight ?? this.timelineHeight,
     leftTab: leftTab ?? this.leftTab,
     mode: mode ?? this.mode,
+    agentOpen: agentOpen ?? this.agentOpen,
   );
 }
 
@@ -139,6 +145,7 @@ class EditorLayoutNotifier extends Notifier<EditorLayoutState> {
       ? state.copyWith(mode: EditorMode.design, timelineOpen: false)
       : state.copyWith(timelineOpen: !state.timelineOpen);
   void setMode(EditorMode mode) => state = state.copyWith(mode: mode);
+  void toggleAgent() => state = state.copyWith(agentOpen: !state.agentOpen);
   void setLeftTab(LeftPanelTab t) => state = state.copyWith(leftTab: t);
 
   /// The expanded timeline's height, clamped (see [clampTimelineHeight]
